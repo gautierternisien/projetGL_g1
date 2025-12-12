@@ -1,11 +1,88 @@
 <template>
-  <RouterView />
+  <div class="app-container">
+    <RouterView />
+  </div>
+
+  <nav class="bottom-nav">
+    <RouterLink to="/" class="nav-item">
+      <span>📊</span>
+    </RouterLink>
+
+    <RouterLink to="/questionnaires" class="nav-item">
+      <span>📝</span>
+    </RouterLink>
+
+    <RouterLink to="/missions" class="nav-item">
+      <span>🎯</span>
+    </RouterLink>
+
+    <RouterLink to="/community" class="nav-item">
+      <span>👥</span>
+    </RouterLink>
+
+    <RouterLink to="/tips" class="nav-item">
+      <span>💡</span>
+    </RouterLink>
+  </nav>
 </template>
 
 <script setup lang="ts">
-import { RouterView } from 'vue-router'
+import { RouterView, RouterLink } from 'vue-router'
 </script>
 
 <style scoped>
-/* Styles globaux spécifiques à l'App si besoin */
+.app-container {
+  /* On laisse plus d'espace en bas pour que le contenu ne soit pas caché par la nav flottante */
+  padding-bottom: 100px;
+}
+
+.bottom-nav {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+
+  /* Largeur adaptative (max 350px pour ressembler à l'image) */
+  width: 90%;
+  max-width: 350px;
+  height: 65px;
+
+  /* Couleur de fond sombre (gris foncé) */
+  background-color: #5E5E5E;
+
+  /* Arrondi prononcé (forme de pilule) */
+  border-radius: 35px;
+
+  display: flex;
+  justify-content: space-evenly;
+  align-items: center;
+  z-index: 1000;
+
+  /* Ombre portée pour l'effet flottant */
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  background-color: #77786F;
+
+  /* Taille fixe pour créer des cercles parfaits */
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+
+  /* Transition douce pour l'effet au clic */
+  transition: background-color 0.3s ease;
+
+  font-size: 1.5rem;
+}
+
+/* Style de l'élément actif (cercle plus clair) */
+.router-link-active {
+  background-color: #9C9E89;
+}
+
 </style>

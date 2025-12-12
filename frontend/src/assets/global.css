@@ -10,6 +10,15 @@
   flex-direction: column;
 }
 
+header {
+  background-color: #679436;
+  padding: 1rem;
+  display: flex;
+  justify-content: space-between;
+  color: #F5F5F5
+}
+
+
 body {
   margin: 0;
   padding: 0;
@@ -17,10 +26,11 @@ body {
   height: 100%;
   /* Empêche le rebond élastique sur iOS si souhaité */
   overscroll-behavior: none;
+  color : black
 }
 
 a {
   text-decoration: none;
-  color: hsla(160, 100%, 37%, 1);
   transition: 0.4s;
 }
+
