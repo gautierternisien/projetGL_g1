@@ -1,15 +1,10 @@
-<script setup lang="ts">
-</script>
+<script setup lang="ts"></script>
 
 <template>
   <header>
     <h1>Tableau de bord</h1>
-    <Button>Profil
-    </Button>
+    <Button>Profil </Button>
   </header>
-
 </template>
 
-<style scoped>
-
-</style>
+<style scoped></style>

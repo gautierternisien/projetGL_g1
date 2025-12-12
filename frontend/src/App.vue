@@ -48,7 +48,7 @@ import { RouterView, RouterLink } from 'vue-router'
   height: 65px;
 
   /* Couleur de fond sombre (gris foncé) */
-  background-color: #5E5E5E;
+  background-color: #5e5e5e;
 
   /* Arrondi prononcé (forme de pilule) */
   border-radius: 35px;
@@ -67,7 +67,7 @@ import { RouterView, RouterLink } from 'vue-router'
   align-items: center;
   justify-content: center;
   text-decoration: none;
-  background-color: #77786F;
+  background-color: #77786f;
 
   /* Taille fixe pour créer des cercles parfaits */
   width: 50px;
@@ -82,7 +82,6 @@ import { RouterView, RouterLink } from 'vue-router'
 
 /* Style de l'élément actif (cercle plus clair) */
 .router-link-active {
-  background-color: #9C9E89;
+  background-color: #9c9e89;
 }
-
 </style>

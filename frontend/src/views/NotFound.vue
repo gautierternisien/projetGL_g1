@@ -1,17 +1,11 @@
-<script setup lang="ts">
-</script>
+<script setup lang="ts"></script>
 
 <template>
   <header>
     <h1>Site web</h1>
-    <Button>Profil
-    </Button>
+    <Button>Profil </Button>
   </header>
-<h1>Page non trouvée</h1>
-
-  <nav>
-  </nav>
-
+  <h1>Page non trouvée</h1>
 </template>
 
 <style scoped>

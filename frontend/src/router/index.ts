@@ -21,7 +21,7 @@ const router = createRouter({
       path: '/:catchAll(.*)',
       name: 'not-found',
       component: () => import('../views/NotFound.vue'),
-    }
+    },
   ],
 })
 
