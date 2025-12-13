@@ -16,11 +16,11 @@
       <span>🎯</span>
     </RouterLink>
 
-    <RouterLink to="/community" class="nav-item">
+    <RouterLink to="/communaute" class="nav-item">
       <span>👥</span>
     </RouterLink>
 
-    <RouterLink to="/tips" class="nav-item">
+    <RouterLink to="/conseils" class="nav-item">
       <span>💡</span>
     </RouterLink>
   </nav>

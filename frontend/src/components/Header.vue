@@ -37,7 +37,7 @@ defineProps({
   top: 0;
   left: 0;
   width: 100%;
-  background-color: #6d8b46;
+  background-color: #679436;
   z-index: 1000;
   border-bottom-left-radius: 20px;
   border-bottom-right-radius: 20px;

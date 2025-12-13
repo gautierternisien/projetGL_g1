@@ -1,6 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import SurveyView from '@/views/SurveyView.vue'
+import MissionsView from '@/views/MissionsView.vue'
+import CommunauteView from '@/views/CommunauteView.vue'
+import ConseilsView from '@/views/ConseilsView.vue'
+import ProfileView from '@/views/ProfileView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -14,6 +18,26 @@ const router = createRouter({
       path: '/questionnaires',
       name: 'questionnaires',
       component: SurveyView,
+    },
+    {
+      path: '/missions',
+      name: 'missions',
+      component: MissionsView,
+    },
+    {
+      path: '/communaute',
+      name: 'communaute',
+      component: CommunauteView,
+    },
+    {
+      path: '/conseils',
+      name: 'conseils',
+      component: ConseilsView,
+    },
+    {
+      path: '/profile',
+      name: 'profile',
+      component: ProfileView,
     },
     {
       path: '/about',

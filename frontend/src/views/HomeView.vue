@@ -77,23 +77,27 @@ const events = ref([
         <Card title="Missions en cours" :hasArrow="true">
           <div class="carousel-container">
             <div v-for="mission in missions" :key="mission.id" class="mission-card">
-              <div class="card-content">
-                <span class="card-icon">🎯</span>
-                <span class="card-title">{{ mission.title }}</span>
-              </div>
+              <RouterLink :to="'/missions/' + mission.id">
+                <div class="card-content">
+                  <span class="card-icon">🎯</span>
+                  <span class="card-title">{{ mission.title }}</span>
+                </div>
+              </RouterLink>
             </div>
           </div>
         </Card>
       </RouterLink>
 
-      <RouterLink to="/evenements" class="unstyled-link">
+      <RouterLink to="/communaute" class="unstyled-link">
         <Card title="Évènements communautaires " :hasArrow="true">
           <div class="carousel-container">
             <div v-for="event in events" :key="event.id" class="mission-card">
-              <div class="card-content">
-                <span class="card-icon">👥</span>
-                <span class="card-title">{{ event.title }}</span>
-              </div>
+              <RouterLink :to="'/communaute/' + event.id">
+                <div class="card-content">
+                  <span class="card-icon">👥</span>
+                  <span class="card-title">{{ event.title }}</span>
+                </div>
+              </RouterLink>
             </div>
           </div>
         </Card>
