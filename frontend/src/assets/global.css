@@ -25,6 +25,7 @@ body {
   height: 100%;
   /* Empêche le rebond élastique sur iOS si souhaité */
   overscroll-behavior: none;
+  overflow: hidden;
   color: black;
 }
 

@@ -1,18 +1,7 @@
-<script setup lang="ts"></script>
-
+<script setup lang="ts">
+import Header from '@/components/Header.vue'
+</script>
+import Header from './Header.vue';
 <template>
-  <header>
-    <h1>Site web</h1>
-    <Button>Profil </Button>
-  </header>
-  <h1>Page non trouvée</h1>
+  <Header title="Page Non Trouvée"></Header>
 </template>
-
-<style scoped>
-header {
-  background-color: #679436;
-  padding: 1rem;
-  display: flex;
-  justify-content: space-between;
-}
-</style>
