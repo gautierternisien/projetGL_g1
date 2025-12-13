@@ -4,17 +4,41 @@ defineProps({
     type: String,
     default: '',
   },
+  subtitle: {
+    type: String,
+    default: '',
+  },
   isConnected: {
     type: Boolean,
     default: true,
   },
+  showResumeBtn: {
+    type: Boolean,
+    default: false,
+  },
 })
+
+defineEmits(['resumeLater'])
 </script>
 
 <template>
   <header class="top-header">
     <div class="header-content">
-      <h1>{{ title }}</h1>
+      <div class="header-left">
+        <!-- Regroupement du bouton et du titre sur une même ligne -->
+        <div class="header-title-row">
+          <h1>{{ title }}</h1>
+          <h2 v-if="subtitle">{{ subtitle }}</h2>
+        </div>
+
+        <!-- Le sous-titre reste en dessous -->
+        <div class="header-sub-row">
+          <button class="resume-btn" v-if="showResumeBtn" @click="$emit('resumeLater')">
+            Reprendre plus tard
+          </button>
+        </div>
+      </div>
+
       <RouterLink to="/profile" v-if="isConnected">
         <div class="user-avatar">👤</div>
       </RouterLink>
@@ -56,13 +80,64 @@ defineProps({
   padding: 0 20px 15px 20px;
 }
 
+.header-left {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  flex: 1;
+  margin-right: 10px;
+}
+
+/* Nouvelle classe pour aligner bouton et titre */
+.header-title-row {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.header-sub-row {
+  display: flex;
+  align-items: center;
+  margin-top: 4px;
+  min-width: 0;
+}
+
 .header-content h1 {
   margin: 0;
-  font-size: 1.4rem; /* Légère réduction pour gagner de la place */
+  font-size: 1.4rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-right: 8px; /* Petit espace de sécurité avant les boutons */
+  line-height: 1.2;
+}
+
+.header-content h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.resume-btn {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: white;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 0.65rem;
+  cursor: pointer;
+  margin-right: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.resume-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
 }
 
 .user-avatar {
@@ -75,25 +150,26 @@ defineProps({
   align-items: center;
   justify-content: center;
   backdrop-filter: blur(5px);
+  flex-shrink: 0;
 }
 
 .auth-buttons {
   display: flex;
-  gap: 5px; /* Espace très réduit entre les boutons */
+  gap: 5px;
   align-items: center;
-  flex-shrink: 0; /* Empêche les boutons d'être écrasés */
+  flex-shrink: 0;
 }
 
 .auth-btn {
   background-color: white;
   color: #6d8b46;
   border: none;
-  padding: 4px 10px; /* Boutons très compacts */
+  padding: 4px 10px;
   border-radius: 12px;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
-  font-size: 0.7rem; /* Police réduite */
+  font-size: 0.7rem;
   transition:
     transform 0.1s ease,
     background-color 0.2s;
