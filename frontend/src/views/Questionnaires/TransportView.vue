@@ -6,22 +6,33 @@ import ProgressBar from '@/components/ProgressBar.vue'
 import { VRadio, VRadioGroup } from 'vuetify/components'
 import { useProgressStore } from '@/stores/progress'
 
+// Définition des types pour éviter les 'any'
+interface Option {
+  label: string
+  value: string
+}
+
+interface Question {
+  id: number
+  text: string
+  options: Option[]
+}
+
 const router = useRouter()
 const progressStore = useProgressStore()
 
 // --- CONFIGURATION API ---
 const API_URL = 'http://localhost:8000'
-const USER_ID = 'user123' // ID utilisateur simulé (à remplacer par l'auth réelle plus tard)
+const USER_ID = 'user123'
 
 // --- ÉTAT ---
-// Les questions sont chargées depuis le backend
-const questions = ref<any[]>([])
+const questions = ref<Question[]>([])
 const isLoading = ref(true)
+const isCompletedMode = ref(false) // Nouvel état pour le récapitulatif
 
-// Stockage des réponses (synchronisé avec le backend)
+// Stockage des réponses
 const savedAnswers = ref<Record<number, string>>({})
 
-// État pour suivre la question actuelle
 const currentQuestionIndex = ref(0)
 const selectedAnswer = ref<string | null>(null)
 
@@ -62,7 +73,6 @@ const saveAnswerToBackend = async (questionId: number, value: string) => {
 
     if (response.ok) {
       const data = await response.json()
-      // On met à jour le store avec la progression calculée par le serveur
       progressStore.setScore('transport', data.progress)
     }
   } catch (error) {
@@ -70,28 +80,62 @@ const saveAnswerToBackend = async (questionId: number, value: string) => {
   }
 }
 
+// Fonction pour effacer les réponses (Reset)
+const resetAnswers = async () => {
+  if (
+    confirm(
+      'Attention, cela va effacer toutes vos réponses pour ce questionnaire. Voulez-vous continuer ?',
+    )
+  ) {
+    try {
+      // Appel DELETE au backend
+      const response = await fetch(`${API_URL}/answers/${USER_ID}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        // Si le backend confirme la suppression, on reset le frontend
+        savedAnswers.value = {}
+        currentQuestionIndex.value = 0
+        selectedAnswer.value = null
+        isCompletedMode.value = false
+        progressStore.setScore('transport', 0)
+        console.log('Réponses réinitialisées avec succès.')
+      } else {
+        alert('Erreur lors de la réinitialisation côté serveur.')
+      }
+    } catch (error) {
+      console.error('Erreur réseau lors du reset:', error)
+    }
+  }
+}
+
 // --- INITIALISATION (onMounted) ---
 onMounted(async () => {
-  // 1. On charge les données en parallèle
   await Promise.all([fetchQuestions(), fetchUserProgress()])
 
-  // 2. Calcul de l'index initial basé sur la progression (si des questions existent)
   if (questions.value.length > 0) {
-    const savedScore = progressStore.getCategoryScore('transport')
-    let initialIndex = 0
+    // 1. Vérifier si tout est répondu
+    const totalQuestions = questions.value.length
+    const answeredCount = Object.keys(savedAnswers.value).length
 
-    if (savedScore > 0) {
-      initialIndex = Math.round((savedScore * questions.value.length) / 100) - 1
-      if (initialIndex < 0) initialIndex = 0
-      if (initialIndex >= questions.value.length) initialIndex = questions.value.length - 1
-    }
+    if (answeredCount === totalQuestions && totalQuestions > 0) {
+      // Tout est répondu -> Mode Récapitulatif
+      isCompletedMode.value = true
+      progressStore.setScore('transport', 100)
+    } else {
+      // 2. Sinon, trouver la première question NON répondue
+      const firstUnansweredIndex = questions.value.findIndex((q) => !savedAnswers.value[q.id])
 
-    currentQuestionIndex.value = initialIndex
+      // Si on trouve une question non répondue, on y va, sinon on va à la fin (cas rare)
+      currentQuestionIndex.value =
+        firstUnansweredIndex !== -1 ? firstUnansweredIndex : totalQuestions - 1
 
-    // 3. Initialiser la réponse courante pour la question affichée
-    const currentQ = questions.value[initialIndex]
-    if (currentQ) {
-      selectedAnswer.value = savedAnswers.value[currentQ.id] || null
+      // Initialiser la réponse courante
+      const currentQ = questions.value[currentQuestionIndex.value]
+      if (currentQ) {
+        selectedAnswer.value = savedAnswers.value[currentQ.id] || null
+      }
     }
   }
 
@@ -103,6 +147,7 @@ const currentQuestion = computed(() => questions.value[currentQuestionIndex.valu
 
 const progressValue = computed(() => {
   if (questions.value.length === 0) return 0
+  if (isCompletedMode.value) return 100
   return ((currentQuestionIndex.value + 1) / questions.value.length) * 100
 })
 
@@ -111,14 +156,18 @@ const isLastQuestion = computed(
   () => questions.value.length > 0 && currentQuestionIndex.value === questions.value.length - 1,
 )
 
-// Vérifie si une réponse est sélectionnée pour activer le bouton suivant
 const canProceed = computed(
   () => selectedAnswer.value !== null && selectedAnswer.value !== undefined,
 )
 
-// --- WATCHERS ---
+// Helper pour afficher le libellé de la réponse dans le récapitulatif
+const getAnswerLabel = (question: Question) => {
+  const val = savedAnswers.value[question.id]
+  const option = question.options.find((opt) => opt.value === val)
+  return option ? option.label : 'Non répondu'
+}
 
-// Quand on change de question, on restaure la réponse depuis l'état local (qui vient du back)
+// --- WATCHERS ---
 watch(currentQuestionIndex, (newIndex) => {
   if (questions.value[newIndex]) {
     const questionId = questions.value[newIndex].id
@@ -126,30 +175,24 @@ watch(currentQuestionIndex, (newIndex) => {
   }
 })
 
-// Quand l'utilisateur sélectionne une réponse, on sauvegarde via l'API
 watch(selectedAnswer, async (newVal) => {
   if (newVal && currentQuestion.value) {
     const questionId = currentQuestion.value.id
-
-    // Mise à jour locale immédiate
     savedAnswers.value[questionId] = newVal
-
-    // Envoi asynchrone au backend
     await saveAnswerToBackend(questionId, newVal)
   }
 })
 
 // --- ACTIONS DE NAVIGATION ---
-
 const nextQuestion = () => {
   if (!canProceed.value) return
 
   if (!isLastQuestion.value) {
     currentQuestionIndex.value++
   } else {
-    // Fin du questionnaire
-    console.log('Questionnaire terminé')
-    router.push('/questionnaires')
+    // Fin du questionnaire -> On passe en mode récapitulatif
+    isCompletedMode.value = true
+    progressStore.setScore('transport', 100)
   }
 }
 
@@ -160,14 +203,11 @@ const prevQuestion = () => {
 }
 
 const saveAndExit = () => {
-  // La sauvegarde est déjà faite à chaque sélection via le watcher.
-  // On met juste à jour le store localement pour l'affichage immédiat dans le dashboard
   const answeredCount = Object.keys(savedAnswers.value).length
   if (questions.value.length > 0) {
     const realProgress = Math.round((answeredCount / questions.value.length) * 100)
     progressStore.setScore('transport', realProgress)
   }
-
   router.push('/questionnaires')
 }
 </script>
@@ -177,24 +217,40 @@ const saveAndExit = () => {
     <Header
       title="Questionnaire"
       subtitle="Transport"
-      :showResumeBtn="true"
+      :showResumeBtn="!isCompletedMode"
       @resumeLater="saveAndExit"
     />
 
     <div class="scrollable-area">
-      <!-- Affichage conditionnel : on attend que les questions soient chargées -->
-      <div v-if="isLoading" class="loading-state">Chargement du questionnaire...</div>
+      <div v-if="isLoading" class="loading-state">Chargement...</div>
 
-      <div class="question-container" v-else-if="currentQuestion">
-        <!-- Compteur -->
+      <!-- VUE RÉCAPITULATIF (Si terminé) -->
+      <div v-else-if="isCompletedMode" class="recap-container">
+        <div class="success-icon">🎉</div>
+        <h2 class="recap-title">Questionnaire terminé !</h2>
+        <p class="recap-subtitle">Voici le récapitulatif de vos réponses :</p>
+
+        <div class="recap-list">
+          <div v-for="q in questions" :key="q.id" class="recap-item">
+            <div class="recap-question">{{ q.text }}</div>
+            <div class="recap-answer">{{ getAnswerLabel(q) }}</div>
+          </div>
+        </div>
+
+        <div class="recap-actions">
+          <button class="nav-btn prev-btn" @click="saveAndExit">Retour au tableau de bord</button>
+          <button class="nav-btn reset-btn" @click="resetAnswers">Modifier mes réponses</button>
+        </div>
+      </div>
+
+      <!-- VUE QUESTIONNAIRE (Si en cours) -->
+      <div v-else-if="currentQuestion" class="question-container">
         <h3 class="question-counter">
           Question {{ currentQuestionIndex + 1 }} sur {{ questions.length }}
         </h3>
 
-        <!-- Question posée -->
         <h1 class="question-text">{{ currentQuestion.text }}</h1>
 
-        <!-- Réponses -->
         <div class="answers-area">
           <v-radio-group v-model="selectedAnswer">
             <v-radio
@@ -207,12 +263,10 @@ const saveAndExit = () => {
           </v-radio-group>
         </div>
 
-        <!-- Boutons de navigation -->
         <div class="navigation-buttons">
           <button v-if="!isFirstQuestion" class="nav-btn prev-btn" @click="prevQuestion">
-            &lt; Question précédente
+            < Question précédente
           </button>
-
           <div v-else></div>
 
           <button class="nav-btn next-btn" @click="nextQuestion" :disabled="!canProceed">
@@ -220,15 +274,12 @@ const saveAndExit = () => {
           </button>
         </div>
 
-        <!-- Barre de progression -->
         <div class="progress-section">
           <ProgressBar :value="progressValue" :showLabel="false" />
         </div>
       </div>
 
-      <div v-else class="error-state">
-        Impossible de charger les questions. Vérifiez que le backend est lancé.
-      </div>
+      <div v-else class="error-state">Erreur de chargement.</div>
     </div>
   </div>
 </template>
@@ -260,7 +311,8 @@ const saveAndExit = () => {
   color: #666;
 }
 
-.question-container {
+.question-container,
+.recap-container {
   width: 100%;
   max-width: 600px;
   display: flex;
@@ -268,6 +320,58 @@ const saveAndExit = () => {
   flex: 1;
 }
 
+/* Styles spécifiques au récapitulatif */
+.recap-container {
+  align-items: center;
+}
+.success-icon {
+  font-size: 3rem;
+  margin-bottom: 10px;
+}
+.recap-title {
+  font-size: 1.8rem;
+  color: #2c3e50;
+  margin-bottom: 10px;
+}
+.recap-subtitle {
+  color: #666;
+  margin-bottom: 30px;
+}
+.recap-list {
+  width: 100%;
+  background: #f9f9f9;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 30px;
+}
+.recap-item {
+  margin-bottom: 15px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 15px;
+}
+.recap-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+.recap-question {
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 5px;
+  font-size: 0.95rem;
+}
+.recap-answer {
+  color: #679436;
+  font-weight: 500;
+}
+.recap-actions {
+  display: flex;
+  gap: 15px;
+  width: 100%;
+  justify-content: center;
+}
+
+/* Styles existants */
 .question-counter {
   text-align: center;
   color: #666;
@@ -311,7 +415,6 @@ const saveAndExit = () => {
   background-color: #f0f0f0;
   color: #555;
 }
-
 .prev-btn:hover {
   background-color: #e0e0e0;
 }
@@ -320,17 +423,23 @@ const saveAndExit = () => {
   background-color: #2c3e50;
   color: white;
 }
-
 .next-btn:hover {
   background-color: #1a252f;
 }
-
-/* Style pour le bouton désactivé */
 .next-btn:disabled {
-  background-color: #bdc3c7; /* Gris */
+  background-color: #bdc3c7;
   color: #7f8c8d;
   cursor: not-allowed;
-  transform: none;
+}
+
+.reset-btn {
+  background-color: #fff;
+  color: #e74c3c;
+  border: 1px solid #e74c3c;
+}
+.reset-btn:hover {
+  background-color: #e74c3c;
+  color: white;
 }
 
 .progress-section {

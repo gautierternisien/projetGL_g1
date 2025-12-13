@@ -117,3 +117,11 @@ async def save_answer(user_id: str, answer: UserAnswer):
 async def get_user_progress(user_id: str):
     """Récupère les réponses existantes pour reprendre le questionnaire"""
     return user_answers_db.get(user_id, {})
+
+@app.delete("/answers/{user_id}")
+async def reset_user_progress(user_id: str):
+    """Supprime toutes les réponses d'un utilisateur (Reset)"""
+    if user_id in user_answers_db:
+        del user_answers_db[user_id]
+
+    return {"status": "reset", "progress": 0}
