@@ -12,7 +12,7 @@ const store = useProgressStore()
     <Header title="Questionnaires" />
 
     <div class="scrollable-area">
-      <RouterLink to="/transport">
+      <RouterLink to="/questionnaires/transport">
         <Card title="Transport & Mobilité" :has-arrow="true">
           <div class="image-center">
             <span class="emoji-img">🚗</span>
@@ -21,7 +21,7 @@ const store = useProgressStore()
         </Card>
       </RouterLink>
 
-      <RouterLink to="/logement">
+      <RouterLink to="/questionnaires/logement">
         <Card title="Logement & Énergie" :has-arrow="true">
           <div class="image-center">
             <span class="emoji-img">🏠</span>
@@ -30,7 +30,7 @@ const store = useProgressStore()
         </Card>
       </RouterLink>
 
-      <RouterLink to="/alimentation">
+      <RouterLink to="/questionnaires/alimentation">
         <Card title="Alimentation" :has-arrow="true">
           <div class="image-center">
             <span class="emoji-img">🍽️</span>
@@ -39,7 +39,7 @@ const store = useProgressStore()
         </Card>
       </RouterLink>
 
-      <RouterLink to="/consommation">
+      <RouterLink to="/questionnaires/consommation">
         <Card title="Consommation" :has-arrow="true">
           <div class="image-center">
             <span class="emoji-img">📦️</span>
@@ -48,7 +48,7 @@ const store = useProgressStore()
         </Card>
       </RouterLink>
 
-      <RouterLink to="/recyclage">
+      <RouterLink to="/questionnaires/recyclage">
         <Card title="Déchets & Recyclage" :has-arrow="true">
           <div class="image-center">
             <span class="emoji-img">♻️️</span>
@@ -57,7 +57,7 @@ const store = useProgressStore()
         </Card>
       </RouterLink>
 
-      <RouterLink to="/numerique">
+      <RouterLink to="/questionnaires/numerique">
         <Card title="Numérique" :has-arrow="true">
           <div class="image-center">
             <span class="emoji-img">💻️</span>
@@ -66,7 +66,7 @@ const store = useProgressStore()
         </Card>
       </RouterLink>
 
-      <RouterLink to="/loisirs">
+      <RouterLink to="/questionnaires/loisirs">
         <Card title="Loisirs" :has-arrow="true">
           <div class="image-center">
             <span class="emoji-img">🃏️</span>
@@ -75,7 +75,7 @@ const store = useProgressStore()
         </Card>
       </RouterLink>
 
-      <RouterLink to="/quotidien">
+      <RouterLink to="/questionnaires/quotidien">
         <Card title="Habitudes Quotidiennes" :has-arrow="true">
           <div class="image-center">
             <span class="emoji-img">🗓️️</span>
