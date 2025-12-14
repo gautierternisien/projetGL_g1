@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import Header from '@/components/Header.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
 import { VRadio, VRadioGroup } from 'vuetify/components'
-import { useProgressStore } from '@/stores/progress'
+import { useProgressStore } from '@/stores/progress.ts'
 
 // Définition des types pour éviter les 'any'
 interface Option {
@@ -19,15 +19,19 @@ interface Question {
 }
 
 const router = useRouter()
+const route = useRoute()
 const progressStore = useProgressStore()
 
 // --- CONFIGURATION API ---
 const API_URL = 'http://localhost:8000'
 const USER_ID = 'user123'
 
+const currentCategory = computed(() => route.params.category as string)
+
 // --- ÉTAT ---
 const questions = ref<Question[]>([])
 const isLoading = ref(true)
+const isError = ref(false)
 const isCompletedMode = ref(false) // Nouvel état pour le récapitulatif
 
 // Stockage des réponses
@@ -40,20 +44,32 @@ const selectedAnswer = ref<string | null>(null)
 
 const fetchQuestions = async () => {
   try {
-    const response = await fetch(`${API_URL}/questions/transport`)
+    // URL DYNAMIQUE : /questions/{category}
+    const response = await fetch(`${API_URL}/questions/${currentCategory.value}`)
+
     if (response.ok) {
       questions.value = await response.json()
+    } else {
+      isError.value = true
+      console.error('Catégorie introuvable ou erreur serveur')
     }
   } catch (error) {
+    isError.value = true
     console.error('Erreur lors du chargement des questions:', error)
   }
 }
 
 const fetchUserProgress = async () => {
   try {
-    const response = await fetch(`${API_URL}/answers/${USER_ID}`)
+    // AJOUT DE L'OPTION { cache: 'no-store' }
+    const response = await fetch(`${API_URL}/answers/${currentCategory.value}/${USER_ID}`, {
+      cache: 'no-store',
+    })
+
     if (response.ok) {
-      savedAnswers.value = await response.json()
+      const data = await response.json()
+      savedAnswers.value = data.answers || {}
+      progressStore.setScore(currentCategory.value, data.progress || 0)
     }
   } catch (error) {
     console.error('Erreur lors du chargement de la progression:', error)
@@ -62,7 +78,8 @@ const fetchUserProgress = async () => {
 
 const saveAnswerToBackend = async (questionId: number, value: string) => {
   try {
-    const response = await fetch(`${API_URL}/answers/${USER_ID}`, {
+    // URL DYNAMIQUE : /answers/{category}/{user_id}
+    const response = await fetch(`${API_URL}/answers/${currentCategory.value}/${USER_ID}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -73,7 +90,8 @@ const saveAnswerToBackend = async (questionId: number, value: string) => {
 
     if (response.ok) {
       const data = await response.json()
-      progressStore.setScore('transport', data.progress)
+      // Mise à jour du store avec la progression calculée par le backend
+      progressStore.setScore(currentCategory.value, data.progress)
     }
   } catch (error) {
     console.error('Erreur lors de la sauvegarde:', error)
@@ -82,27 +100,25 @@ const saveAnswerToBackend = async (questionId: number, value: string) => {
 
 // Fonction pour effacer les réponses (Reset)
 const resetAnswers = async () => {
-  if (
-    confirm(
-      'Attention, cela va effacer toutes vos réponses pour ce questionnaire. Voulez-vous continuer ?',
-    )
-  ) {
+  if (confirm('Attention, cela va effacer toutes vos réponses pour cette catégorie. Continuer ?')) {
     try {
-      // Appel DELETE au backend
-      const response = await fetch(`${API_URL}/answers/${USER_ID}`, {
+      // --- C'EST ICI QUE ÇA MANQUAIT ---
+      // On appelle vraiment le backend pour supprimer les données de la base
+      const response = await fetch(`${API_URL}/answers/${currentCategory.value}/${USER_ID}`, {
         method: 'DELETE',
       })
 
       if (response.ok) {
-        // Si le backend confirme la suppression, on reset le frontend
+        // Seulement si le serveur a dit "OK", on nettoie l'affichage
         savedAnswers.value = {}
         currentQuestionIndex.value = 0
         selectedAnswer.value = null
         isCompletedMode.value = false
-        progressStore.setScore('transport', 0)
-        console.log('Réponses réinitialisées avec succès.')
+        progressStore.setScore(currentCategory.value, 0)
+
+        console.log('Reset réussi côté serveur et client')
       } else {
-        alert('Erreur lors de la réinitialisation côté serveur.')
+        alert("Erreur : Le serveur n'a pas pu supprimer les réponses.")
       }
     } catch (error) {
       console.error('Erreur réseau lors du reset:', error)
@@ -112,43 +128,60 @@ const resetAnswers = async () => {
 
 // --- INITIALISATION (onMounted) ---
 onMounted(async () => {
+  isLoading.value = true
+  // On charge les données en parallèle
   await Promise.all([fetchQuestions(), fetchUserProgress()])
 
-  if (questions.value.length > 0) {
-    // 1. Vérifier si tout est répondu
+  if (!isError.value && questions.value.length > 0) {
     const totalQuestions = questions.value.length
     const answeredCount = Object.keys(savedAnswers.value).length
 
     if (answeredCount === totalQuestions && totalQuestions > 0) {
-      // Tout est répondu -> Mode Récapitulatif
       isCompletedMode.value = true
-      progressStore.setScore('transport', 100)
     } else {
-      // 2. Sinon, trouver la première question NON répondue
       const firstUnansweredIndex = questions.value.findIndex((q) => !savedAnswers.value[q.id])
-
-      // Si on trouve une question non répondue, on y va, sinon on va à la fin (cas rare)
       currentQuestionIndex.value =
         firstUnansweredIndex !== -1 ? firstUnansweredIndex : totalQuestions - 1
 
-      // Initialiser la réponse courante
       const currentQ = questions.value[currentQuestionIndex.value]
       if (currentQ) {
         selectedAnswer.value = savedAnswers.value[currentQ.id] || null
       }
     }
   }
-
   isLoading.value = false
 })
 
+const CATEGORY_DISPLAY_NAMES: Record<string, string> = {
+  transport: 'Transport & Mobilité',
+  alimentation: 'Alimentation',
+  logement: 'Logement & Énergie',
+  numerique: 'Numérique',
+  loisirs: 'Loisirs & Voyages',
+  quotidien: 'Habitudes Quotidiennes',
+  recyclage: 'Déchets & Recyclage',
+  consommation: 'Consommation & Achats',
+}
+
 // --- COMPUTED ---
+const categoryTitle = computed(() => {
+  const slug = currentCategory.value
+
+  // On regarde s'il y a un joli nom, sinon on met une majuscule par défaut
+  if (CATEGORY_DISPLAY_NAMES[slug]) {
+    return CATEGORY_DISPLAY_NAMES[slug]
+  }
+
+  // Fallback (au cas où) : transport -> Transport
+  return slug.charAt(0).toUpperCase() + slug.slice(1)
+})
+
 const currentQuestion = computed(() => questions.value[currentQuestionIndex.value])
 
 const progressValue = computed(() => {
   if (questions.value.length === 0) return 0
   if (isCompletedMode.value) return 100
-  return ((currentQuestionIndex.value + 1) / questions.value.length) * 100
+  return (currentQuestionIndex.value / questions.value.length) * 100
 })
 
 const isFirstQuestion = computed(() => currentQuestionIndex.value === 0)
@@ -192,7 +225,7 @@ const nextQuestion = () => {
   } else {
     // Fin du questionnaire -> On passe en mode récapitulatif
     isCompletedMode.value = true
-    progressStore.setScore('transport', 100)
+    progressStore.setScore(currentCategory.value, 100)
   }
 }
 
@@ -206,7 +239,7 @@ const saveAndExit = () => {
   const answeredCount = Object.keys(savedAnswers.value).length
   if (questions.value.length > 0) {
     const realProgress = Math.round((answeredCount / questions.value.length) * 100)
-    progressStore.setScore('transport', realProgress)
+    progressStore.setScore(currentCategory.value, realProgress)
   }
   router.push('/questionnaires')
 }
@@ -216,13 +249,20 @@ const saveAndExit = () => {
   <div class="dashboard-wrapper">
     <Header
       title="Questionnaire"
-      subtitle="Transport"
+      :subtitle="categoryTitle"
       :showResumeBtn="!isCompletedMode"
       @resumeLater="saveAndExit"
     />
 
     <div class="scrollable-area">
       <div v-if="isLoading" class="loading-state">Chargement...</div>
+
+      <div v-else-if="isError" class="error-state">
+        <span class="error-emoji">😕</span>
+        <h2>Oups !</h2>
+        <p>Impossible de charger le questionnaire "{{ categoryTitle }}".</p>
+        <button class="nav-btn prev-btn" @click="saveAndExit">Retour au menu</button>
+      </div>
 
       <!-- VUE RÉCAPITULATIF (Si terminé) -->
       <div v-else-if="isCompletedMode" class="recap-container">
@@ -287,21 +327,40 @@ const saveAndExit = () => {
 <style scoped>
 .dashboard-wrapper {
   background-color: white;
-  height: 100vh;
+
+  /* --- FIX MOBILE --- */
+  height: 100dvh;
+  width: 100vw; /* Prend toute la largeur */
+  overflow: hidden; /* Interdit le scroll sur le parent (body) */
+  overscroll-behavior: none; /* Empêche l'effet "rebond" (elastic scroll) sur iOS */
+
   display: flex;
   flex-direction: column;
-  overflow: hidden;
   font-family: 'Instrument Sans', sans-serif;
   position: relative;
 }
 
 .scrollable-area {
-  padding: 120px 20px 40px 20px;
+  padding: 120px 20px 120px 20px;
   overflow-y: auto;
   flex: 1;
+
   display: flex;
   flex-direction: column;
   align-items: center;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.scrollable-area > *:first-child {
+  margin-top: 0;
+}
+
+/* Supprime les marges qui dépassent en bas */
+.scrollable-area > *:last-child {
+  margin-bottom: 0;
 }
 
 .loading-state,

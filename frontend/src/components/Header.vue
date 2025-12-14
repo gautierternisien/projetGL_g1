@@ -28,14 +28,13 @@ defineEmits(['resumeLater'])
         <!-- Regroupement du bouton et du titre sur une même ligne -->
         <div class="header-title-row">
           <h1>{{ title }}</h1>
-          <h2 v-if="subtitle">{{ subtitle }}</h2>
-        </div>
-
-        <!-- Le sous-titre reste en dessous -->
-        <div class="header-sub-row">
           <button class="resume-btn" v-if="showResumeBtn" @click="$emit('resumeLater')">
             Reprendre plus tard
           </button>
+        </div>
+        <!-- Le sous-titre reste en dessous -->
+        <div class="header-sub-row">
+          <h2 v-if="subtitle">{{ subtitle }}</h2>
         </div>
       </div>
 
@@ -83,7 +82,8 @@ defineEmits(['resumeLater'])
 .header-left {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-end;
+  align-items: flex-start;
   min-width: 0;
   flex: 1;
   margin-right: 10px;
@@ -99,22 +99,21 @@ defineEmits(['resumeLater'])
 .header-sub-row {
   display: flex;
   align-items: center;
-  margin-top: 4px;
+  margin-top: 2px;
   min-width: 0;
 }
 
 .header-content h1 {
   margin: 0;
   font-size: 1.4rem;
-  white-space: nowrap;
-  overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.2;
+  white-space: nowrap;
 }
 
 .header-content h2 {
   margin: 0;
-  font-size: 1.4rem;
+  font-size: 1.2rem;
   font-weight: 400;
   white-space: nowrap;
   overflow: hidden;
@@ -130,7 +129,6 @@ defineEmits(['resumeLater'])
   padding: 4px 8px;
   font-size: 0.65rem;
   cursor: pointer;
-  margin-right: 10px;
   white-space: nowrap;
   flex-shrink: 0;
   transition: background 0.2s;

@@ -43,27 +43,17 @@ export const useProgressStore = defineStore('progress', () => {
     return Math.round(total / 8)
   })
 
-  const getCategoryScore = (category: string) => {
-    switch (category) {
-      case 'transport':
-        return progressValueTransport.value
-      case 'logement':
-        return progressValueLogement.value
-      case 'alimentation':
-        return progressValueAlimentation.value
-      case 'consommation':
-        return progressValueConsommation.value
-      case 'recyclage':
-        return progressValueRecyclage.value
-      case 'numerique':
-        return progressValueNumerique.value
-      case 'loisirs':
-        return progressValueLoisirs.value
-      case 'quotidien':
-        return progressValueQuotidien.value
-      default:
-        return 0
-    }
+  function getCategoryScore(category: string): number {
+    if (category === 'transport') return progressValueTransport.value
+    if (category === 'alimentation') return progressValueAlimentation.value
+    if (category === 'logement') return progressValueLogement.value
+    if (category === 'consommation') return progressValueConsommation.value
+    if (category === 'recyclage') return progressValueRecyclage.value
+    if (category === 'numerique') return progressValueNumerique.value
+    if (category === 'loisirs') return progressValueLoisirs.value
+    if (category === 'quotidien') return progressValueQuotidien.value
+
+    return 0 // Valeur par défaut si catégorie inconnue
   }
 
   // On retourne tout pour pouvoir l'utiliser ailleurs

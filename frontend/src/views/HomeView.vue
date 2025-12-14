@@ -120,55 +120,16 @@ const events = ref([
   position: relative;
 }
 
-/* --- HEADER FIXE --- */
-/*
-.top-header {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  background-color: #6d8b46;
-  z-index: 1000;
-  border-bottom-left-radius: 20px;
-  border-bottom-right-radius: 20px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  height: 100px;
-  padding-top: env(safe-area-inset-top);
-}
-
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  color: white;
-  box-sizing: border-box;
-  width: 100%;
-}
-
-.header-content h1 {
-  margin: 0;
-  font-size: 1.8rem;
-}
-
-.user-avatar {
-  font-size: 1.5rem;
-  background: rgba(255, 255, 255, 0.2);
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  backdrop-filter: blur(5px);
-}
-*/
-
 /* --- ZONE DE SCROLL --- */
 .scrollable-area {
+  flex: 1;
   padding-top: 100px;
   padding-left: 20px;
   padding-right: 20px;
   overflow-y: auto;
+
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 /* --- MISE EN PAGE CONTENU (GAUCHE / DROITE) --- */

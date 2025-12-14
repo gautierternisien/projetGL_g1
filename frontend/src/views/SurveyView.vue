@@ -102,6 +102,9 @@ const store = useProgressStore()
 .scrollable-area {
   padding: 100px 20px;
   overflow-y: auto;
+  flew: 1;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .image-center {
