@@ -60,9 +60,9 @@ const events = ref([
 
 // --- LOGIQUE DE CALCUL ---
 const calculateStatus = (score: number, avg: number) => {
-  // On définit une marge de tolérance de 15% autour de la moyenne
-  const lowThreshold = avg * 0.85
-  const highThreshold = avg * 1.15
+  // On définit une marge de tolérance de 50% autour de la moyenne
+  const lowThreshold = avg * 0.5
+  const highThreshold = avg * 1.5
 
   if (score < lowThreshold) {
     // Cas VERT : Bien en dessous de la moyenne
@@ -140,7 +140,7 @@ onMounted(async () => {
     <Header title="Tableau de bord" />
 
     <div class="scrollable-area">
-      <Card title="Empreinte ce mois">
+      <Card title="Empreinte carbone">
         <div class="split-content">
           <div class="info-side">
             <span class="big-number" :style="{ color: scoreColor }">{{ userScore / 1000 }}</span>
