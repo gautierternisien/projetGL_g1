@@ -44,7 +44,7 @@ import { RouterView, RouterLink } from 'vue-router'
 
   /* Largeur adaptative (max 350px pour ressembler à l'image) */
   width: 90%;
-  max-width: 350px;
+  max-width: 320px;
   height: 65px;
 
   /* Couleur de fond sombre (gris foncé) */

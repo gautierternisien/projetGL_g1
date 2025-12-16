@@ -461,11 +461,13 @@ const saveAndExit = () => {
 }
 
 .nav-btn {
-  padding: 12px 20px;
+  /* MODIFICATION : Padding réduit (12px 20px -> 8px 16px) */
+  padding: 18px 16px;
   border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
-  font-size: 0.9rem;
+  /* MODIFICATION : Taille de police réduite (0.9rem -> 0.8rem) */
+  font-size: 0.8rem;
   transition: all 0.2s;
   border: none;
 }

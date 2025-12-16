@@ -65,7 +65,8 @@ defineEmits(['resumeLater'])
   border-bottom-left-radius: 20px;
   border-bottom-right-radius: 20px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  height: 100px;
+  /* MODIFICATION : Hauteur réduite de 100px à 80px */
+  height: 80px;
   padding-top: env(safe-area-inset-top);
 }
 
@@ -76,7 +77,10 @@ defineEmits(['resumeLater'])
   color: white;
   box-sizing: border-box;
   width: 100%;
-  padding: 0 20px 15px 20px;
+  /* MODIFICATION : Padding réduit en bas (15px -> 10px) */
+  padding: 0 20px 10px 20px;
+  /* AJOUT : S'assurer que le contenu prend toute la hauteur disponible */
+  height: 100%;
 }
 
 .header-left {
@@ -109,6 +113,7 @@ defineEmits(['resumeLater'])
   text-overflow: ellipsis;
   line-height: 1.2;
   white-space: nowrap;
+  font-weight: 500;
 }
 
 .header-content h2 {

@@ -52,10 +52,10 @@ const missions = ref([
 ])
 
 const events = ref([
-  { id: 1, title: 'Maxine à pris le vélo au lieu de la voiture' },
-  { id: 2, title: 'Maxine à pris le vélo au lieu de la voiture' },
-  { id: 3, title: 'Maxine à pris le vélo au lieu de la voiture' },
-  { id: 4, title: 'Maxine à pris le vélo au lieu de la voiture' },
+  { id: 1, title: 'Maxine a pris le vélo au lieu de la voiture' },
+  { id: 2, title: 'Maxine a pris le vélo au lieu de la voiture' },
+  { id: 3, title: 'Maxine a pris le vélo au lieu de la voiture' },
+  { id: 4, title: 'Maxine a pris le vélo au lieu de la voiture' },
 ])
 
 // --- LOGIQUE DE CALCUL ---
