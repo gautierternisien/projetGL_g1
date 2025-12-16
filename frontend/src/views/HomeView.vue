@@ -60,9 +60,9 @@ const events = ref([
 
 // --- LOGIQUE DE CALCUL ---
 const calculateStatus = (score: number, avg: number) => {
-  // On définit une marge de tolérance de 50% autour de la moyenne
-  const lowThreshold = avg * 0.5
-  const highThreshold = avg * 1.5
+  // On définit une marge de tolérance de 15% autour de la moyenne
+  const lowThreshold = avg * 0.85
+  const highThreshold = avg * 1.15
 
   if (score < lowThreshold) {
     // Cas VERT : Bien en dessous de la moyenne
@@ -229,6 +229,7 @@ onMounted(async () => {
   padding-top: 100px;
   padding-left: 20px;
   padding-right: 20px;
+  padding-bottom: 50px;
   overflow-y: auto;
 
   -webkit-overflow-scrolling: touch;
@@ -292,7 +293,13 @@ onMounted(async () => {
   display: flex;
   gap: 12px;
   overflow-x: auto;
-  padding-bottom: 5px;
+
+  /* MODIFICATION : On ajoute du padding tout autour pour que l'ombre ne soit pas coupée */
+  padding: 10px 10px 20px 10px;
+  /* (Haut Droite Bas Gauche) - On met un peu plus en bas pour l'ombre portée */
+
+  /* On compense le padding pour que le scroll commence bien au bord visuel si besoin */
+  margin: -10px;
 
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
@@ -308,8 +315,8 @@ onMounted(async () => {
 }
 
 .mission-card {
-  /* Dimensions */
-  width: 290px;
+  /* Dimensions réduites pour voir les cartes adjacentes */
+  width: 230px;
   height: 110px;
 
   /* Apparence : Fond blanc + Ombre */
@@ -324,9 +331,9 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
 
-  /* Comportement scroll */
+  /* Comportement scroll : centré pour voir avant/après */
   flex-shrink: 0;
-  scroll-snap-align: start;
+  scroll-snap-align: center;
   transition: transform 0.2s ease;
 }
 
