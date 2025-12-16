@@ -1,6 +1,7 @@
 // src/stores/progress.ts
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
+import { API_URL } from '@/config' // On importe l'URL de l'API
 
 export const useProgressStore = defineStore('progress', () => {
   // --- 1. STATE (Les données) ---
@@ -25,6 +26,36 @@ export const useProgressStore = defineStore('progress', () => {
     if (category === 'numerique') progressValueNumerique.value = value
     if (category === 'loisirs') progressValueLoisirs.value = value
     if (category === 'quotidien') progressValueQuotidien.value = value
+  }
+
+  // NOUVELLE ACTION : Charge tout depuis le backend
+  async function fetchAllProgress(userId: string) {
+    const categories = [
+      'transport',
+      'logement',
+      'alimentation',
+      'consommation',
+      'recyclage',
+      'numerique',
+      'loisirs',
+      'quotidien',
+    ]
+
+    await Promise.all(
+      categories.map(async (category) => {
+        try {
+          const response = await fetch(`${API_URL}/answers/${category}/${userId}`, {
+            cache: 'no-store',
+          })
+          if (response.ok) {
+            const data = await response.json()
+            setScore(category, data.progress || 0)
+          }
+        } catch (error) {
+          console.error(`Erreur chargement progression ${category}:`, error)
+        }
+      }),
+    )
   }
 
   // --- 3. GETTERS (Calculs automatiques) ---
@@ -60,6 +91,7 @@ export const useProgressStore = defineStore('progress', () => {
   return {
     getCategoryScore,
     setScore,
+    fetchAllProgress, // On exporte la nouvelle action
     globalAverage,
   }
 })

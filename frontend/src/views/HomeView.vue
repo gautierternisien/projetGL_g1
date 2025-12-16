@@ -4,12 +4,9 @@ import ProgressBar from '@/components/ProgressBar.vue'
 import Header from '@/components/Header.vue'
 import { ref, onMounted } from 'vue'
 import { useProgressStore } from '@/stores/progress'
+import { API_URL, USER_ID } from '@/config'
 
 const store = useProgressStore()
-
-// --- CONFIGURATION API ---
-const API_URL = 'http://localhost:8000'
-const USER_ID = 'user123'
 
 // Dictionnaire pour afficher de jolis noms (au lieu de 'transport', 'alimentation'...)
 const CATEGORY_LABELS: Record<string, string> = {
@@ -114,6 +111,9 @@ const processSectors = (details: Record<string, number>, total: number) => {
 
 // --- CHARGEMENT DES DONNÉES ---
 onMounted(async () => {
+  // 1. On lance le chargement des progressions en arrière-plan
+  store.fetchAllProgress(USER_ID)
+
   try {
     const response = await fetch(`${API_URL}/carbon-score/${USER_ID}`)
 
@@ -205,36 +205,16 @@ onMounted(async () => {
           </div>
         </Card>
       </RouterLink>
-
-      <div style="height: 100px"></div>
     </div>
   </div>
 </template>
 
 <style scoped>
 /* --- LAYOUT GLOBAL --- */
-.dashboard-wrapper {
-  background-color: white;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  font-family: 'Instrument Sans', sans-serif;
-  position: relative;
-}
+/* .dashboard-wrapper est dans global.css */
 
 /* --- ZONE DE SCROLL --- */
-.scrollable-area {
-  flex: 1;
-  padding-top: 100px;
-  padding-left: 20px;
-  padding-right: 20px;
-  padding-bottom: 50px;
-  overflow-y: auto;
-
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-}
+/* Géré dans global.css (.scrollable-area) */
 
 /* --- MISE EN PAGE CONTENU (GAUCHE / DROITE) --- */
 .split-content {

@@ -3,7 +3,20 @@ import Header from '@/components/Header.vue'
 </script>
 
 <template>
-  <Header title="Missions" />
+  <div class="dashboard-wrapper">
+    <Header title="Missions" />
+    <div class="scrollable-area">
+      <div class="placeholder-content">
+        <p>Contenu à venir...</p>
+      </div>
+    </div>
+  </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+.placeholder-content {
+  padding: 20px;
+  text-align: center;
+  color: #666;
+}
+</style>

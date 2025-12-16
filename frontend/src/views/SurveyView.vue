@@ -3,8 +3,15 @@ import Card from '@/components/Card.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
 import Header from '@/components/Header.vue'
 import { useProgressStore } from '@/stores/progress'
+import { onMounted } from 'vue'
+import { USER_ID } from '@/config' // Plus besoin de API_URL ici
 
 const store = useProgressStore()
+
+// Au montage de la vue, on utilise l'action centralisée du store
+onMounted(() => {
+  store.fetchAllProgress(USER_ID)
+})
 </script>
 
 <template>
@@ -88,25 +95,6 @@ const store = useProgressStore()
 </template>
 
 <style scoped>
-.dashboard-wrapper {
-  background-color: white;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  font-family: 'Instrument Sans', sans-serif;
-  position: relative;
-}
-
-/* --- ZONE DE SCROLL --- */
-.scrollable-area {
-  padding: 100px 20px;
-  overflow-y: auto;
-  flew: 1;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-}
-
 .image-center {
   flex-shrink: 0;
   margin-left: 15px;
