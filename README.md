@@ -9,7 +9,7 @@ cd .\backend\
 ```
 
 ```sh
-fastappi dev .\main.py
+fastapi dev .\main.py
 ```
 
 ## Lancer le frontend
