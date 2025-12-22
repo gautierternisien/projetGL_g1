@@ -46,8 +46,10 @@ QUESTIONS_DB = {
             "id": 1,
             "text": 'Quel est votre moyen de transport principal ?',
             "options": [
-                { "label": 'Voiture personnelle', "value": 'car', "score": 2000, "is_default": True },
-                { "label": 'Transports en commun', "value": 'public', "score": 500 },
+                { "label": 'Voiture personnelle (diesel)', "value": 'car', "score": 2000, "is_default": True },
+                { "label": 'Voiture personnelle (électrique)', "value": 'electric car', "score": 950,},
+                { "label": 'Transports en commun (Bus)', "value": 'bus', "score": 850 },
+                { "label": 'Transports en commun (Rail)', "value": 'rail', "score": 40 },
                 { "label": 'Vélo / Marche', "value": 'soft', "score": 0 },
             ],
         },
@@ -62,15 +64,6 @@ QUESTIONS_DB = {
         },
         {
             "id": 3,
-            "text": 'Possédez-vous un véhicule électrique ?',
-            "options": [
-                { "label": 'Oui', "value": 'yes', "score": 500 }, # Impact fabrication batterie
-                { "label": 'Non', "value": 'no', "score": 0, "is_default": True },
-                { "label": 'Je ne possède pas de voiture', "value": 'none', "score": 0 },
-            ],
-        },
-        {
-            "id": 4,
             "text": 'À quelle fréquence faites-vous du covoiturage ?',
             "options": [
                 { "label": 'Régulièrement', "value": 'regular', "score": -200 }, # Bonus
@@ -79,7 +72,7 @@ QUESTIONS_DB = {
             ],
         },
         {
-            "id": 5,
+            "id": 4,
             "text": "Prenez-vous l'avion pour vos vacances ?",
             "options": [
                 { "label": 'Plusieurs fois par an', "value": 'often', "score": 3000 },
@@ -100,11 +93,10 @@ QUESTIONS_DB = {
         },
         {
             "id": 102,
-            "text": 'Achetez-vous des produits locaux et de saison ?',
+            "text": "Vous consommez de l'eau en ?",
             "options": [
-                { "label": 'Toujours', "value": 'always', "score": 0 },
-                { "label": 'Parfois', "value": 'sometimes', "score": 200, "is_default": True },
-                { "label": 'Rarement', "value": 'rarely', "score": 500 },
+                { "label": 'Bouteille', "value": 'plastic', "score": 200 },
+                { "label": 'Robinet', "value": 'tap', "score": 10, "is_default": True },
             ],
         },
         {
@@ -163,6 +155,16 @@ QUESTIONS_DB = {
                 { "label": 'Petite (-30m²)', "value": 'small', "score": 200 },
             ],
         },
+        {
+            "id": 205,
+            "text": 'Quel type de jardin ?',
+            "options": [
+                { "label": "Pas d'éxtérieur ", "value": 'no', "score": 0, "is_default": True },
+                { "label": "Grande pelouse avec beaucoup d'entretien et de dalles/béton", "value": "high", "score": 500},
+                { "label": 'Jardin classique', "value": 'classic', "score": 50 },
+                { "label": "Jardin positif pour le climat (Compostage, potager,récupération d'eau", "value": 'eco', "score": -200}
+            ],
+        }
     ],
     "consommation": [
         {
@@ -176,20 +178,11 @@ QUESTIONS_DB = {
         },
         {
             "id": 302,
-            "text": 'Appareil en panne ?',
+            "text": 'Quand un appareil est en panne ?',
             "options": [
                 { "label": 'Achat neuf', "value": 'replace', "score": 500 },
                 { "label": 'Réparation', "value": 'repair', "score": 100, "is_default": True },
                 { "label": 'Occasion', "value": 'secondhand', "score": 50 },
-            ],
-        },
-        {
-            "id": 303,
-            "text": 'Achat gadgets / déco ?',
-            "options": [
-                { "label": 'Régulièrement', "value": 'regular', "score": 400 },
-                { "label": 'Occasionnel', "value": 'occasional', "score": 150, "is_default": True },
-                { "label": 'Jamais', "value": 'never', "score": 0 },
             ],
         },
     ],
@@ -209,16 +202,6 @@ QUESTIONS_DB = {
             "options": [
                 { "label": 'Oui', "value": 'yes', "score": -50 },
                 { "label": 'Non', "value": 'no', "score": 0, "is_default": True },
-                { "label": 'J\'aimerais bien', "value": 'maybe', "score": 0 },
-            ],
-        },
-        {
-            "id": 403,
-            "text": 'Vrac ?',
-            "options": [
-                { "label": 'Souvent', "value": 'bulk', "score": -50 },
-                { "label": 'Parfois', "value": 'sometimes', "score": 0, "is_default": True },
-                { "label": 'Jamais', "value": 'packaged', "score": 50 },
             ],
         },
     ],
@@ -295,14 +278,6 @@ QUESTIONS_DB = {
                 { "label": 'Bains', "value": 'bath', "score": 300 },
                 { "label": 'Douches longues', "value": 'long_shower', "score": 150 },
                 { "label": 'Douches rapides', "value": 'quick_shower', "score": 50, "is_default": True },
-            ],
-        },
-        {
-            "id": 702,
-            "text": 'Eau ?',
-            "options": [
-                { "label": 'Bouteille', "value": 'plastic', "score": 200 },
-                { "label": 'Robinet', "value": 'tap', "score": 10, "is_default": True },
             ],
         },
         {

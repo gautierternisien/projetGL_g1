@@ -5,12 +5,9 @@ import Header from '@/components/Header.vue'
 import { ref, onMounted } from 'vue'
 import type { Mission } from '@/types/mission'
 import { useProgressStore } from '@/stores/progress'
+import { API_URL, USER_ID } from '@/config'
 
 const store = useProgressStore()
-
-// --- CONFIGURATION API ---
-const API_URL = 'http://localhost:8000'
-const USER_ID = 'user123'
 
 // Dictionnaire pour afficher de jolis noms (au lieu de 'transport', 'alimentation'...)
 const CATEGORY_LABELS: Record<string, string> = {
@@ -87,10 +84,10 @@ async function loadDashboardMissions() {
 }
 
 const events = ref([
-  { id: 1, title: 'Maxine à pris le vélo au lieu de la voiture' },
-  { id: 2, title: 'Maxine à pris le vélo au lieu de la voiture' },
-  { id: 3, title: 'Maxine à pris le vélo au lieu de la voiture' },
-  { id: 4, title: 'Maxine à pris le vélo au lieu de la voiture' },
+  { id: 1, title: 'Maxine a pris le vélo au lieu de la voiture' },
+  { id: 2, title: 'Maxine a pris le vélo au lieu de la voiture' },
+  { id: 3, title: 'Maxine a pris le vélo au lieu de la voiture' },
+  { id: 4, title: 'Maxine a pris le vélo au lieu de la voiture' },
 ])
 
 // --- LOGIQUE DE CALCUL ---
@@ -149,6 +146,9 @@ const processSectors = (details: Record<string, number>, total: number) => {
 
 // --- CHARGEMENT DES DONNÉES ---
 onMounted(async () => {
+  // 1. On lance le chargement des progressions en arrière-plan
+  store.fetchAllProgress(USER_ID)
+
   try {
     const response = await fetch(`${API_URL}/carbon-score/${USER_ID}`)
 
@@ -177,7 +177,7 @@ onMounted(async () => {
     <Header title="Tableau de bord" />
 
     <div class="scrollable-area">
-      <Card title="Empreinte ce mois">
+      <Card title="Empreinte carbone">
         <div class="split-content">
           <div class="info-side">
             <span class="big-number" :style="{ color: scoreColor }">{{ userScore / 1000 }}</span>
@@ -244,35 +244,16 @@ onMounted(async () => {
           </div>
         </Card>
       </RouterLink>
-
-      <div style="height: 100px"></div>
     </div>
   </div>
 </template>
 
 <style scoped>
 /* --- LAYOUT GLOBAL --- */
-.dashboard-wrapper {
-  background-color: white;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  font-family: 'Instrument Sans', sans-serif;
-  position: relative;
-}
+/* .dashboard-wrapper est dans global.css */
 
 /* --- ZONE DE SCROLL --- */
-.scrollable-area {
-  flex: 1;
-  padding-top: 100px;
-  padding-left: 20px;
-  padding-right: 20px;
-  overflow-y: auto;
-
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-}
+/* Géré dans global.css (.scrollable-area) */
 
 /* --- MISE EN PAGE CONTENU (GAUCHE / DROITE) --- */
 .split-content {
@@ -331,7 +312,13 @@ onMounted(async () => {
   display: flex;
   gap: 12px;
   overflow-x: auto;
-  padding-bottom: 5px;
+
+  /* MODIFICATION : On ajoute du padding tout autour pour que l'ombre ne soit pas coupée */
+  padding: 10px 10px 20px 10px;
+  /* (Haut Droite Bas Gauche) - On met un peu plus en bas pour l'ombre portée */
+
+  /* On compense le padding pour que le scroll commence bien au bord visuel si besoin */
+  margin: -10px;
 
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
@@ -351,8 +338,8 @@ onMounted(async () => {
 }
 
 .mission-card {
-  /* Dimensions */
-  width: 290px;
+  /* Dimensions réduites pour voir les cartes adjacentes */
+  width: 230px;
   height: 110px;
 
   /* Apparence : Fond blanc + Ombre */
@@ -367,9 +354,9 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
 
-  /* Comportement scroll */
+  /* Comportement scroll : centré pour voir avant/après */
   flex-shrink: 0;
-  scroll-snap-align: start;
+  scroll-snap-align: center;
   transition: transform 0.2s ease;
 }
 

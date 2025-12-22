@@ -19,7 +19,8 @@ header {
   color: #f5f5f5;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   width: 100%;
@@ -31,11 +32,43 @@ html, body {
   box-sizing: border-box;
 }
 
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
 a {
   text-decoration: none;
   transition: 0.4s;
+}
+
+.scrollable-area {
+  flex: 1;
+  /* Espace pour le Header fixe (80px + marge) */
+  padding-top: 100px;
+  /* Espace pour la Nav fixe (65px + marge) */
+  padding-bottom: 150px;
+  padding-left: 20px;
+  padding-right: 20px;
+  overflow-y: auto;
+  width: 100%;
+
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.dashboard-wrapper {
+  background-color: white;
+
+  /* --- FIX MOBILE --- */
+  height: 100dvh;
+  width: 100vw; /* Prend toute la largeur */
+  overflow: hidden; /* Interdit le scroll sur le parent (body) */
+  overscroll-behavior: none; /* Empêche l'effet "rebond" (elastic scroll) sur iOS */
+
+  display: flex;
+  flex-direction: column;
+  font-family: 'Instrument Sans', sans-serif;
+  position: relative;
 }

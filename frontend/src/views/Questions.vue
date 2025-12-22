@@ -5,6 +5,7 @@ import Header from '@/components/Header.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
 import { VRadio, VRadioGroup } from 'vuetify/components'
 import { useProgressStore } from '@/stores/progress.ts'
+import { API_URL, USER_ID } from '@/config'
 
 // Définition des types pour éviter les 'any'
 interface Option {
@@ -21,10 +22,6 @@ interface Question {
 const router = useRouter()
 const route = useRoute()
 const progressStore = useProgressStore()
-
-// --- CONFIGURATION API ---
-const API_URL = 'http://localhost:8000'
-const USER_ID = 'user123'
 
 const currentCategory = computed(() => route.params.category as string)
 
@@ -278,8 +275,8 @@ const saveAndExit = () => {
         </div>
 
         <div class="recap-actions">
-          <button class="nav-btn prev-btn" @click="saveAndExit">Retour au tableau de bord</button>
           <button class="nav-btn reset-btn" @click="resetAnswers">Modifier mes réponses</button>
+          <button class="nav-btn quest-btn" @click="saveAndExit">Retour aux questionnaires</button>
         </div>
       </div>
 
@@ -325,31 +322,11 @@ const saveAndExit = () => {
 </template>
 
 <style scoped>
-.dashboard-wrapper {
-  background-color: white;
-
-  /* --- FIX MOBILE --- */
-  height: 100dvh;
-  width: 100vw; /* Prend toute la largeur */
-  overflow: hidden; /* Interdit le scroll sur le parent (body) */
-  overscroll-behavior: none; /* Empêche l'effet "rebond" (elastic scroll) sur iOS */
-
-  display: flex;
-  flex-direction: column;
-  font-family: 'Instrument Sans', sans-serif;
-  position: relative;
-}
-
 .scrollable-area {
-  padding: 120px 20px 120px 20px;
-  overflow-y: auto;
-  flex: 1;
-
+  /* Les propriétés de scroll et padding sont gérées dans global.css */
   display: flex;
   flex-direction: column;
   align-items: center;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
   box-sizing: border-box;
   width: 100%;
 }
@@ -461,11 +438,13 @@ const saveAndExit = () => {
 }
 
 .nav-btn {
-  padding: 12px 20px;
+  /* MODIFICATION : Padding réduit (12px 20px -> 8px 16px) */
+  padding: 18px 16px;
   border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
-  font-size: 0.9rem;
+  /* MODIFICATION : Taille de police réduite (0.9rem -> 0.8rem) */
+  font-size: 0.8rem;
   transition: all 0.2s;
   border: none;
 }
@@ -474,17 +453,12 @@ const saveAndExit = () => {
   background-color: #f0f0f0;
   color: #555;
 }
-.prev-btn:hover {
-  background-color: #e0e0e0;
-}
 
 .next-btn {
   background-color: #2c3e50;
   color: white;
 }
-.next-btn:hover {
-  background-color: #1a252f;
-}
+
 .next-btn:disabled {
   background-color: #bdc3c7;
   color: #7f8c8d;
@@ -496,13 +470,14 @@ const saveAndExit = () => {
   color: #e74c3c;
   border: 1px solid #e74c3c;
 }
-.reset-btn:hover {
-  background-color: #e74c3c;
-  color: white;
-}
 
 .progress-section {
   margin-top: 20px;
   padding: 0 10px;
+}
+
+.quest-btn {
+  background-color: #679436;
+  color: white;
 }
 </style>

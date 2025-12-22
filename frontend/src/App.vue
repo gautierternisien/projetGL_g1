@@ -32,8 +32,8 @@ import { RouterView, RouterLink } from 'vue-router'
 
 <style scoped>
 .app-container {
-  /* On laisse plus d'espace en bas pour que le contenu ne soit pas caché par la nav flottante */
-  padding-bottom: 100px;
+  width: 100%;
+  height: 100%;
 }
 
 .bottom-nav {
@@ -44,7 +44,7 @@ import { RouterView, RouterLink } from 'vue-router'
 
   /* Largeur adaptative (max 350px pour ressembler à l'image) */
   width: 90%;
-  max-width: 350px;
+  max-width: 320px;
   height: 65px;
 
   /* Couleur de fond sombre (gris foncé) */
