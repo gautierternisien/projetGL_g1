@@ -3,6 +3,7 @@ import Card from '@/components/Card.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
 import Header from '@/components/Header.vue'
 import { ref, onMounted } from 'vue'
+import type { Mission } from '@/types/mission'
 import { useProgressStore } from '@/stores/progress'
 
 const store = useProgressStore()
@@ -44,12 +45,46 @@ const scoreComment = ref('Chargement...')
 
 const sectors = ref<{ name: string; pct: number; color: string }[]>([])
 
-const missions = ref([
-  { id: 1, title: 'Mission 1' },
-  { id: 2, title: 'Mission 2' },
-  { id: 3, title: 'Mission 3' },
-  { id: 4, title: 'Mission 4' },
-])
+// Dashboard missions: load actual missions from backend (show title + category)
+const displayMissions = ref<{ mission: Mission; category: string }[]>([])
+
+async function loadDashboardMissions() {
+  try {
+    const keys = Object.keys(CATEGORY_LABELS)
+    const results = await Promise.all(
+      keys.map((k) =>
+        fetch(`${API_URL}/missions/${k}`, { cache: 'no-store' })
+          .then((r) => (r.ok ? r.json() : []))
+          .catch(() => []),
+      ),
+    )
+
+    const rows: { mission: Mission; category: string }[] = []
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i]
+      const data = results[i]
+      if (Array.isArray(data)) {
+        for (const d of data) {
+          const status = (d.status ?? d.desc ?? 'new').toString().toLowerCase()
+          if (
+            status.includes('en_cours') ||
+            status.includes('encours') ||
+            status.includes('in_progress') ||
+            status.includes('ongoing')
+          ) {
+            rows.push({ mission: { id: Number(d.id), title: d.title, description: d.description ?? d.desc ?? '', status }, category: k })
+          }
+          if (rows.length >= 6) break
+        }
+      }
+      if (rows.length >= 6) break
+    }
+
+    displayMissions.value = rows
+  } catch (e) {
+    console.error('Erreur loadDashboardMissions', e)
+  }
+}
 
 const events = ref([
   { id: 1, title: 'Maxine à pris le vélo au lieu de la voiture' },
@@ -132,6 +167,8 @@ onMounted(async () => {
     console.error('Erreur chargement:', error)
     scoreComment.value = 'Erreur'
   }
+  // load dashboard missions (real ones)
+  await loadDashboardMissions()
 })
 </script>
 
@@ -176,20 +213,22 @@ onMounted(async () => {
         </Card>
       </RouterLink>
 
-      <RouterLink to="/missions" class="unstyled-link">
-        <Card title="Missions en cours" :hasArrow="true">
-          <div class="carousel-container">
-            <div v-for="mission in missions" :key="mission.id" class="mission-card">
-              <RouterLink :to="'/missions/' + mission.id">
-                <div class="card-content">
-                  <span class="card-icon">🎯</span>
-                  <span class="card-title">{{ mission.title }}</span>
+      <Card title="Missions en cours" :hasArrow="true">
+        <div class="carousel-container">
+          <div v-for="item in displayMissions" :key="item.mission.id" class="mission-card">
+            <RouterLink :to="`/missions/${item.category}?missionId=${item.mission.id}`" class="unstyled-link inner-mission-link">
+              <div class="card-content">
+                <span class="card-icon">🎯</span>
+                <div class="card-texts">
+                  <span class="card-title">{{ item.mission.title }}</span>
+                  <span class="card-subtitle">{{ CATEGORY_LABELS[item.category] }}</span>
                 </div>
-              </RouterLink>
-            </div>
+              </div>
+            </RouterLink>
           </div>
-        </Card>
-      </RouterLink>
+          <div v-if="displayMissions.length === 0" class="mission-card empty">Aucune mission en cours</div>
+        </div>
+      </Card>
 
       <RouterLink to="/communaute" class="unstyled-link">
         <Card title="Évènements communautaires " :hasArrow="true">
@@ -296,11 +335,15 @@ onMounted(async () => {
 
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  overscroll-behavior-x: contain;
+  scroll-behavior: smooth;
+  width: 100%;
 }
 
 /* Masquer la barre de scroll du carrousel (Optionnel mais joli) */
 .carousel-container::-webkit-scrollbar {
-  display: none;
+  height: 8px;
 }
 .carousel-container {
   -ms-overflow-style: none;
@@ -338,20 +381,40 @@ onMounted(async () => {
 /* Contenu central (Icône + Texte) */
 .card-content {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 8px; /* Espace entre icône et texte */
+  gap: 12px; /* Espace entre icône et textes */
+  justify-content: flex-start;
+  padding: 6px 8px;
 }
 
 .card-icon {
   font-size: 1.8rem;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-texts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .card-title {
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   color: #333;
-  font-weight: 500;
-  text-align: center;
+  font-weight: 600;
+  text-align: left;
+}
+
+.card-subtitle {
+  font-size: 0.8rem;
+  color: #679436; /* app green */
+  font-weight: 600;
 }
 
 .unstyled-link {

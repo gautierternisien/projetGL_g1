@@ -26,6 +26,11 @@ const router = createRouter({
       component: MissionsView,
     },
     {
+      path: '/missions/:category',
+      name: 'mission-category',
+      component: () => import('../views/MissionCategoryView.vue'),
+    },
+    {
       path: '/communaute',
       name: 'communaute',
       component: CommunauteView,

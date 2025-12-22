@@ -27,6 +27,13 @@ class Question(BaseModel):
     text: str
     options: List[Option]
 
+
+class Mission(BaseModel):
+    id: int
+    title: str
+    description: Optional[str] = None
+    status: Optional[str] = None
+
 class UserAnswer(BaseModel):
     question_id: int
     answer_value: str
@@ -310,6 +317,43 @@ QUESTIONS_DB = {
     ],
 }
 
+# --- SIMULATION FAUSSE DES MISSIONS ---
+MISSIONS_DB = {
+    "transport": [
+        { "id": 1, "title": 'Prendre le vélo', "description": 'Remplacez un trajet voiture par vélo', "status": 'en_cours' },
+        { "id": 2, "title": 'Privilégier les transports en commun', "description": 'Utilisez le bus ou le tram pour au moins un trajet cette semaine', "status": 'new' },
+    ],
+    "logement": [
+        { "id": 101, "title": 'Isolation fenêtre', "description": 'Vérifier les joints des fenêtres', "status": 'new' },
+        { "id": 3, "title": 'Baisser le chauffage', "description": 'Réduire la température de 1°C pendant une semaine', "status": 'en_cours' },
+    ],
+    "alimentation": [
+        { "id": 4, "title": 'Recette végétarienne', "description": 'Essayez une recette végétarienne', "status": 'new' },
+        { "id": 5, "title": 'Acheter local', "description": 'Acheter au moins un produit local et de saison', "status": 'termine' },
+    ],
+    "numerique": [
+        { "id": 6, "title": 'Nettoyer boîte mail', "description": 'Supprimez les anciens emails volumineux', "status": 'new' },
+        { "id": 7, "title": 'Éteindre la nuit', "description": 'Éteindre ou débrancher les appareils non utilisés la nuit', "status": 'en_cours' },
+    ],
+    "loisirs": [
+        { "id": 8, "title": 'Activité locale', "description": 'Privilégier une sortie proche à faible empreinte', "status": 'new' },
+        { "id": 9, "title": 'Week‑end sans avion', "description": 'Planifier un week‑end sans prendre l’avion', "status": 'termine' },
+    ],
+    "quotidien": [
+        { "id": 10, "title": 'Éteindre veille', "description": 'Éteindre les appareils en veille chaque soir', "status": 'en_cours' },
+        { "id": 11, "title": 'Utiliser une gourde', "description": 'Remplacer les bouteilles plastiques par une gourde', "status": 'new' },
+    ],
+    "recyclage": [
+        { "id": 12, "title": 'Compostage', "description": 'Mettre en place un compost ou collecter les déchets organiques', "status": 'new' },
+        { "id": 13, "title": 'Réemploi', "description": 'Donner ou réparer un objet au lieu de le jeter', "status": 'termine' },
+    ],
+    "consommation": [
+        { "id": 14, "title": 'Acheter d’occasion', "description": 'Acheter un article d’occasion cette semaine', "status": 'en_cours' },
+        { "id": 15, "title": 'Attendre avant achat', "description": 'Attendre 48h avant un achat non essentiel', "status": 'new' },
+    ],
+}
+
+
 # --- STOCKAGE TEMPORAIRE DES RÉPONSES ---
 # Nouvelle Structure :
 # {
@@ -338,6 +382,34 @@ async def get_questions_by_category(category: str):
         raise HTTPException(status_code=404, detail="Catégorie non trouvée")
 
     return QUESTIONS_DB[category]
+
+@app.get("/missions/{category}", response_model=List[Mission])
+async def get_missions_by_category(category: str):
+    """
+    Récupère les missions d'une catégorie spécifique (ex: /missions/transport)
+    """
+    if category not in MISSIONS_DB:
+        raise HTTPException(status_code=404, detail="Catégorie de missions non trouvée")
+
+    return MISSIONS_DB[category]
+
+
+class MissionUpdate(BaseModel):
+    status: str
+
+
+@app.put("/missions/{mission_id}")
+async def update_mission(mission_id: int, payload: MissionUpdate):
+    """
+    Met à jour le statut d'une mission identifiée par son `id`.
+    """
+    for cat, missions in MISSIONS_DB.items():
+        for m in missions:
+            if int(m.get('id')) == mission_id:
+                m['status'] = payload.status
+                return m
+
+    raise HTTPException(status_code=404, detail="Mission non trouvée")
 
 @app.post("/answers/{category}/{user_id}")
 async def save_answer(category: str, user_id: str, answer: UserAnswer):
