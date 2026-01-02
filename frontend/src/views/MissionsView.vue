@@ -9,7 +9,9 @@ import { useProgressStore } from '@/stores/progress'
 const store = useProgressStore()
 const API_URL = 'http://localhost:8000'
 
-const countsByCategory = ref<Record<string, { completed: number; total: number; inProgress: number }>>({})
+const countsByCategory = ref<
+  Record<string, { completed: number; total: number; inProgress: number }>
+>({})
 
 // tableau statique des catégories
 const CATEGORY_DATA = [
@@ -23,24 +25,28 @@ const CATEGORY_DATA = [
   { key: 'quotidien', title: 'Habitudes Quotidiennes', emoji: '🗓️️' },
 ]
 
-const categoriesKeys = ref(CATEGORY_DATA.map(c => c.key))
+const categoriesKeys = ref(CATEGORY_DATA.map((c) => c.key))
 
 async function loadCategoryCounts() {
   try {
     const results = await Promise.all(
-      categoriesKeys.value.map(k =>
+      categoriesKeys.value.map((k) =>
         fetch(`${API_URL}/missions/${k}`, { cache: 'no-store' })
-          .then(r => (r.ok ? r.json() : []))
-          .catch(() => [])
-      )
+          .then((r) => (r.ok ? r.json() : []))
+          .catch(() => []),
+      ),
     )
 
     results.forEach((data, i) => {
       const key = categoriesKeys.value[i]
       if (Array.isArray(data)) {
         const total = data.length
-        const completed = data.filter(d => /termine|terminee|done|completed/i.test(d.status ?? '')).length
-        const inProgress = data.filter(d => /en_cours|encours|in_progress|ongoing|open/i.test(d.status ?? '')).length
+        const completed = data.filter((d) =>
+          /termine|terminee|done|completed/i.test(d.status ?? ''),
+        ).length
+        const inProgress = data.filter((d) =>
+          /en_cours|encours|in_progress|ongoing|open/i.test(d.status ?? ''),
+        ).length
         countsByCategory.value[key] = { completed, total, inProgress }
       } else {
         countsByCategory.value[key] = { completed: 0, total: 0, inProgress: 0 }
@@ -55,13 +61,13 @@ onMounted(loadCategoryCounts)
 
 // Computed categories avec progression
 const categoriesWithProgress = computed(() => {
-  return CATEGORY_DATA.map(c => {
+  return CATEGORY_DATA.map((c) => {
     const backend = countsByCategory.value[c.key]
     const pct = store.getCategoryScore(c.key)
     const totalConfigured = backend ? backend.total : 0
     const completed = backend ? backend.completed : Math.round((pct / 100) * totalConfigured)
     const inProgress = backend ? backend.inProgress : Math.max(0, totalConfigured - completed)
-    return { ...c, pct, completed, inProgress }
+    return { ...c, pct, completed, inProgress, total: totalConfigured }
   })
 })
 </script>
@@ -84,7 +90,10 @@ const categoriesWithProgress = computed(() => {
                 <span class="emoji-img">{{ cat.emoji }}</span>
               </div>
               <div class="mission-info">
-                <div class="mission-count">En cours: {{ cat.inProgress }} • Terminées: {{ cat.completed }}</div>
+                <div class="mission-count">
+                  En cours: {{ cat.inProgress }} • Terminées: {{ cat.completed }} • Total:
+                  {{ cat.total }}
+                </div>
                 <ProgressBar :value="cat.pct" :showLabel="false" />
               </div>
             </div>
@@ -144,7 +153,6 @@ const categoriesWithProgress = computed(() => {
 }
 
 .mission-count {
-  font-weight: 700;
   color: #333;
   font-size: 0.95rem;
 }
