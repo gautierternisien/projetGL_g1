@@ -39,6 +39,9 @@ async function loadCategoryCounts() {
 
     results.forEach((data, i) => {
       const key = categoriesKeys.value[i]
+      // On s'assure que la clé existe
+      if (!key) return
+
       if (Array.isArray(data)) {
         const total = data.length
         const completed = data.filter((d) =>
@@ -131,7 +134,7 @@ const categoriesWithProgress = computed(() => {
 .mission-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
 
 .emoji-side {
@@ -143,18 +146,19 @@ const categoriesWithProgress = computed(() => {
 
 .emoji-img {
   font-size: 2.5rem;
+  line-height: 1;
 }
 
 .mission-info {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .mission-count {
-  color: #333;
-  font-size: 0.95rem;
+  color: #666;
+  font-size: 0.85rem;
 }
 
 .unstyled-link {
