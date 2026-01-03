@@ -660,36 +660,44 @@ async def get_carbon_score(user_id: str):
     }
 
 @app.get("/global-stats")
-async def get_global_stats():
+async def get_global_stats(db: Session = Depends(get_db)):
     """
-    Calcule la moyenne des scores de tous les utilisateurs enregistrés dans user_answers_db.
+    Calcule la moyenne des scores de tous les utilisateurs enregistrés.
+    Prend en compte tous les utilisateurs en base de données.
     """
-    total_users = len(user_answers_db)
+    # 1. Calcul du score national de référence (somme des defaults)
+    sum_of_defaults = 0
+    national_category_scores = {}
 
-    # Si aucun utilisateur n'a répondu, on renvoie les moyennes par défaut (nationales)
+    for cat, questions in QUESTIONS_DB.items():
+        cat_score = 0
+        for q in questions:
+            for opt in q['options']:
+                if opt.get('is_default'):
+                    cat_score += opt['score']
+        national_category_scores[cat] = cat_score
+        sum_of_defaults += cat_score
+
+    average_national_score = sum_of_defaults
+
+    # 2. Récupération de tous les utilisateurs
+    all_users = crud.get_all_users(db)
+    total_users = len(all_users)
+
     if total_users == 0:
-        average_score = 0
-        category_scores = {}
-        for cat, questions in QUESTIONS_DB.items():
-            cat_score = 0
-            for q in questions:
-                for opt in q['options']:
-                    if opt.get('is_default'):
-                        cat_score += opt['score']
-            category_scores[cat] = cat_score
-            average_score += cat_score
-
         return {
-            "global_score": average_score,
-            "details_by_category": category_scores,
+            "global_score": sum_of_defaults,
+            "average_national_score": average_national_score,
+            "details_by_category": national_category_scores,
             "user_count": 0
         }
 
-    # Sinon on calcule la moyenne réelle
+    # 3. Calcul de la moyenne réelle
     global_sum = 0
     category_sums = {cat: 0 for cat in QUESTIONS_DB}
 
-    for user_id in user_answers_db:
+    for user in all_users:
+        user_id = user.username # user_answers_db utilise le username comme clé
         user_data = user_answers_db.get(user_id, {})
 
         for category, questions in QUESTIONS_DB.items():
@@ -699,11 +707,16 @@ async def get_global_stats():
             for question in questions:
                 user_val = user_cat_answers.get(question['id'])
                 score_added = False
-                for option in question['options']:
-                    if user_val == option['value']:
-                        cat_score += option['score']
-                        score_added = True
-                        break
+
+                # Chercher si l'utilisateur a répondu
+                if user_val:
+                    for option in question['options']:
+                        if user_val == option['value']:
+                            cat_score += option['score']
+                            score_added = True
+                            break
+
+                # Sinon valeur par défaut
                 if not score_added:
                     for option in question['options']:
                         if option.get('is_default'):
@@ -718,6 +731,7 @@ async def get_global_stats():
 
     return {
         "global_score": avg_global,
+        "average_national_score": average_national_score,
         "details_by_category": avg_categories,
         "user_count": total_users
     }
