@@ -1,4 +1,11 @@
 <script setup lang="ts">
+import { useAuthStore } from '@/stores/auth'
+import { computed } from 'vue'
+import { mdiLogin } from '@mdi/js'
+
+const authStore = useAuthStore()
+const isConnected = computed(() => authStore.isConnected)
+
 defineProps({
   title: {
     type: String,
@@ -7,10 +14,6 @@ defineProps({
   subtitle: {
     type: String,
     default: '',
-  },
-  isConnected: {
-    type: Boolean,
-    default: true,
   },
   showResumeBtn: {
     type: Boolean,
@@ -47,12 +50,7 @@ defineEmits(['resumeLater'])
         <div class="user-avatar">👤</div>
       </RouterLink>
       <div v-else class="auth-buttons">
-        <RouterLink to="/login">
-          <button class="auth-btn">Se connecter</button>
-        </RouterLink>
-        <RouterLink to="/register">
-          <button class="auth-btn">S'inscrire</button>
-        </RouterLink>
+        <RouterLink to="/login" class="login-btn"> Se connecter </RouterLink>
       </div>
     </div>
   </header>
@@ -153,6 +151,21 @@ defineEmits(['resumeLater'])
   margin-bottom: 4px; /* Léger ajustement vertical pour centrer avec l'avatar */
 }
 
+.login-btn {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: white;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.2s;
+  text-decoration: none;
+  margin-bottom: 4px;
+}
+
 .user-avatar {
   font-size: 1.5rem;
   background: rgba(255, 255, 255, 0.2);
@@ -168,29 +181,6 @@ defineEmits(['resumeLater'])
 
 .auth-buttons {
   display: flex;
-  gap: 5px;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.auth-btn {
-  background-color: white;
-  color: #6d8b46;
-  border: none;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  font-size: 0.7rem;
-  transition:
-    transform 0.1s ease,
-    background-color 0.2s;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  white-space: nowrap;
-}
-
-.auth-btn:active {
-  transform: scale(0.95);
+  gap: 10px;
 }
 </style>

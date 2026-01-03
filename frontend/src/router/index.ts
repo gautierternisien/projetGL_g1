@@ -5,7 +5,9 @@ import MissionsView from '@/views/MissionsView.vue'
 import CommunauteView from '@/views/CommunauteView.vue'
 import ConseilsView from '@/views/ConseilsView.vue'
 import ProfileView from '@/views/ProfileView.vue'
-import Questions from '@/views/Questions.vue'
+import LoginView from '@/views/LoginView.vue'
+import RegisterView from '@/views/RegisterView.vue'
+import TrophiesView from '@/views/TrophiesView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -14,6 +16,16 @@ const router = createRouter({
       path: '/',
       name: 'home',
       component: HomeView,
+    },
+    {
+      path: '/login',
+      name: 'login',
+      component: LoginView,
+    },
+    {
+      path: '/register',
+      name: 'register',
+      component: RegisterView,
     },
     {
       path: '/questionnaires',
@@ -44,6 +56,11 @@ const router = createRouter({
       path: '/profile',
       name: 'profile',
       component: ProfileView,
+    },
+    {
+      path: '/trophees',
+      name: 'trophees',
+      component: TrophiesView,
     },
     {
       path: '/questionnaires/:category',

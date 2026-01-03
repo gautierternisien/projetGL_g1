@@ -1,22 +1,103 @@
 <script setup lang="ts">
 import Header from '@/components/Header.vue'
+import { useAuthStore } from '@/stores/auth'
+import { useRouter } from 'vue-router'
+import { computed } from 'vue'
+
+const authStore = useAuthStore()
+const router = useRouter()
+const isConnected = computed(() => authStore.isConnected)
 </script>
 
 <template>
   <div class="dashboard-wrapper">
     <Header title="Espace Communautaire" />
     <div class="scrollable-area">
-      <div class="placeholder-content">
-        <p>Contenu à venir...</p>
+      <div v-if="!isConnected" class="blur-overlay">
+        <div class="lock-message">
+          <span class="lock-icon">🔒</span>
+          <p>Connectez-vous pour accéder à l'espace communautaire</p>
+          <button @click="router.push('/login')" class="login-btn">Se connecter</button>
+        </div>
+      </div>
+
+      <div :class="{ 'blurred-content': !isConnected }">
+        <div class="placeholder-content">
+          <p>Contenu à venir...</p>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+.dashboard-wrapper {
+  background-color: white;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: 'Instrument Sans', sans-serif;
+  position: relative;
+}
+
+.scrollable-area {
+  padding: 100px 20px;
+  overflow-y: auto;
+  flex: 1;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+}
+
 .placeholder-content {
   padding: 20px;
   text-align: center;
   color: #666;
+}
+
+.blurred-content {
+  filter: blur(5px);
+  pointer-events: none;
+  user-select: none;
+}
+
+.blur-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 500px;
+}
+
+.lock-message {
+  background: rgba(255, 255, 255, 0.9);
+  padding: 2rem;
+  border-radius: 16px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.lock-icon {
+  font-size: 3rem;
+}
+
+.login-btn {
+  background-color: #679436;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 1rem;
 }
 </style>

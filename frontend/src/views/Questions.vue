@@ -5,6 +5,7 @@ import Header from '@/components/Header.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
 import { VRadio, VRadioGroup } from 'vuetify/components'
 import { useProgressStore } from '@/stores/progress.ts'
+import { useAuthStore } from '@/stores/auth'
 import { API_URL, USER_ID } from '@/config'
 
 // Définition des types pour éviter les 'any'
@@ -22,6 +23,9 @@ interface Question {
 const router = useRouter()
 const route = useRoute()
 const progressStore = useProgressStore()
+const authStore = useAuthStore()
+
+const userId = computed(() => (authStore.user ? authStore.user.username : USER_ID))
 
 const currentCategory = computed(() => route.params.category as string)
 
@@ -59,7 +63,7 @@ const fetchQuestions = async () => {
 const fetchUserProgress = async () => {
   try {
     // AJOUT DE L'OPTION { cache: 'no-store' }
-    const response = await fetch(`${API_URL}/answers/${currentCategory.value}/${USER_ID}`, {
+    const response = await fetch(`${API_URL}/answers/${currentCategory.value}/${userId.value}`, {
       cache: 'no-store',
     })
 
@@ -76,7 +80,7 @@ const fetchUserProgress = async () => {
 const saveAnswerToBackend = async (questionId: number, value: string) => {
   try {
     // URL DYNAMIQUE : /answers/{category}/{user_id}
-    const response = await fetch(`${API_URL}/answers/${currentCategory.value}/${USER_ID}`, {
+    const response = await fetch(`${API_URL}/answers/${currentCategory.value}/${userId.value}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -95,31 +99,14 @@ const saveAnswerToBackend = async (questionId: number, value: string) => {
   }
 }
 
-// Fonction pour effacer les réponses (Reset)
-const resetAnswers = async () => {
-  if (confirm('Attention, cela va effacer toutes vos réponses pour cette catégorie. Continuer ?')) {
-    try {
-      // --- C'EST ICI QUE ÇA MANQUAIT ---
-      // On appelle vraiment le backend pour supprimer les données de la base
-      const response = await fetch(`${API_URL}/answers/${currentCategory.value}/${USER_ID}`, {
-        method: 'DELETE',
-      })
-
-      if (response.ok) {
-        // Seulement si le serveur a dit "OK", on nettoie l'affichage
-        savedAnswers.value = {}
-        currentQuestionIndex.value = 0
-        selectedAnswer.value = null
-        isCompletedMode.value = false
-        progressStore.setScore(currentCategory.value, 0)
-
-        console.log('Reset réussi côté serveur et client')
-      } else {
-        alert("Erreur : Le serveur n'a pas pu supprimer les réponses.")
-      }
-    } catch (error) {
-      console.error('Erreur réseau lors du reset:', error)
-    }
+// Fonction pour modifier les réponses (Retour au mode édition)
+const modifyAnswers = () => {
+  isCompletedMode.value = false
+  currentQuestionIndex.value = 0
+  // On remet la réponse sélectionnée pour la première question
+  if (questions.value.length > 0) {
+    const firstQ = questions.value[0]
+    selectedAnswer.value = savedAnswers.value[firstQ.id] || null
   }
 }
 
@@ -275,7 +262,7 @@ const saveAndExit = () => {
         </div>
 
         <div class="recap-actions">
-          <button class="nav-btn reset-btn" @click="resetAnswers">Modifier mes réponses</button>
+          <button class="nav-btn reset-btn" @click="modifyAnswers">Modifier mes réponses</button>
           <button class="nav-btn quest-btn" @click="saveAndExit">Retour aux questionnaires</button>
         </div>
       </div>

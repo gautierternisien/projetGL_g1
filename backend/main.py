@@ -1,9 +1,27 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List, Optional, Dict
+from datetime import timedelta
+
+import crud, models, schemas, utils
+from database import SessionLocal, engine
+
+models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+# Dependency
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # Configuration CORS pour autoriser le frontend (Vue.js) à parler au backend
 app.add_middleware(
@@ -339,7 +357,67 @@ MISSIONS_DB = {
 # }
 user_answers_db: Dict[str, Dict[str, Dict[int, str]]] = {}
 
+# {
+#    "user_123": {
+#        1: "en_cours",
+#        2: "termine"
+#    }
+# }
+user_missions_db: Dict[str, Dict[int, str]] = {}
+
 # --- ROUTES API ---
+
+@app.post("/register", response_model=schemas.User)
+def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    db_user = crud.get_user_by_email(db, email=user.email)
+    if db_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    db_user = crud.get_user_by_username(db, username=user.username)
+    if db_user:
+        raise HTTPException(status_code=400, detail="Username already registered")
+    return crud.create_user(db=db, user=user)
+
+@app.post("/token", response_model=schemas.Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    # Try to find user by username
+    user = crud.get_user_by_username(db, username=form_data.username)
+    # If not found, try by email
+    if not user:
+        user = crud.get_user_by_email(db, email=form_data.username)
+
+    if not user or not crud.verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username/email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    access_token_expires = timedelta(minutes=utils.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = utils.create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@app.get("/users/me", response_model=schemas.User)
+async def read_users_me(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = utils.jwt.decode(token, utils.SECRET_KEY, algorithms=[utils.ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        token_data = schemas.TokenData(email=username) # reusing email field for username/sub
+    except utils.JWTError:
+        raise credentials_exception
+
+    user = crud.get_user_by_username(db, username=token_data.email)
+    if user is None:
+        raise credentials_exception
+    return user
 
 @app.get("/")
 async def root():
@@ -359,30 +437,79 @@ async def get_questions_by_category(category: str):
     return QUESTIONS_DB[category]
 
 @app.get("/missions/{category}", response_model=List[Mission])
-async def get_missions_by_category(category: str):
+async def get_missions_by_category(category: str, user_id: Optional[str] = None):
     """
-    Récupère les missions d'une catégorie spécifique (ex: /missions/transport)
+    Récupère les missions d'une catégorie spécifique (ex: /missions/transport).
+    Si user_id est fourni, retourne les statuts personnalisés.
+    Sinon, retourne les missions avec statut 'new' par défaut.
     """
     if category not in MISSIONS_DB:
         raise HTTPException(status_code=404, detail="Catégorie de missions non trouvée")
 
-    return MISSIONS_DB[category]
+    raw_missions = MISSIONS_DB[category]
+
+    # Si pas d'utilisateur, on renvoie tout en 'new' (ou tel quel si on veut garder le comportement par défaut)
+    # La demande est : "lorsque j'ai un nouvel utilisateur, les missions proposées soient toutes des missions 'à réaliser' / 'nouvelles missions'"
+    # Donc on va forcer le statut à 'new' si on ne connait pas le statut pour cet utilisateur.
+
+    personalized_missions = []
+    user_statuses = {}
+    if user_id and user_id in user_missions_db:
+        user_statuses = user_missions_db[user_id]
+
+    for m in raw_missions:
+        # On crée une copie pour ne pas modifier la DB globale
+        m_copy = m.copy()
+
+        # Si on a un statut pour cet utilisateur, on l'utilise
+        # Sinon, c'est 'new'
+        if user_id:
+            m_copy['status'] = user_statuses.get(m['id'], 'new')
+        else:
+            # Si pas d'user_id (ex: appel anonyme), on met 'new' par défaut pour ne pas montrer de fausses progressions
+            m_copy['status'] = 'new'
+
+        personalized_missions.append(m_copy)
+
+    return personalized_missions
 
 
 class MissionUpdate(BaseModel):
     status: str
+    user_id: Optional[str] = None
 
 
 @app.put("/missions/{mission_id}")
 async def update_mission(mission_id: int, payload: MissionUpdate):
     """
     Met à jour le statut d'une mission identifiée par son `id`.
+    Si user_id est fourni, met à jour le statut pour cet utilisateur uniquement.
     """
+    # Vérifier si la mission existe
+    mission_exists = False
     for cat, missions in MISSIONS_DB.items():
         for m in missions:
             if int(m.get('id')) == mission_id:
-                m['status'] = payload.status
-                return m
+                mission_exists = True
+                break
+        if mission_exists:
+            break
+
+    if not mission_exists:
+        raise HTTPException(status_code=404, detail="Mission non trouvée")
+
+    if payload.user_id:
+        if payload.user_id not in user_missions_db:
+            user_missions_db[payload.user_id] = {}
+        user_missions_db[payload.user_id][mission_id] = payload.status
+        return {"id": mission_id, "status": payload.status}
+    else:
+        # Fallback legacy : update global DB (déconseillé si multi-user)
+        for cat, missions in MISSIONS_DB.items():
+            for m in missions:
+                if int(m.get('id')) == mission_id:
+                    m['status'] = payload.status
+                    return m
 
     raise HTTPException(status_code=404, detail="Mission non trouvée")
 
@@ -530,4 +657,67 @@ async def get_carbon_score(user_id: str):
         "average_national_score": average_score, # Score de comparaison
         "details_by_category": category_scores,
         "unit": "points_impact" # ou kgCO2e
+    }
+
+@app.get("/global-stats")
+async def get_global_stats():
+    """
+    Calcule la moyenne des scores de tous les utilisateurs enregistrés dans user_answers_db.
+    """
+    total_users = len(user_answers_db)
+
+    # Si aucun utilisateur n'a répondu, on renvoie les moyennes par défaut (nationales)
+    if total_users == 0:
+        average_score = 0
+        category_scores = {}
+        for cat, questions in QUESTIONS_DB.items():
+            cat_score = 0
+            for q in questions:
+                for opt in q['options']:
+                    if opt.get('is_default'):
+                        cat_score += opt['score']
+            category_scores[cat] = cat_score
+            average_score += cat_score
+
+        return {
+            "global_score": average_score,
+            "details_by_category": category_scores,
+            "user_count": 0
+        }
+
+    # Sinon on calcule la moyenne réelle
+    global_sum = 0
+    category_sums = {cat: 0 for cat in QUESTIONS_DB}
+
+    for user_id in user_answers_db:
+        user_data = user_answers_db.get(user_id, {})
+
+        for category, questions in QUESTIONS_DB.items():
+            cat_score = 0
+            user_cat_answers = user_data.get(category, {})
+
+            for question in questions:
+                user_val = user_cat_answers.get(question['id'])
+                score_added = False
+                for option in question['options']:
+                    if user_val == option['value']:
+                        cat_score += option['score']
+                        score_added = True
+                        break
+                if not score_added:
+                    for option in question['options']:
+                        if option.get('is_default'):
+                            cat_score += option['score']
+                            break
+
+            category_sums[category] += cat_score
+            global_sum += cat_score
+
+    avg_global = round(global_sum / total_users)
+    avg_categories = {cat: round(s / total_users) for cat, s in category_sums.items()}
+
+    return {
+        "global_score": avg_global,
+        "details_by_category": avg_categories,
+        "user_count": total_users
     }

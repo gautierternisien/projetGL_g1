@@ -1,13 +1,23 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue'
-import type { Mission } from '@/types/mission'
-import { useRoute, useRouter } from 'vue-router'
 import Header from '@/components/Header.vue'
 import Card from '@/components/Card.vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import type { Mission } from '@/types/mission'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
-const category = String(route.params.category || '')
+const authStore = useAuthStore()
+const category = route.params.category as string
+
+onMounted(() => {
+  if (!authStore.isConnected) {
+    router.push('/login')
+    return
+  }
+  loadMissions()
+})
 
 // ref to the scrolling container so we scroll relative to it
 const containerRef = ref<HTMLElement | null>(null)
@@ -47,7 +57,8 @@ const remoteMissions = ref<Mission[]>([])
 // Load missions for this category from backend
 async function loadMissions() {
   try {
-    const res = await fetch(`${API_URL}/missions/${category}`, { cache: 'no-store' })
+    const userIdParam = authStore.user ? `?user_id=${authStore.user.username}` : ''
+    const res = await fetch(`${API_URL}/missions/${category}${userIdParam}`, { cache: 'no-store' })
     if (res.ok) {
       const data = await res.json()
       // Normalise les clés: backend peut renvoyer `desc` ou `description`.
@@ -131,7 +142,10 @@ function updateMissionStatus(mission: Mission, newStatus: Mission['status']) {
       fetch(`${API_URL}/missions/${mission.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({
+          status: newStatus,
+          user_id: authStore.user?.username,
+        }),
       })
         .then(async (r) => {
           if (!r.ok) throw new Error('PUT failed')
