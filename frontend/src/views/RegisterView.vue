@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter, RouterLink } from 'vue-router'
-import Header from '@/components/Header.vue'
+import Header from '@/components/AppHeader.vue'
 
 const authStore = useAuthStore()
 const router = useRouter()

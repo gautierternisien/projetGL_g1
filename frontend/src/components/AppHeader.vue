@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useAuthStore } from '@/stores/auth'
 import { computed } from 'vue'
-import { mdiLogin } from '@mdi/js'
 
 const authStore = useAuthStore()
 const isConnected = computed(() => authStore.isConnected)

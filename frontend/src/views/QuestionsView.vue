@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import Header from '@/components/Header.vue'
+import Header from '@/components/AppHeader.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
 import { VRadio, VRadioGroup } from 'vuetify/components'
 import { useProgressStore } from '@/stores/progress.ts'
@@ -106,7 +106,9 @@ const modifyAnswers = () => {
   // On remet la réponse sélectionnée pour la première question
   if (questions.value.length > 0) {
     const firstQ = questions.value[0]
-    selectedAnswer.value = savedAnswers.value[firstQ.id] || null
+    if (firstQ) {
+      selectedAnswer.value = savedAnswers.value[firstQ.id] || null
+    }
   }
 }
 
@@ -289,7 +291,7 @@ const saveAndExit = () => {
 
         <div class="navigation-buttons">
           <button v-if="!isFirstQuestion" class="nav-btn prev-btn" @click="prevQuestion">
-            < Question précédente
+            &lt; Question précédente
           </button>
           <div v-else></div>
 

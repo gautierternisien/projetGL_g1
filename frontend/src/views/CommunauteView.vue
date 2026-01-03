@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import Header from '@/components/Header.vue'
+import Header from '@/components/AppHeader.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 import { computed } from 'vue'

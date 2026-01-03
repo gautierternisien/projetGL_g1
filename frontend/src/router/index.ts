@@ -65,7 +65,7 @@ const router = createRouter({
     {
       path: '/questionnaires/:category',
       name: 'questionnaire',
-      component: () => import('../views/Questions.vue'),
+      component: () => import('../views/QuestionsView.vue'),
     },
     {
       path: '/about',

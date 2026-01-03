@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import Card from '@/components/Card.vue'
+import Card from '@/components/AppCard.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
-import Header from '@/components/Header.vue'
+import Header from '@/components/AppHeader.vue'
 import { ref, onMounted, computed, onActivated, watch } from 'vue'
 import type { Mission } from '@/types/mission'
 import { useProgressStore } from '@/stores/progress'

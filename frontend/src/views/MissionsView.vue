@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import Header from '@/components/Header.vue'
-import Card from '@/components/Card.vue'
+import Header from '@/components/AppHeader.vue'
+import Card from '@/components/AppCard.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { computed, ref, onMounted } from 'vue'

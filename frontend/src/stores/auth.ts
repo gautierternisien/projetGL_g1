@@ -2,9 +2,16 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { API_URL } from '@/config'
 
+interface User {
+  username: string
+  email: string
+  first_name?: string
+  last_name?: string
+}
+
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(localStorage.getItem('token'))
-  const user = ref<any>(null)
+  const user = ref<User | null>(null)
 
   const isConnected = computed(() => !!token.value)
 

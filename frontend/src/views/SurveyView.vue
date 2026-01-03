@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import Card from '@/components/Card.vue'
+import Card from '@/components/AppCard.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
-import Header from '@/components/Header.vue'
+import Header from '@/components/AppHeader.vue'
 import { useProgressStore } from '@/stores/progress'
 import { useAuthStore } from '@/stores/auth'
 import { onMounted, computed, watch } from 'vue'
-import { USER_ID } from '@/config'
 import { useRouter } from 'vue-router'
 
 const store = useProgressStore()

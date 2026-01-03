@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import Header from '@/components/Header.vue'
-import Card from '@/components/Card.vue'
+import Header from '@/components/AppHeader.vue'
+import Card from '@/components/AppCard.vue'
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import type { Mission } from '@/types/mission'
+import type { Mission, MissionStatus } from '@/types/mission'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -54,6 +54,14 @@ const sampleMissions = reactive<Record<number, Mission[]>>({ 0: [], 1: [], 2: []
 const API_URL = 'http://localhost:8000'
 const remoteMissions = ref<Mission[]>([])
 
+interface RawMission {
+  id: number | string
+  title: string
+  description?: string
+  desc?: string
+  status?: string
+}
+
 // Load missions for this category from backend
 async function loadMissions() {
   try {
@@ -63,11 +71,11 @@ async function loadMissions() {
       const data = await res.json()
       // Normalise les clés: backend peut renvoyer `desc` ou `description`.
       if (Array.isArray(data)) {
-        remoteMissions.value = data.map((d: any) => ({
+        remoteMissions.value = data.map((d: RawMission) => ({
           id: Number(d.id),
           title: d.title,
           description: d.description ?? d.desc ?? '',
-          status: d.status ?? 'new',
+          status: (d.status as MissionStatus) ?? 'new',
         }))
       }
     } else {
@@ -135,7 +143,7 @@ function restoreToInProgress(mission: Mission) {
 function updateMissionStatus(mission: Mission, newStatus: Mission['status']) {
   if (remoteMissions.value.length > 0) {
     const idx = remoteMissions.value.findIndex((x) => x.id === mission.id)
-    if (idx !== -1) {
+    if (idx !== -1 && remoteMissions.value[idx]) {
       // optimistically update local list
       remoteMissions.value[idx].status = newStatus
       // send update to backend, then refresh list and re-scroll to the mission if still present
@@ -162,9 +170,9 @@ function updateMissionStatus(mission: Mission, newStatus: Mission['status']) {
       const i = arr.findIndex((m) => m.id === mission.id)
       if (i !== -1) arr.splice(i, 1)
     })
-    if (newStatus === 'en_cours') sampleMissions[0].unshift({ ...mission, status: newStatus })
-    else if (newStatus === 'termine') sampleMissions[1].unshift({ ...mission, status: newStatus })
-    else sampleMissions[2].unshift({ ...mission, status: newStatus })
+    if (newStatus === 'en_cours') sampleMissions[0]?.unshift({ ...mission, status: newStatus })
+    else if (newStatus === 'termine') sampleMissions[1]?.unshift({ ...mission, status: newStatus })
+    else sampleMissions[2]?.unshift({ ...mission, status: newStatus })
   }
 }
 
@@ -259,22 +267,6 @@ const goBack = () => router.push('/missions')
   overflow-y: auto;
   flex: 1;
 }
-.category-header {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 12px;
-}
-.emoji-img {
-  font-size: 2.6rem;
-}
-.title-block h2 {
-  margin: 0;
-}
-.subtitle {
-  margin: 0;
-  color: #666;
-}
 .tabs {
   display: flex;
   gap: 8px;
@@ -301,61 +293,6 @@ const goBack = () => router.push('/missions')
   color: #666;
   text-align: center;
   margin-top: 12px;
-}
-.actions {
-  margin-top: 20px;
-  display: flex;
-  justify-content: center;
-}
-.nav-btn {
-  padding: 10px 16px;
-  border-radius: 8px;
-  border: none;
-  cursor: pointer;
-}
-.prev-btn {
-  background: #f0f0f0;
-}
-
-/* Actions */
-.tabs-actions {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-}
-.back-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: white;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  padding: 8px 12px;
-  border-radius: 999px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
-  cursor: pointer;
-  transition:
-    transform 0.08s ease,
-    box-shadow 0.12s ease;
-}
-.back-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
-}
-.back-icon {
-  font-size: 1.05rem;
-  color: #679436;
-}
-.back-label {
-  font-weight: 700;
-  color: #333;
-}
-.add-btn {
-  background: #679436;
-  color: white;
-  border: none;
-  padding: 8px 12px;
-  border-radius: 8px;
-  cursor: pointer;
 }
 .card-actions {
   margin-top: 10px;
