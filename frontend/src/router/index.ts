@@ -48,6 +48,16 @@ const router = createRouter({
       component: CommunauteView,
     },
     {
+      path: '/communaute/amis',
+      name: 'CommunityFriends',
+      component: () => import('../views/FriendsView.vue'),
+    },
+    {
+      path: '/communaute/ligues',
+      name: 'CommunityLeagues',
+      component: () => import('../views/LeaguesView.vue'),
+    },
+    {
       path: '/conseils',
       name: 'conseils',
       component: ConseilsView,

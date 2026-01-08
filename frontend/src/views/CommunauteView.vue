@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import Card from '@/components/AppCard.vue'
 import Header from '@/components/AppHeader.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
@@ -7,6 +8,12 @@ import { computed } from 'vue'
 const authStore = useAuthStore()
 const router = useRouter()
 const isConnected = computed(() => authStore.isConnected)
+
+function handleCardClick(e: Event) {
+  if (!isConnected.value) {
+    e.preventDefault()
+  }
+}
 </script>
 
 <template>
@@ -22,9 +29,37 @@ const isConnected = computed(() => authStore.isConnected)
       </div>
 
       <div :class="{ 'blurred-content': !isConnected }">
-        <div class="placeholder-content">
-          <p>Contenu à venir...</p>
-        </div>
+         <!-- Liste d'amis -->
+        <RouterLink
+          to="/communaute/amis"
+          class="unstyled-link"
+          @click="handleCardClick"
+        >
+          <Card title="Liste d'amis" :hasArrow="isConnected">
+            <div class="dashboard-card-content">
+              <span class="dashboard-emoji">👥</span>
+              <p class="dashboard-text">
+                Retrouvez et comparez votre impact avec vos amis
+              </p>
+            </div>
+          </Card>
+        </RouterLink>
+
+        <!-- Ligues -->
+        <RouterLink
+          to="/communaute/ligues"
+          class="unstyled-link"
+          @click="handleCardClick"
+        >
+          <Card title="Ligues" :hasArrow="isConnected">
+            <div class="dashboard-card-content">
+              <span class="dashboard-emoji">🏆</span>
+              <p class="dashboard-text">
+                Participez à des ligues et classements communautaires
+              </p>
+            </div>
+          </Card>
+        </RouterLink>
       </div>
     </div>
   </div>
@@ -100,4 +135,33 @@ const isConnected = computed(() => authStore.isConnected)
   cursor: pointer;
   font-size: 1rem;
 }
+
+.dashboard-card-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 0;
+  text-align: center;
+}
+
+.dashboard-emoji {
+  font-size: 3rem;
+}
+
+.dashboard-text {
+  font-size: 0.9rem;
+  color: #666;
+  font-weight: 500;
+  max-width: 240px;
+}
+
+.unstyled-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+
 </style>
