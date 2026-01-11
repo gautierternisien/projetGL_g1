@@ -88,4 +88,8 @@ const uiStore = useUiStore()
 
   font-size: 1.5rem;
 }
+
+.router-link-active {
+  background-color: #9c9e89;
+}
 </style>
