@@ -53,9 +53,19 @@ const router = createRouter({
       component: () => import('../views/FriendsView.vue'),
     },
     {
+      path: '/communaute/amis/ajouter',
+      name: 'CommunityFriendsAdd',
+      component: () => import('../views/AddFriendView.vue'),
+    },
+    {
       path: '/communaute/ligues',
       name: 'CommunityLeagues',
       component: () => import('../views/LeaguesView.vue'),
+    },
+    {
+      path: '/communaute/evenements',
+      name: 'CommunityEvents',
+      component: () => import('../views/EvenementsView.vue'),
     },
     {
       path: '/conseils',

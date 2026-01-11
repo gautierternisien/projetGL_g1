@@ -4,7 +4,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List, Optional, Dict
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 import crud, models, schemas, utils
 from database import SessionLocal, engine
@@ -31,6 +31,27 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = utils.jwt.decode(token, utils.SECRET_KEY, algorithms=[utils.ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        token_data = schemas.TokenData(email=username) # reuse email field for username/sub
+    except utils.JWTError:
+        raise credentials_exception
+
+    user = crud.get_user_by_username(db, username=token_data.email)
+    if user is None:
+        raise credentials_exception
+    return user
 
 # --- MODÈLES DE DONNÉES (Pydantic) ---
 
@@ -365,6 +386,9 @@ user_answers_db: Dict[str, Dict[str, Dict[int, str]]] = {}
 # }
 user_missions_db: Dict[str, Dict[int, str]] = {}
 
+# Feed des activités : { "username_receiver": [ { "sender_username": "...", "mission_id": 1, ... } ] }
+user_feed_db: Dict[str, List[Dict]] = {} 
+
 # --- ROUTES API ---
 
 @app.post("/register", response_model=schemas.User)
@@ -399,25 +423,149 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.get("/users/me", response_model=schemas.User)
-async def read_users_me(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = utils.jwt.decode(token, utils.SECRET_KEY, algorithms=[utils.ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-        token_data = schemas.TokenData(email=username) # reusing email field for username/sub
-    except utils.JWTError:
-        raise credentials_exception
+async def read_users_me(current_user: models.User = Depends(get_current_user)):
+    return current_user
 
-    user = crud.get_user_by_username(db, username=token_data.email)
-    if user is None:
-        raise credentials_exception
-    return user
+
+@app.get("/users", response_model=List[schemas.UserPublic])
+async def search_users(prefix: str = "", current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    users = crud.search_users_by_prefix(db, prefix)
+    # Get accepted friends and pending requests sent
+    friend_ids = set(crud.get_accepted_friends(db, current_user.id))
+    pending_requests = crud.get_pending_requests_sent(db, current_user.id)
+    pending_receiver_ids = set(r.receiver_id for r in pending_requests)
+    # Exclure soi-même, amis acceptés, et demandes en attente
+    filtered = [u for u in users if u.id != current_user.id and u.id not in friend_ids and u.id not in pending_receiver_ids]
+    return filtered
+
+
+@app.get("/friends", response_model=List[schemas.UserPublic])
+async def list_friends(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    friend_ids = crud.get_accepted_friends(db, current_user.id)
+    if not friend_ids:
+        return []
+    friends = crud.get_users_by_ids(db, friend_ids)
+    return friends
+
+@app.get("/friends/activity", response_model=List[schemas.FriendActivity])
+async def get_friends_activity(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Récupérer le feed personnel de l'utilisateur
+    my_feed = user_feed_db.get(current_user.username, [])
+    
+    # Transformer pour le schema de réponse
+    # On renvoie la liste inversée pour avoir le plus récent en premier
+    response_activities = []
+    for activity in reversed(my_feed):
+        response_activities.append(schemas.FriendActivity(
+            friend_username=activity["sender_username"],
+            mission_title=activity["mission_title"],
+            mission_id=activity["mission_id"],
+            status=activity["status"],
+            timestamp=activity["timestamp"].isoformat() if activity.get("timestamp") else None
+        ))
+            
+    return response_activities
+
+
+@app.post("/friend-requests/{friend_id}")
+async def send_friend_request(friend_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    target = crud.get_user(db, friend_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    try:
+        req = crud.send_friend_request(db, current_user.id, friend_id)
+        return {"id": req.id, "status": "pending", "receiver": {"id": target.id, "username": target.username}}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/friend-requests/pending", response_model=List[schemas.FriendRequestSchema])
+async def get_pending_requests(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    requests = crud.get_pending_requests_sent(db, current_user.id)
+    return [
+        {
+            "id": r.id,
+            "sender": {"id": r.sender.id, "username": r.sender.username},
+            "receiver": {"id": r.receiver.id, "username": r.receiver.username},
+            "status": r.status
+        } for r in requests
+    ]
+
+
+@app.get("/friend-requests/incoming", response_model=List[schemas.FriendRequestSchema])
+async def get_incoming_requests(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    requests = crud.get_incoming_requests(db, current_user.id)
+    return [
+        {
+            "id": r.id,
+            "sender": {"id": r.sender.id, "username": r.sender.username},
+            "receiver": {"id": r.receiver.id, "username": r.receiver.username},
+            "status": r.status
+        } for r in requests
+    ]
+
+
+@app.put("/friend-requests/{request_id}/accept")
+async def accept_request(request_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        req = crud.accept_friend_request(db, request_id)
+        return {"accepted": True, "request_id": req.id}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.put("/friend-requests/{request_id}/reject")
+async def reject_request(request_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        crud.reject_friend_request(db, request_id)
+        return {"rejected": True, "request_id": request_id}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.put("/friend-requests/{request_id}/cancel")
+async def cancel_request(request_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        crud.cancel_friend_request(db, request_id)
+        return {"cancelled": True, "request_id": request_id}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.delete("/friends/{friend_id}")
+async def delete_friend(friend_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Find the accepted request between them
+    req = db.query(models.FriendRequest).filter(
+        ((models.FriendRequest.sender_id == current_user.id) & (models.FriendRequest.receiver_id == friend_id)) |
+        ((models.FriendRequest.sender_id == friend_id) & (models.FriendRequest.receiver_id == current_user.id)),
+        models.FriendRequest.status == "accepted"
+    ).first()
+    if req:
+        # Supprimer aussi le lien dans friend_links via crud.remove_friend
+        crud.remove_friend(db, current_user.id, friend_id)
+        
+        db.delete(req)
+        db.commit()
+
+        # Nettoyage des feeds d'activités
+        # 1. Retirer les activités de l'ami supprimé dans MON feed
+        friend_user = crud.get_user(db, friend_id)
+        if friend_user:
+            friend_username = friend_user.username
+            if current_user.username in user_feed_db:
+                user_feed_db[current_user.username] = [
+                    act for act in user_feed_db[current_user.username] 
+                    if act["sender_username"] != friend_username
+                ]
+            
+            # 2. Retirer MES activités dans le feed de l'ami supprimé
+            if friend_username in user_feed_db:
+                user_feed_db[friend_username] = [
+                    act for act in user_feed_db[friend_username] 
+                    if act["sender_username"] != current_user.username
+                ]
+
+    return {"deleted": True}
 
 @app.get("/")
 async def root():
@@ -480,17 +628,19 @@ class MissionUpdate(BaseModel):
 
 
 @app.put("/missions/{mission_id}")
-async def update_mission(mission_id: int, payload: MissionUpdate):
+async def update_mission(mission_id: int, payload: MissionUpdate, db: Session = Depends(get_db)):
     """
     Met à jour le statut d'une mission identifiée par son `id`.
     Si user_id est fourni, met à jour le statut pour cet utilisateur uniquement.
     """
     # Vérifier si la mission existe
     mission_exists = False
+    mission_title = "Mission"
     for cat, missions in MISSIONS_DB.items():
         for m in missions:
             if int(m.get('id')) == mission_id:
                 mission_exists = True
+                mission_title = m.get('title', 'Mission')
                 break
         if mission_exists:
             break
@@ -502,6 +652,30 @@ async def update_mission(mission_id: int, payload: MissionUpdate):
         if payload.user_id not in user_missions_db:
             user_missions_db[payload.user_id] = {}
         user_missions_db[payload.user_id][mission_id] = payload.status
+        
+        # Enregistrement dans le feed des amis si terminé
+        if payload.status == 'termine':
+            # 1. Recuperer l'ID de l'utilisateur qui a terminé la mission
+            user = crud.get_user_by_username(db, payload.user_id)
+            if user:
+                # 2. Recuperer ses amis
+                friend_ids = crud.get_accepted_friends(db, user.id)
+                friends = crud.get_users_by_ids(db, friend_ids)
+                
+                # 3. Ajouter l'activité dans le feed de chaque ami
+                new_activity = {
+                    "sender_username": payload.user_id,
+                    "mission_id": mission_id,
+                    "mission_title": mission_title,
+                    "status": payload.status,
+                    "timestamp": datetime.now()
+                }
+                
+                for friend in friends:
+                    if friend.username not in user_feed_db:
+                        user_feed_db[friend.username] = []
+                    user_feed_db[friend.username].append(new_activity)
+            
         return {"id": mission_id, "status": payload.status}
     else:
         # Fallback legacy : update global DB (déconseillé si multi-user)

@@ -25,6 +25,29 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     email: Optional[str] = None
 
+class UserPublic(BaseModel):
+    id: int
+    username: str
+
+    class Config:
+        from_attributes = True
+
+class FriendActivity(BaseModel):
+    friend_username: str
+    mission_title: str
+    mission_id: int
+    status: str
+    timestamp: Optional[str] = None
+
+class FriendRequestSchema(BaseModel):
+  id: int
+  sender: UserPublic
+  receiver: UserPublic
+  status: str
+
+  class Config:
+    from_attributes = True
+
 # --- APP ---
 
 class OptionBase(BaseModel):

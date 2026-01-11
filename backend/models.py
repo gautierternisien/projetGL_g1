@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -79,3 +79,34 @@ class UserMissionStatus(Base):
 
     user = relationship("User", back_populates="mission_statuses")
     mission = relationship("Mission", back_populates="user_statuses")
+
+
+class FriendLink(Base):
+    __tablename__ = "friend_links"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    friend_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'friend_id', name='uq_friend_pair'),
+    )
+
+    user = relationship("User", foreign_keys=[user_id])
+    friend = relationship("User", foreign_keys=[friend_id])
+
+
+class FriendRequest(Base):
+    __tablename__ = "friend_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    sender_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    receiver_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    status = Column(String, default="pending")  # pending, accepted, rejected
+
+    __table_args__ = (
+        UniqueConstraint('sender_id', 'receiver_id', name='uq_friend_request_pair'),
+    )
+
+    sender = relationship("User", foreign_keys=[sender_id])
+    receiver = relationship("User", foreign_keys=[receiver_id])

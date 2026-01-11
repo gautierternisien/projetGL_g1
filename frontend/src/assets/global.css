@@ -1,5 +1,16 @@
 @import './base.css';
 
+@font-face {
+  font-family: 'Instrument Sans';
+  src: url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;600;700&display=swap');
+}
+
+html,
+body,
+#app {
+  font-family: 'Instrument Sans', sans-serif;
+}
+
 #app {
   width: 100vw;
   height: 100dvh;

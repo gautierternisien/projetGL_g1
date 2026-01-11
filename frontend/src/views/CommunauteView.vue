@@ -60,6 +60,22 @@ function handleCardClick(e: Event) {
             </div>
           </Card>
         </RouterLink>
+
+        <!-- Evenements -->
+        <RouterLink
+          to="/communaute/evenements"
+          class="unstyled-link"
+          @click="handleCardClick"
+        >
+          <Card title="Événements" :hasArrow="isConnected">
+            <div class="dashboard-card-content">
+              <span class="dashboard-emoji">📅</span>
+              <p class="dashboard-text">
+                Dernières missions réalisées par les amis (bientot les ligues)
+              </p>
+            </div>
+          </Card>
+        </RouterLink>
       </div>
     </div>
   </div>
