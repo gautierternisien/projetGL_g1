@@ -1,17 +1,43 @@
 <script setup lang="ts">
-import Card from '@/components/Card.vue'
+import Card from '@/components/AppCard.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
-import Header from '@/components/Header.vue'
+import Header from '@/components/AppHeader.vue'
 import { useProgressStore } from '@/stores/progress'
-import { onMounted } from 'vue'
-import { USER_ID } from '@/config' // Plus besoin de API_URL ici
+import { useAuthStore } from '@/stores/auth'
+import { onMounted, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 
 const store = useProgressStore()
+const authStore = useAuthStore()
+const router = useRouter()
+const isConnected = computed(() => authStore.isConnected)
 
 // Au montage de la vue, on utilise l'action centralisée du store
-onMounted(() => {
-  store.fetchAllProgress(USER_ID)
+onMounted(async () => {
+  if (isConnected.value) {
+    if (!authStore.user) {
+      await authStore.fetchUser()
+    }
+    if (authStore.user) {
+      store.fetchAllProgress(authStore.user.username)
+    }
+  }
 })
+
+watch(
+  () => authStore.user,
+  (newUser) => {
+    if (newUser) {
+      store.fetchAllProgress(newUser.username)
+    }
+  },
+)
+
+function handleCardClick(e: Event) {
+  if (!isConnected.value) {
+    e.preventDefault()
+  }
+}
 </script>
 
 <template>
@@ -19,82 +45,181 @@ onMounted(() => {
     <Header title="Questionnaires" />
 
     <div class="scrollable-area">
-      <RouterLink to="/questionnaires/transport">
-        <Card title="Transport & Mobilité" :has-arrow="true">
-          <div class="image-center">
-            <span class="emoji-img">🚗</span>
-          </div>
-          <ProgressBar :value="store.getCategoryScore('transport')"></ProgressBar>
-        </Card>
-      </RouterLink>
+      <div v-if="!isConnected" class="blur-overlay">
+        <div class="lock-message">
+          <span class="lock-icon">🔒</span>
+          <p>Connectez-vous pour accéder aux questionnaires</p>
+          <button @click="router.push('/login')" class="login-btn">Se connecter</button>
+        </div>
+      </div>
 
-      <RouterLink to="/questionnaires/logement">
-        <Card title="Logement & Énergie" :has-arrow="true">
-          <div class="image-center">
-            <span class="emoji-img">🏠</span>
-          </div>
-          <ProgressBar :value="store.getCategoryScore('logement')"></ProgressBar>
-        </Card>
-      </RouterLink>
+      <div :class="{ 'blurred-content': !isConnected }">
+        <RouterLink to="/questionnaires/transport" @click="handleCardClick">
+          <Card title="Transport & Mobilité" :has-arrow="isConnected">
+            <div class="image-center">
+              <span class="emoji-img">🚗</span>
+            </div>
+            <ProgressBar
+              v-if="isConnected"
+              :value="store.getCategoryScore('transport')"
+            ></ProgressBar>
+            <div v-else class="lock-placeholder">🔒</div>
+          </Card>
+        </RouterLink>
 
-      <RouterLink to="/questionnaires/alimentation">
-        <Card title="Alimentation" :has-arrow="true">
-          <div class="image-center">
-            <span class="emoji-img">🍽️</span>
-          </div>
-          <ProgressBar :value="store.getCategoryScore('alimentation')"></ProgressBar>
-        </Card>
-      </RouterLink>
+        <RouterLink to="/questionnaires/logement" @click="handleCardClick">
+          <Card title="Logement & Énergie" :has-arrow="isConnected">
+            <div class="image-center">
+              <span class="emoji-img">🏠</span>
+            </div>
+            <ProgressBar
+              v-if="isConnected"
+              :value="store.getCategoryScore('logement')"
+            ></ProgressBar>
+            <div v-else class="lock-placeholder">🔒</div>
+          </Card>
+        </RouterLink>
 
-      <RouterLink to="/questionnaires/consommation">
-        <Card title="Consommation" :has-arrow="true">
-          <div class="image-center">
-            <span class="emoji-img">📦️</span>
-          </div>
-          <ProgressBar :value="store.getCategoryScore('consommation')"></ProgressBar>
-        </Card>
-      </RouterLink>
+        <RouterLink to="/questionnaires/alimentation" @click="handleCardClick">
+          <Card title="Alimentation" :has-arrow="isConnected">
+            <div class="image-center">
+              <span class="emoji-img">🍽️</span>
+            </div>
+            <ProgressBar
+              v-if="isConnected"
+              :value="store.getCategoryScore('alimentation')"
+            ></ProgressBar>
+            <div v-else class="lock-placeholder">🔒</div>
+          </Card>
+        </RouterLink>
 
-      <RouterLink to="/questionnaires/recyclage">
-        <Card title="Déchets & Recyclage" :has-arrow="true">
-          <div class="image-center">
-            <span class="emoji-img">♻️️</span>
-          </div>
-          <ProgressBar :value="store.getCategoryScore('recyclage')"></ProgressBar>
-        </Card>
-      </RouterLink>
+        <RouterLink to="/questionnaires/consommation" @click="handleCardClick">
+          <Card title="Consommation" :has-arrow="isConnected">
+            <div class="image-center">
+              <span class="emoji-img">📦️</span>
+            </div>
+            <ProgressBar
+              v-if="isConnected"
+              :value="store.getCategoryScore('consommation')"
+            ></ProgressBar>
+            <div v-else class="lock-placeholder">🔒</div>
+          </Card>
+        </RouterLink>
 
-      <RouterLink to="/questionnaires/numerique">
-        <Card title="Numérique" :has-arrow="true">
-          <div class="image-center">
-            <span class="emoji-img">💻️</span>
-          </div>
-          <ProgressBar :value="store.getCategoryScore('numerique')"></ProgressBar>
-        </Card>
-      </RouterLink>
+        <RouterLink to="/questionnaires/recyclage" @click="handleCardClick">
+          <Card title="Déchets & Recyclage" :has-arrow="isConnected">
+            <div class="image-center">
+              <span class="emoji-img">♻️️</span>
+            </div>
+            <ProgressBar
+              v-if="isConnected"
+              :value="store.getCategoryScore('recyclage')"
+            ></ProgressBar>
+            <div v-else class="lock-placeholder">🔒</div>
+          </Card>
+        </RouterLink>
 
-      <RouterLink to="/questionnaires/loisirs">
-        <Card title="Loisirs" :has-arrow="true">
-          <div class="image-center">
-            <span class="emoji-img">🃏️</span>
-          </div>
-          <ProgressBar :value="store.getCategoryScore('loisirs')"></ProgressBar>
-        </Card>
-      </RouterLink>
+        <RouterLink to="/questionnaires/numerique" @click="handleCardClick">
+          <Card title="Numérique" :has-arrow="isConnected">
+            <div class="image-center">
+              <span class="emoji-img">💻️</span>
+            </div>
+            <ProgressBar
+              v-if="isConnected"
+              :value="store.getCategoryScore('numerique')"
+            ></ProgressBar>
+            <div v-else class="lock-placeholder">🔒</div>
+          </Card>
+        </RouterLink>
 
-      <RouterLink to="/questionnaires/quotidien">
-        <Card title="Habitudes Quotidiennes" :has-arrow="true">
-          <div class="image-center">
-            <span class="emoji-img">🗓️️</span>
-          </div>
-          <ProgressBar :value="store.getCategoryScore('quotidien')"></ProgressBar>
-        </Card>
-      </RouterLink>
+        <RouterLink to="/questionnaires/loisirs" @click="handleCardClick">
+          <Card title="Loisirs" :has-arrow="isConnected">
+            <div class="image-center">
+              <span class="emoji-img">🃏️</span>
+            </div>
+            <ProgressBar
+              v-if="isConnected"
+              :value="store.getCategoryScore('loisirs')"
+            ></ProgressBar>
+            <div v-else class="lock-placeholder">🔒</div>
+          </Card>
+        </RouterLink>
+
+        <RouterLink to="/questionnaires/quotidien" @click="handleCardClick">
+          <Card title="Habitudes Quotidiennes" :has-arrow="isConnected">
+            <div class="image-center">
+              <span class="emoji-img">🗓️️</span>
+            </div>
+            <ProgressBar
+              v-if="isConnected"
+              :value="store.getCategoryScore('quotidien')"
+            ></ProgressBar>
+            <div v-else class="lock-placeholder">🔒</div>
+          </Card>
+        </RouterLink>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+.scrollable-area {
+  position: relative;
+}
+
+.blurred-content {
+  filter: blur(5px);
+  pointer-events: none;
+  user-select: none;
+}
+
+.blur-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  /* Ensure overlay covers the scrollable area properly */
+  min-height: 500px;
+}
+
+.lock-message {
+  background: rgba(255, 255, 255, 0.9);
+  padding: 2rem;
+  border-radius: 16px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.lock-icon {
+  font-size: 3rem;
+}
+
+.login-btn {
+  background-color: #679436;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.lock-placeholder {
+  text-align: center;
+  font-size: 1.5rem;
+  color: #999;
+}
+
 .image-center {
   flex-shrink: 0;
   margin-left: 15px;
@@ -105,23 +230,5 @@ onMounted(() => {
 
 .emoji-img {
   font-size: 2.5rem;
-}
-
-/* --- BARRE DE PROGRESSION --- */
-.progress-container {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.progress-track {
-  flex-grow: 1;
-  height: 12px;
-  background-color: white;
-  border-radius: 10px;
-  overflow: hidden;
-}
-.progress-fill {
-  background-color: #ccc;
-  height: 100%;
 }
 </style>

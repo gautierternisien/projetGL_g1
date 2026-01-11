@@ -3,7 +3,7 @@
     <RouterView />
   </div>
 
-  <nav class="bottom-nav">
+  <nav class="bottom-nav" :class="{ 'nav-blurred': uiStore.isNavigationBlurred }">
     <RouterLink to="/" class="nav-item">
       <span>📊</span>
     </RouterLink>
@@ -28,6 +28,9 @@
 
 <script setup lang="ts">
 import { RouterView, RouterLink } from 'vue-router'
+import { useUiStore } from '@/stores/ui'
+
+const uiStore = useUiStore()
 </script>
 
 <style scoped>
@@ -60,6 +63,12 @@ import { RouterView, RouterLink } from 'vue-router'
 
   /* Ombre portée pour l'effet flottant */
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  transition: filter 0.3s ease;
+}
+
+.nav-blurred {
+  filter: blur(5px);
+  pointer-events: none;
 }
 
 .nav-item {
@@ -78,10 +87,5 @@ import { RouterView, RouterLink } from 'vue-router'
   transition: background-color 0.3s ease;
 
   font-size: 1.5rem;
-}
-
-/* Style de l'élément actif (cercle plus clair) */
-.router-link-active {
-  background-color: #9c9e89;
 }
 </style>

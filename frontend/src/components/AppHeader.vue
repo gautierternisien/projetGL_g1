@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import { useAuthStore } from '@/stores/auth'
+import { computed } from 'vue'
+
+const authStore = useAuthStore()
+const isConnected = computed(() => authStore.isConnected)
+
 defineProps({
   title: {
     type: String,
@@ -8,13 +14,13 @@ defineProps({
     type: String,
     default: '',
   },
-  isConnected: {
-    type: Boolean,
-    default: true,
-  },
   showResumeBtn: {
     type: Boolean,
     default: false,
+  },
+  resumeBtnLabel: {
+    type: String,
+    default: 'Reprendre plus tard',
   },
 })
 
@@ -25,29 +31,25 @@ defineEmits(['resumeLater'])
   <header class="top-header">
     <div class="header-content">
       <div class="header-left">
-        <!-- Regroupement du bouton et du titre sur une même ligne -->
+        <!-- Le titre reste à gauche -->
         <div class="header-title-row">
           <h1>{{ title }}</h1>
-          <button class="resume-btn" v-if="showResumeBtn" @click="$emit('resumeLater')">
-            Reprendre plus tard
-          </button>
         </div>
-        <!-- Le sous-titre reste en dessous -->
         <div class="header-sub-row">
           <h2 v-if="subtitle">{{ subtitle }}</h2>
         </div>
       </div>
 
+      <!-- Bouton déplacé ici : il sera poussé à droite par le flex:1 de header-left, juste avant l'avatar -->
+      <button class="resume-btn" v-if="showResumeBtn" @click="$emit('resumeLater')">
+        {{ resumeBtnLabel }}
+      </button>
+
       <RouterLink to="/profile" v-if="isConnected">
         <div class="user-avatar">👤</div>
       </RouterLink>
       <div v-else class="auth-buttons">
-        <RouterLink to="/login">
-          <button class="auth-btn">Se connecter</button>
-        </RouterLink>
-        <RouterLink to="/register">
-          <button class="auth-btn">S'inscrire</button>
-        </RouterLink>
+        <RouterLink to="/login" class="login-btn"> Se connecter </RouterLink>
       </div>
     </div>
   </header>
@@ -65,9 +67,18 @@ defineEmits(['resumeLater'])
   border-bottom-left-radius: 20px;
   border-bottom-right-radius: 20px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  /* MODIFICATION : Hauteur réduite de 100px à 80px */
-  height: 80px;
-  padding-top: env(safe-area-inset-top);
+
+  /* Ajustement pour la marge en haut et la hauteur flexible */
+  min-height: 90px;
+  height: auto;
+  padding-top: calc(env(safe-area-inset-top) + 10px);
+  padding-bottom: 10px;
+  box-sizing: border-box;
+
+  /* Flex column pour aligner le contenu en bas du header */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
 }
 
 .header-content {
@@ -77,10 +88,8 @@ defineEmits(['resumeLater'])
   color: white;
   box-sizing: border-box;
   width: 100%;
-  /* MODIFICATION : Padding réduit en bas (15px -> 10px) */
-  padding: 0 20px 10px 20px;
-  /* AJOUT : S'assurer que le contenu prend toute la hauteur disponible */
-  height: 100%;
+  /* Padding latéral réduit */
+  padding: 0 10px;
 }
 
 .header-left {
@@ -93,7 +102,6 @@ defineEmits(['resumeLater'])
   margin-right: 10px;
 }
 
-/* Nouvelle classe pour aligner bouton et titre */
 .header-title-row {
   display: flex;
   align-items: center;
@@ -131,16 +139,30 @@ defineEmits(['resumeLater'])
   border: 1px solid rgba(255, 255, 255, 0.4);
   color: white;
   border-radius: 8px;
-  padding: 4px 8px;
-  font-size: 0.65rem;
+  padding: 6px 12px;
+  font-size: 0.75rem;
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
   transition: background 0.2s;
+  /* Positionnement à côté de l'avatar */
+  margin-right: 12px;
+  margin-bottom: 4px; /* Léger ajustement vertical pour centrer avec l'avatar */
 }
 
-.resume-btn:hover {
-  background: rgba(255, 255, 255, 0.25);
+.login-btn {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: white;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.2s;
+  text-decoration: none;
+  margin-bottom: 4px;
 }
 
 .user-avatar {
@@ -158,29 +180,6 @@ defineEmits(['resumeLater'])
 
 .auth-buttons {
   display: flex;
-  gap: 5px;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.auth-btn {
-  background-color: white;
-  color: #6d8b46;
-  border: none;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  font-size: 0.7rem;
-  transition:
-    transform 0.1s ease,
-    background-color 0.2s;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  white-space: nowrap;
-}
-
-.auth-btn:active {
-  transform: scale(0.95);
+  gap: 10px;
 }
 </style>

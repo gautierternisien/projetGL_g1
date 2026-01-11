@@ -1,13 +1,21 @@
 <script setup lang="ts">
-import Card from '@/components/Card.vue'
+import Card from '@/components/AppCard.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
-import Header from '@/components/Header.vue'
-import { ref, onMounted } from 'vue'
+import Header from '@/components/AppHeader.vue'
+import { ref, onMounted, computed, onActivated, watch } from 'vue'
 import type { Mission } from '@/types/mission'
 import { useProgressStore } from '@/stores/progress'
+import { useAuthStore } from '@/stores/auth'
 import { API_URL, USER_ID } from '@/config'
 
 const store = useProgressStore()
+const authStore = useAuthStore()
+const isConnected = computed(() => authStore.isConnected)
+
+interface CommunityEvent {
+  id: number
+  title: string
+}
 
 // Dictionnaire pour afficher de jolis noms (au lieu de 'transport', 'alimentation'...)
 const CATEGORY_LABELS: Record<string, string> = {
@@ -21,17 +29,17 @@ const CATEGORY_LABELS: Record<string, string> = {
   quotidien: 'Quotidien',
 }
 
-// Palette de dégradé : Du Rouge (Impact Fort) au Vert (Impact Faible)
-const GRADIENT_PALETTE = [
-  '#D32F2F', // Rouge foncé (1er)
-  '#E64A19',
-  '#F57C00', // Orange
-  '#FBC02D', // Jaune
-  '#AFB42B',
-  '#7CB342', // Vert clair
-  '#388E3C', // Vert foncé
-  '#2E7D32', // Vert très foncé (8ème)
-]
+// Couleurs fixes par catégorie
+const CATEGORY_COLORS: Record<string, string> = {
+  transport: '#5D4037', // Brown
+  alimentation: '#D84315', // Deep Orange
+  logement: '#9f8a50', // Yellow
+  consommation: '#8E24AA', // Purple
+  recyclage: '#388E3C', // Green
+  numerique: '#1976D2', // Blue
+  loisirs: '#0097A7', // Cyan
+  quotidien: '#455A64', // Blue Grey
+}
 
 // --- ÉTATS ---
 const userScore = ref(0)
@@ -48,9 +56,10 @@ const displayMissions = ref<{ mission: Mission; category: string }[]>([])
 async function loadDashboardMissions() {
   try {
     const keys = Object.keys(CATEGORY_LABELS)
+    const userIdParam = authStore.user ? `?user_id=${authStore.user.username}` : ''
     const results = await Promise.all(
       keys.map((k) =>
-        fetch(`${API_URL}/missions/${k}`, { cache: 'no-store' })
+        fetch(`${API_URL}/missions/${k}${userIdParam}`, { cache: 'no-store' })
           .then((r) => (r.ok ? r.json() : []))
           .catch(() => []),
       ),
@@ -69,7 +78,15 @@ async function loadDashboardMissions() {
             status.includes('in_progress') ||
             status.includes('ongoing')
           ) {
-            rows.push({ mission: { id: Number(d.id), title: d.title, description: d.description ?? d.desc ?? '', status }, category: k })
+            rows.push({
+              mission: {
+                id: Number(d.id),
+                title: String(d.title || ''),
+                description: d.description ?? d.desc ?? '',
+                status,
+              },
+              category: k as string,
+            })
           }
           if (rows.length >= 6) break
         }
@@ -83,12 +100,26 @@ async function loadDashboardMissions() {
   }
 }
 
-const events = ref([
-  { id: 1, title: 'Maxine a pris le vélo au lieu de la voiture' },
-  { id: 2, title: 'Maxine a pris le vélo au lieu de la voiture' },
-  { id: 3, title: 'Maxine a pris le vélo au lieu de la voiture' },
-  { id: 4, title: 'Maxine a pris le vélo au lieu de la voiture' },
-])
+const events = ref<CommunityEvent[]>([])
+
+// --- COMPUTED POUR LE GRAPHIQUE ---
+const donutStyle = computed(() => {
+  if (sectors.value.length === 0) {
+    return { background: '#e0e0e0' }
+  }
+
+  let current = 0
+  const segments = sectors.value.map((s) => {
+    const start = current
+    const end = current + s.pct
+    current = end
+    return `${s.color} ${start}% ${end}%`
+  })
+
+  return {
+    background: `conic-gradient(${segments.join(', ')})`,
+  }
+})
 
 // --- LOGIQUE DE CALCUL ---
 const calculateStatus = (score: number, avg: number) => {
@@ -104,7 +135,7 @@ const calculateStatus = (score: number, avg: number) => {
   } else if (score > highThreshold) {
     // Cas ROUGE : Bien au-dessus de la moyenne
     scoreColor.value = '#D32F2F' // Rouge
-    scoreEmoji.value = '💀' //
+    scoreEmoji.value = '🪾' //
     scoreComment.value = 'Attention'
   } else {
     // Cas ORANGE : Dans la moyenne
@@ -119,6 +150,7 @@ const processSectors = (details: Record<string, number>, total: number) => {
   // A. On transforme l'objet { transport: 2000, ... } en tableau
   const rawSectors = Object.entries(details).map(([key, value]) => {
     return {
+      key: key, // On garde la clé pour la couleur
       name: CATEGORY_LABELS[key] || key, // On met le joli nom ou la clé par défaut
       rawScore: value,
       pct: total > 0 ? Math.round((value / total) * 100) : 0,
@@ -131,33 +163,47 @@ const processSectors = (details: Record<string, number>, total: number) => {
   // C. On TRIE du plus grand au plus petit pourcentage
   activeSectors.sort((a, b) => b.pct - a.pct)
 
-  // D. On applique la couleur selon la position (1er = Rouge, Dernier = Vert)
-  sectors.value = activeSectors.map((sector, index) => {
-    // On prend la couleur dans la liste, ou la dernière si on dépasse
-    const color = GRADIENT_PALETTE[index] || GRADIENT_PALETTE[GRADIENT_PALETTE.length - 1]
+  // D. On applique la couleur selon la catégorie
+  sectors.value = activeSectors.map((sector) => {
+    const color = CATEGORY_COLORS[sector.key] || '#333'
 
     return {
       name: sector.name,
       pct: sector.pct,
-      color: color,
+      color: String(color),
     }
   })
 }
 
 // --- CHARGEMENT DES DONNÉES ---
 onMounted(async () => {
+  // Ensure user is loaded if connected
+  if (isConnected.value && !authStore.user) {
+    await authStore.fetchUser()
+  }
+
   // 1. On lance le chargement des progressions en arrière-plan
-  store.fetchAllProgress(USER_ID)
+  if (isConnected.value && authStore.user) {
+    store.fetchAllProgress(authStore.user.username)
+  }
 
   try {
-    const response = await fetch(`${API_URL}/carbon-score/${USER_ID}`)
+    let url = `${API_URL}/global-stats`
+    if (isConnected.value) {
+      const userId = authStore.user ? authStore.user.username : USER_ID
+      url = `${API_URL}/carbon-score/${userId}`
+    }
+
+    const response = await fetch(url)
 
     if (response.ok) {
       const data = await response.json()
 
       // Mise à jour des scores globaux
       userScore.value = data.global_score
-      averageScore.value = data.average_national_score
+      // Si connecté, on compare à la moyenne nationale (déjà dans data)
+      // Si pas connecté, on affiche la moyenne globale comme score principal
+      averageScore.value = data.average_national_score || 0
       calculateStatus(userScore.value, averageScore.value)
 
       // Mise à jour dynamique du graphique
@@ -167,9 +213,43 @@ onMounted(async () => {
     console.error('Erreur chargement:', error)
     scoreComment.value = 'Erreur'
   }
-  // load dashboard missions (real ones)
-  await loadDashboardMissions()
+
+  // load dashboard missions (real ones) only if connected
+  if (isConnected.value) {
+    await loadDashboardMissions()
+  }
 })
+
+// Refresh missions when navigating back to this view (if cached)
+onActivated(async () => {
+  if (isConnected.value) {
+    await loadDashboardMissions()
+    if (authStore.user) {
+      store.fetchAllProgress(authStore.user.username)
+    }
+  }
+})
+
+// Also refresh when the window regains focus
+window.addEventListener('focus', async () => {
+  if (isConnected.value) {
+    await loadDashboardMissions()
+    if (authStore.user) {
+      store.fetchAllProgress(authStore.user.username)
+    }
+  }
+})
+
+// Watch for user changes to reload data (e.g. after login or page refresh)
+watch(
+  () => authStore.user,
+  async (newUser) => {
+    if (newUser) {
+      store.fetchAllProgress(newUser.username)
+      await loadDashboardMissions()
+    }
+  },
+)
 </script>
 
 <template>
@@ -177,10 +257,12 @@ onMounted(async () => {
     <Header title="Tableau de bord" />
 
     <div class="scrollable-area">
-      <Card title="Empreinte carbone">
+      <Card :title="isConnected ? 'Mon empreinte carbone' : 'Empreinte moyenne des utilisateurs'">
         <div class="split-content">
           <div class="info-side">
-            <span class="big-number" :style="{ color: scoreColor }">{{ userScore / 1000 }}</span>
+            <span class="big-number" :style="{ color: scoreColor }">{{
+              (userScore / 1000).toFixed(2)
+            }}</span>
             <span class="unit-text">Tonnes CO₂</span>
           </div>
           <div class="image-side">
@@ -189,7 +271,7 @@ onMounted(async () => {
         </div>
       </Card>
 
-      <Card title="Émissions par secteur">
+      <Card :title="isConnected ? 'Mes émissions par secteur' : 'Émissions moyennes par secteur'">
         <div class="split-content">
           <div class="info-side">
             <ul class="legend-list">
@@ -202,37 +284,47 @@ onMounted(async () => {
             </ul>
           </div>
           <div class="image-side">
-            <span class="emoji-img">🍩</span>
+            <!-- Remplacement de l'emoji par le graphique Donut CSS -->
+            <div class="donut-chart" :style="donutStyle"></div>
           </div>
         </div>
       </Card>
 
       <RouterLink to="/questionnaires" class="unstyled-link">
         <Card title="Questionnaires" :hasArrow="true">
-          <ProgressBar :value="store.globalAverage"></ProgressBar>
+          <ProgressBar v-if="isConnected" :value="store.globalAverage"></ProgressBar>
+          <div v-else class="lock-placeholder">🔒</div>
         </Card>
       </RouterLink>
 
-      <Card title="Missions en cours" :hasArrow="true">
-        <div class="carousel-container">
-          <div v-for="item in displayMissions" :key="item.mission.id" class="mission-card">
-            <RouterLink :to="`/missions/${item.category}?missionId=${item.mission.id}`" class="unstyled-link inner-mission-link">
-              <div class="card-content">
-                <span class="card-icon">🎯</span>
-                <div class="card-texts">
-                  <span class="card-title">{{ item.mission.title }}</span>
-                  <span class="card-subtitle">{{ CATEGORY_LABELS[item.category] }}</span>
+      <RouterLink to="/missions" class="unstyled-link">
+        <Card title="Missions en cours" :hasArrow="true">
+          <div v-if="isConnected" class="carousel-container">
+            <div v-for="item in displayMissions" :key="item.mission.id" class="mission-card">
+              <RouterLink
+                :to="`/missions/${item.category}?missionId=${item.mission.id}`"
+                class="unstyled-link inner-mission-link"
+              >
+                <div class="card-content">
+                  <span class="card-icon">🎯</span>
+                  <div class="card-texts">
+                    <span class="card-title">{{ item.mission.title }}</span>
+                    <span class="card-subtitle">{{ CATEGORY_LABELS[item.category] }}</span>
+                  </div>
                 </div>
-              </div>
-            </RouterLink>
+              </RouterLink>
+            </div>
+            <div v-if="displayMissions.length === 0" class="mission-card empty">
+              Aucune mission en cours
+            </div>
           </div>
-          <div v-if="displayMissions.length === 0" class="mission-card empty">Aucune mission en cours</div>
-        </div>
-      </Card>
+          <div v-else class="lock-placeholder">🔒</div>
+        </Card>
+      </RouterLink>
 
       <RouterLink to="/communaute" class="unstyled-link">
         <Card title="Évènements communautaires " :hasArrow="true">
-          <div class="carousel-container">
+          <div v-if="isConnected" class="carousel-container">
             <div v-for="event in events" :key="event.id" class="mission-card">
               <RouterLink :to="'/communaute/' + event.id">
                 <div class="card-content">
@@ -241,7 +333,9 @@ onMounted(async () => {
                 </div>
               </RouterLink>
             </div>
+            <div v-if="events.length === 0" class="mission-card empty">Aucun évènement récent</div>
           </div>
+          <div v-else class="lock-placeholder">🔒</div>
         </Card>
       </RouterLink>
     </div>
@@ -279,6 +373,28 @@ onMounted(async () => {
 
 .emoji-img {
   font-size: 3.5rem;
+}
+
+/* --- GRAPHIQUE DONUT (Custom CSS car v-pie n'existe pas) --- */
+.donut-chart {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  /* Le background est géré dynamiquement via :style */
+}
+
+/* Le trou du donut */
+.donut-chart::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60%; /* Épaisseur du donut */
+  height: 60%;
+  background-color: #f5f5f5; /* Couleur de fond de la carte */
+  border-radius: 50%;
 }
 
 /* --- STYLE SPÉCIFIQUE EMPREINTE --- */
@@ -409,5 +525,12 @@ onMounted(async () => {
   color: inherit;
   display: block;
   cursor: pointer;
+}
+
+.lock-placeholder {
+  text-align: center;
+  font-size: 1.5rem;
+  color: #999;
+  padding: 10px;
 }
 </style>
