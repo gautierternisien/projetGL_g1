@@ -126,8 +126,15 @@ const calculateStatus = (score: number, avg: number) => {
   // On définit une marge de tolérance de 15% autour de la moyenne
   const lowThreshold = avg * 0.85
   const highThreshold = avg * 1.15
+  const objetiveTreshold = 2000
 
-  if (score < lowThreshold) {
+  if (score < objetiveTreshold) {
+    // Cas JAUNE : En dessous des 2 tonnes
+    scoreColor.value = '#FFC01F' // Jaune
+    scoreEmoji.value = '👑'
+    scoreComment.value = 'Objectif atteint !'
+  }
+  else if (score < lowThreshold) {
     // Cas VERT : Bien en dessous de la moyenne
     scoreColor.value = '#4CAF50' // Vert
     scoreEmoji.value = '🌹'

@@ -3,7 +3,7 @@ import Header from '@/components/AppHeader.vue'
 import Card from '@/components/AppCard.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
 import { RouterLink, useRouter } from 'vue-router'
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted, watchEffect } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 
 const API_URL = 'http://localhost:8000'
@@ -14,6 +14,20 @@ const isConnected = computed(() => authStore.isConnected)
 const countsByCategory = ref<
   Record<string, { completed: number; total: number; inProgress: number }>
 >({})
+
+// Scroll lock si pas connecté
+watchEffect(() => {
+  if (!isConnected.value) {
+    document.body.style.overflow = 'hidden'
+  } else {
+    document.body.style.overflow = ''
+  }
+})
+
+// Scroll unlock au unmount
+onUnmounted(() => {
+  document.body.style.overflow = ''
+})
 
 // tableau statique des catégories
 const CATEGORY_DATA = [
@@ -158,7 +172,7 @@ function handleCardClick(e: Event) {
 }
 
 .blur-overlay {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   width: 100%;
