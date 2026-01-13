@@ -3,7 +3,7 @@ import Card from '@/components/AppCard.vue'
 import Header from '@/components/AppHeader.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
-import { computed, onUnmounted, watchEffect  } from 'vue'
+import { computed, onUnmounted, watchEffect } from 'vue'
 import { conseilHebdo } from '@/data/conseilHebdo.ts'
 
 const authStore = useAuthStore()
@@ -198,7 +198,8 @@ const conseilActuel = computed(() => {
 .aide_text {
   font-size: 1.2rem;
   font-weight: 600;
-  color: #333;
+  color: #666;
+  text-decoration: underline;
 }
 
 .emoji-link {
