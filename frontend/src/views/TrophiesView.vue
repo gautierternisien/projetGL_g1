@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import Header from '@/components/AppHeader.vue'
+import { useRouter } from 'vue-router'
+const router = useRouter()
+const goBack = () => router.push('/profile')
 </script>
 
 <template>
   <div class="dashboard-wrapper">
-    <Header title="Trophées" />
+    <Header title="Trophées" :showResumeBtn="true" resumeBtnLabel="Retour" @resumeLater="goBack" />
     <div class="scrollable-area">
       <div class="placeholder-content">
         <span class="emoji">🏆</span>
