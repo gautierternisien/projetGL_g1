@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, RouterView } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import SurveyView from '@/views/SurveyView.vue'
 import MissionsView from '@/views/MissionsView.vue'
@@ -28,44 +28,70 @@ const router = createRouter({
       component: RegisterView,
     },
     {
+      // Regroupement Questionnaires
       path: '/questionnaires',
-      name: 'questionnaires',
-      component: SurveyView,
+      component: RouterView, // Composant "pass-through" pour afficher les enfants
+      children: [
+        {
+          path: '', // Chemin par défaut (/questionnaires)
+          name: 'questionnaires',
+          component: SurveyView,
+        },
+        {
+          path: ':category', // Sous-chemin (/questionnaires/:category)
+          name: 'questionnaire',
+          component: () => import('../views/QuestionsView.vue'),
+        },
+      ],
     },
     {
+      // Regroupement Missions
       path: '/missions',
-      name: 'missions',
-      component: MissionsView,
+      component: RouterView,
+      children: [
+        {
+          path: '',
+          name: 'missions',
+          component: MissionsView,
+        },
+        {
+          path: ':category',
+          name: 'mission-category',
+          component: () => import('../views/MissionCategoryView.vue'),
+        },
+      ],
     },
     {
-      path: '/missions/:category',
-      name: 'mission-category',
-      component: () => import('../views/MissionCategoryView.vue'),
-    },
-    {
+      // Regroupement Communauté
       path: '/communaute',
-      name: 'communaute',
-      component: CommunauteView,
-    },
-    {
-      path: '/communaute/amis',
-      name: 'CommunityFriends',
-      component: () => import('../views/FriendsView.vue'),
-    },
-    {
-      path: '/communaute/amis/ajouter',
-      name: 'CommunityFriendsAdd',
-      component: () => import('../views/AddFriendView.vue'),
-    },
-    {
-      path: '/communaute/ligues',
-      name: 'CommunityLeagues',
-      component: () => import('../views/LeaguesView.vue'),
-    },
-    {
-      path: '/communaute/evenements',
-      name: 'CommunityEvents',
-      component: () => import('../views/EvenementsView.vue'),
+      component: RouterView,
+      children: [
+        {
+          path: '',
+          name: 'communaute',
+          component: CommunauteView,
+        },
+        {
+          path: 'amis',
+          name: 'CommunityFriends',
+          component: () => import('../views/FriendsView.vue'),
+        },
+        {
+          path: 'amis/ajouter',
+          name: 'CommunityFriendsAdd',
+          component: () => import('../views/AddFriendView.vue'),
+        },
+        {
+          path: 'ligues',
+          name: 'CommunityLeagues',
+          component: () => import('../views/LeaguesView.vue'),
+        },
+        {
+          path: 'evenements',
+          name: 'CommunityEvents',
+          component: () => import('../views/EvenementsView.vue'),
+        },
+      ],
     },
     {
       path: '/conseils',
@@ -83,16 +109,8 @@ const router = createRouter({
       component: TrophiesView,
     },
     {
-      path: '/questionnaires/:category',
-      name: 'questionnaire',
-      component: () => import('../views/QuestionsView.vue'),
-    },
-    {
       path: '/about',
       name: 'about',
-      // route level code-splitting
-      // this generates a separate chunk (About.[hash].js) for this route
-      // which is lazy-loaded when the route is visited.
       component: () => import('../views/AboutView.vue'),
     },
     {
