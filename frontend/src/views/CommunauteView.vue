@@ -65,7 +65,7 @@ function handleCardClick(e: Event) {
                 Vous avez {{ friendsStore.incomingRequests.length }} demande{{
                   friendsStore.incomingRequests.length > 1 ? 's' : ''
                 }}
-                en ami
+                en attente
               </p>
             </div>
           </Card>
