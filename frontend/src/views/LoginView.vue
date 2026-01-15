@@ -55,22 +55,6 @@ async function handleLogin() {
 </template>
 
 <style scoped>
-.dashboard-wrapper {
-  background-color: white;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  font-family: 'Instrument Sans', sans-serif;
-}
-
-.scrollable-area {
-  padding: 100px 20px;
-  overflow-y: auto;
-  flex: 1;
-  -webkit-overflow-scrolling: touch;
-}
-
 .auth-container {
   display: flex;
   justify-content: center;

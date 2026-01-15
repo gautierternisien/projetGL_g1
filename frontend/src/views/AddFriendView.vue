@@ -41,7 +41,7 @@ onMounted(async () => {
 })
 
 function openAdd(userId: number) {
-  const user = results.value.find(u => u.id === userId) || null
+  const user = results.value.find((u) => u.id === userId) || null
   confirmState.value = { open: true, user }
 }
 
@@ -62,20 +62,16 @@ const goBack = () => router.push('/communaute/amis')
 
 <template>
   <div class="dashboard-wrapper">
-    <Header title="Ajouter un ami"
-    :showResumeBtn="true"
+    <Header
+      title="Ajouter un ami"
+      :showResumeBtn="true"
       resumeBtnLabel="Retour"
-      @resumeLater="goBack" />
+      @resumeLater="goBack"
+    />
     <div class="scrollable-area" :class="{ 'blurred-content': isBlurred }">
-
       <div class="search-box">
         <label for="search">Rechercher par pseudo</label>
-        <input
-          id="search"
-          type="text"
-          v-model="query"
-          placeholder="Ex: Ju..."
-        />
+        <input id="search" type="text" v-model="query" placeholder="Ex: Ju..." />
       </div>
 
       <div v-if="loading" class="empty">Recherche...</div>
@@ -104,23 +100,6 @@ const goBack = () => router.push('/communaute/amis')
 </template>
 
 <style scoped>
-.dashboard-wrapper {
-  background-color: white;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  font-family: 'Instrument Sans', sans-serif;
-  position: relative;
-}
-
-.scrollable-area {
-  padding: 100px 16px 24px;
-  overflow-y: auto;
-  flex: 1;
-  -webkit-overflow-scrolling: touch;
-}
-
 .blurred-content {
   filter: blur(4px);
   pointer-events: none;

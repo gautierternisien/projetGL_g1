@@ -256,17 +256,6 @@ const goBack = () => router.push('/missions')
 </template>
 
 <style scoped>
-.dashboard-wrapper {
-  background: white;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-.scrollable-area {
-  padding: 100px 20px;
-  overflow-y: auto;
-  flex: 1;
-}
 .tabs {
   display: flex;
   gap: 8px;

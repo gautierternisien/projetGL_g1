@@ -43,44 +43,28 @@ function handleCardClick(e: Event) {
       </div>
 
       <div :class="{ 'blurred-content': !isConnected }">
-         <!-- Liste d'amis -->
-        <RouterLink
-          to="/communaute/amis"
-          class="unstyled-link"
-          @click="handleCardClick"
-        >
+        <!-- Liste d'amis -->
+        <RouterLink to="/communaute/amis" class="unstyled-link" @click="handleCardClick">
           <Card title="Liste d'amis" :hasArrow="isConnected">
             <div class="dashboard-card-content">
               <span class="dashboard-emoji">👥</span>
-              <p class="dashboard-text">
-                Retrouvez et comparez votre impact avec vos amis
-              </p>
+              <p class="dashboard-text">Retrouvez et comparez votre impact avec vos amis</p>
             </div>
           </Card>
         </RouterLink>
 
         <!-- Ligues -->
-        <RouterLink
-          to="/communaute/ligues"
-          class="unstyled-link"
-          @click="handleCardClick"
-        >
+        <RouterLink to="/communaute/ligues" class="unstyled-link" @click="handleCardClick">
           <Card title="Ligues" :hasArrow="isConnected">
             <div class="dashboard-card-content">
               <span class="dashboard-emoji">🏆</span>
-              <p class="dashboard-text">
-                Participez à des ligues et classements communautaires
-              </p>
+              <p class="dashboard-text">Participez à des ligues et classements communautaires</p>
             </div>
           </Card>
         </RouterLink>
 
         <!-- Evenements -->
-        <RouterLink
-          to="/communaute/evenements"
-          class="unstyled-link"
-          @click="handleCardClick"
-        >
+        <RouterLink to="/communaute/evenements" class="unstyled-link" @click="handleCardClick">
           <Card title="Événements" :hasArrow="isConnected">
             <div class="dashboard-card-content">
               <span class="dashboard-emoji">📅</span>
@@ -96,24 +80,6 @@ function handleCardClick(e: Event) {
 </template>
 
 <style scoped>
-.dashboard-wrapper {
-  background-color: white;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  font-family: 'Instrument Sans', sans-serif;
-  position: relative;
-}
-
-.scrollable-area {
-  padding: 100px 20px;
-  overflow-y: auto;
-  flex: 1;
-  -webkit-overflow-scrolling: touch;
-  position: relative;
-}
-
 .placeholder-content {
   padding: 20px;
   text-align: center;
@@ -192,6 +158,4 @@ function handleCardClick(e: Event) {
   color: inherit;
   display: block;
 }
-
-
 </style>

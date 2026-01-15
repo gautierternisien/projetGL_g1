@@ -96,23 +96,6 @@ function cancelLogout() {
 </template>
 
 <style scoped>
-.dashboard-wrapper {
-  background-color: white;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  font-family: 'Instrument Sans', sans-serif;
-  position: relative;
-}
-
-.scrollable-area {
-  padding: 100px 20px;
-  overflow-y: auto;
-  flex: 1;
-  -webkit-overflow-scrolling: touch;
-}
-
 .profile-content {
   display: flex;
   flex-direction: column;

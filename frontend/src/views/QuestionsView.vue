@@ -311,24 +311,6 @@ const saveAndExit = () => {
 </template>
 
 <style scoped>
-.scrollable-area {
-  /* Les propriétés de scroll et padding sont gérées dans global.css */
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  box-sizing: border-box;
-  width: 100%;
-}
-
-.scrollable-area > *:first-child {
-  margin-top: 0;
-}
-
-/* Supprime les marges qui dépassent en bas */
-.scrollable-area > *:last-child {
-  margin-bottom: 0;
-}
-
 .loading-state,
 .error-state {
   margin-top: 50px;

@@ -177,10 +177,6 @@ function handleCardClick(e: Event) {
 </template>
 
 <style scoped>
-.scrollable-area {
-  position: relative;
-}
-
 .blurred-content {
   filter: blur(5px);
   pointer-events: none;

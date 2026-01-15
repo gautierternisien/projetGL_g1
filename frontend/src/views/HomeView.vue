@@ -6,16 +6,13 @@ import { ref, onMounted, computed, onActivated, watch } from 'vue'
 import type { Mission } from '@/types/mission'
 import { useProgressStore } from '@/stores/progress'
 import { useAuthStore } from '@/stores/auth'
+import { useFriendsStore } from '@/stores/friends'
 import { API_URL, USER_ID } from '@/config'
 
 const store = useProgressStore()
 const authStore = useAuthStore()
+const friendsStore = useFriendsStore()
 const isConnected = computed(() => authStore.isConnected)
-
-interface CommunityEvent {
-  id: number
-  title: string
-}
 
 // Dictionnaire pour afficher de jolis noms (au lieu de 'transport', 'alimentation'...)
 const CATEGORY_LABELS: Record<string, string> = {
@@ -100,7 +97,9 @@ async function loadDashboardMissions() {
   }
 }
 
-const events = ref<CommunityEvent[]>([])
+const events = computed(() => {
+  return friendsStore.activities.slice(0, 6)
+})
 
 // --- COMPUTED POUR LE GRAPHIQUE ---
 const donutStyle = computed(() => {
@@ -133,8 +132,7 @@ const calculateStatus = (score: number, avg: number) => {
     scoreColor.value = '#FFC01F' // Jaune
     scoreEmoji.value = '👑'
     scoreComment.value = 'Objectif atteint !'
-  }
-  else if (score < lowThreshold) {
+  } else if (score < lowThreshold) {
     // Cas VERT : Bien en dessous de la moyenne
     scoreColor.value = '#4CAF50' // Vert
     scoreEmoji.value = '🌹'
@@ -224,6 +222,7 @@ onMounted(async () => {
   // load dashboard missions (real ones) only if connected
   if (isConnected.value) {
     await loadDashboardMissions()
+    await friendsStore.fetchActivities()
   }
 })
 
@@ -231,6 +230,7 @@ onMounted(async () => {
 onActivated(async () => {
   if (isConnected.value) {
     await loadDashboardMissions()
+    await friendsStore.fetchActivities()
     if (authStore.user) {
       store.fetchAllProgress(authStore.user.username)
     }
@@ -241,6 +241,7 @@ onActivated(async () => {
 window.addEventListener('focus', async () => {
   if (isConnected.value) {
     await loadDashboardMissions()
+    await friendsStore.fetchActivities()
     if (authStore.user) {
       store.fetchAllProgress(authStore.user.username)
     }
@@ -252,6 +253,9 @@ watch(
   () => authStore.user,
   async (newUser) => {
     if (newUser) {
+      store.fetchAllProgress(newUser.username)
+      await loadDashboardMissions()
+      await friendsStore.fetchActivities()
       store.fetchAllProgress(newUser.username)
       await loadDashboardMissions()
     }
@@ -332,11 +336,14 @@ watch(
       <RouterLink to="/communaute" class="unstyled-link">
         <Card title="Évènements communautaires " :hasArrow="true">
           <div v-if="isConnected" class="carousel-container">
-            <div v-for="event in events" :key="event.id" class="mission-card">
-              <RouterLink :to="'/communaute/' + event.id">
+            <div v-for="(event, i) in events" :key="i" class="mission-card">
+              <RouterLink to="/communaute/activites" class="unstyled-link inner-mission-link">
                 <div class="card-content">
                   <span class="card-icon">👥</span>
-                  <span class="card-title">{{ event.title }}</span>
+                  <div class="card-texts">
+                    <span class="card-title">{{ event.friend_username }}</span>
+                    <span class="card-subtitle">a terminé : {{ event.mission_title }}</span>
+                  </div>
                 </div>
               </RouterLink>
             </div>

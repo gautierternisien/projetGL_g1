@@ -87,7 +87,7 @@ export const useFriendsStore = defineStore('friends', () => {
       method: 'PUT',
       headers: authHeaders(),
     })
-    if (!res.ok) throw new Error('Impossible d\'accepter la demande')
+    if (!res.ok) throw new Error("Impossible d'accepter la demande")
     await fetchFriends()
     await fetchIncomingRequests()
   }
@@ -107,7 +107,7 @@ export const useFriendsStore = defineStore('friends', () => {
       headers: authHeaders(),
     })
     if (!res.ok) throw new Error('Suppression impossible')
-    friends.value = friends.value.filter(f => f.id !== userId)
+    friends.value = friends.value.filter((f) => f.id !== userId)
   }
 
   async function cancelRequest(requestId: number) {
@@ -115,7 +115,7 @@ export const useFriendsStore = defineStore('friends', () => {
       method: 'PUT',
       headers: authHeaders(),
     })
-    if (!res.ok) throw new Error('Impossible d\'annuler la demande')
+    if (!res.ok) throw new Error("Impossible d'annuler la demande")
     await fetchPendingRequests()
   }
 
@@ -127,10 +127,10 @@ export const useFriendsStore = defineStore('friends', () => {
     })
     if (!res.ok) throw new Error('Recherche impossible')
     const found: UserSummary[] = await res.json()
-    const friendIds = new Set(friends.value.map(f => f.id))
-    const pendingIds = new Set(pendingRequests.value.map(r => r.receiver.id))
+    const friendIds = new Set(friends.value.map((f) => f.id))
+    const pendingIds = new Set(pendingRequests.value.map((r) => r.receiver.id))
     // Exclure amis et demandes en attente
-    return found.filter(u => !friendIds.has(u.id) && !pendingIds.has(u.id))
+    return found.filter((u) => !friendIds.has(u.id) && !pendingIds.has(u.id))
   }
 
   return {
@@ -150,4 +150,3 @@ export const useFriendsStore = defineStore('friends', () => {
     searchUsers,
   }
 })
-
