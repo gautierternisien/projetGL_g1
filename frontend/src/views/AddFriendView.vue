@@ -252,7 +252,7 @@ const goBack = () => router.push('/communaute/amis')
 }
 
 .confirm-btn {
-  background-color: #1f7a3a;
+  background-color: #679436;
   color: white;
   border: none;
   padding: 0.75rem 1rem;
