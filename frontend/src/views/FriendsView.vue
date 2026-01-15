@@ -81,6 +81,9 @@ const goBack = () => router.push('/communaute')
           @click="activeTab = t.id"
         >
           {{ t.label }}
+          <span v-if="t.id === 2 && store.incomingRequests.length > 0" class="badge">
+            {{ store.incomingRequests.length }}
+          </span>
         </button>
       </div>
 
@@ -186,6 +189,24 @@ const goBack = () => router.push('/communaute')
   white-space: pre-line;
   font-family: 'Instrument Sans', sans-serif;
   line-height: 1.2;
+  position: relative; /* Pour positionner le badge */
+}
+
+.badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background-color: #ff4d4d;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 700;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
 }
 
 .tab-btn.active {
@@ -290,7 +311,7 @@ const goBack = () => router.push('/communaute')
 }
 
 .request-item.incoming {
-  border-left-color: #4caf50;
+  border-left-color: #679436;
 }
 
 .request-info {
@@ -313,7 +334,7 @@ const goBack = () => router.push('/communaute')
 }
 
 .accept-btn {
-  background: #4caf50;
+  background: #679436;
   color: white;
   border: none;
   padding: 6px 12px;

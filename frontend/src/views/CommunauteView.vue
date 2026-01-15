@@ -2,12 +2,24 @@
 import Card from '@/components/AppCard.vue'
 import Header from '@/components/AppHeader.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useFriendsStore } from '@/stores/friends'
 import { useRouter } from 'vue-router'
-import { computed, watchEffect, onUnmounted } from 'vue'
+import { computed, watchEffect, onUnmounted, onMounted } from 'vue'
 
 const authStore = useAuthStore()
+const friendsStore = useFriendsStore()
 const router = useRouter()
 const isConnected = computed(() => authStore.isConnected)
+
+onMounted(async () => {
+  if (isConnected.value) {
+    try {
+      await friendsStore.fetchIncomingRequests()
+    } catch {
+      // ignore
+    }
+  }
+})
 
 // Scroll lock si pas connecté
 watchEffect(() => {
@@ -48,7 +60,13 @@ function handleCardClick(e: Event) {
           <Card title="Liste d'amis" :hasArrow="isConnected">
             <div class="dashboard-card-content">
               <span class="dashboard-emoji">👥</span>
-              <p class="dashboard-text">Retrouvez et comparez votre impact avec vos amis</p>
+              <p class="dashboard-text">Retrouvez vos amis</p>
+              <p v-if="friendsStore.incomingRequests.length > 0" class="pending-text">
+                Vous avez {{ friendsStore.incomingRequests.length }} demande{{
+                  friendsStore.incomingRequests.length > 1 ? 's' : ''
+                }}
+                en ami
+              </p>
             </div>
           </Card>
         </RouterLink>
@@ -67,9 +85,9 @@ function handleCardClick(e: Event) {
         <RouterLink to="/communaute/evenements" class="unstyled-link" @click="handleCardClick">
           <Card title="Événements" :hasArrow="isConnected">
             <div class="dashboard-card-content">
-              <span class="dashboard-emoji">📅</span>
+              <span class="dashboard-emoji">🍾</span>
               <p class="dashboard-text">
-                Dernières missions réalisées par les amis (bientot les ligues)
+                Dernières missions réalisées par les amis (bientôt par les gens des ligues)
               </p>
             </div>
           </Card>
@@ -151,6 +169,13 @@ function handleCardClick(e: Event) {
   color: #666;
   font-weight: 500;
   max-width: 240px;
+}
+
+.pending-text {
+  color: #ffa500;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-top: 4px;
 }
 
 .unstyled-link {
