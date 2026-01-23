@@ -99,3 +99,9 @@ Thumbs.db
 *.pid
 instance/
 .webassets-cache
+
+# Ignorer les fichiers de configuration UV (Setup Gautier)
+pyproject.toml
+uv.lock
+.venv/
+.python-version
