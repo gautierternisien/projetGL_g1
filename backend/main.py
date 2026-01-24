@@ -41,14 +41,21 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     )
     try:
         payload = utils.jwt.decode(token, utils.SECRET_KEY, algorithms=[utils.ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
+        user_id_str: str = payload.get("sub")
+        if user_id_str is None:
             raise credentials_exception
-        token_data = schemas.TokenData(email=username) # reuse email field for username/sub
+        token_data = schemas.TokenData(email=user_id_str) # reuse email field for user_id/sub
     except utils.JWTError:
         raise credentials_exception
 
-    user = crud.get_user_by_username(db, username=token_data.email)
+    # Try to get user by numeric ID first (new token format)
+    try:
+        user_id = int(token_data.email)
+        user = crud.get_user(db, user_id)
+    except (ValueError, TypeError):
+        # Fall back to username lookup (old token format for backward compatibility)
+        user = crud.get_user_by_username(db, username=token_data.email)
+    
     if user is None:
         raise credentials_exception
     return user
@@ -371,20 +378,20 @@ MISSIONS_DB = {
 # --- STOCKAGE TEMPORAIRE DES RÉPONSES ---
 # Nouvelle Structure :
 # {
-#    "user_123": {
+#    123: {
 #        "transport": { 1: "car", 2: "low" },
 #        "alimentation": { 101: "high" }
 #    }
 # }
-user_answers_db: Dict[str, Dict[str, Dict[int, str]]] = {}
+user_answers_db: Dict[int, Dict[str, Dict[int, str]]] = {}
 
 # {
-#    "user_123": {
+#    123: {
 #        1: "en_cours",
 #        2: "termine"
 #    }
 # }
-user_missions_db: Dict[str, Dict[int, str]] = {}
+user_missions_db: Dict[int, Dict[int, str]] = {}
 
 # Feed des activités : { "username_receiver": [ { "sender_username": "...", "mission_id": 1, ... } ] }
 user_feed_db: Dict[str, List[Dict]] = {} 
@@ -418,7 +425,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
 
     access_token_expires = timedelta(minutes=utils.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = utils.create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
+        data={"sub": str(user.id)}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
@@ -426,6 +433,50 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
 async def read_users_me(current_user: models.User = Depends(get_current_user)):
     return current_user
 
+@app.put("/users/me/email", response_model=schemas.User)
+async def update_user_email(new_email: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return crud.update_user_email(db, current_user.id, new_email)
+
+@app.put("/users/me/username", response_model=schemas.User)
+async def update_user_username(new_username: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Before updating, migrate data from old username to numeric user_id in in-memory stores
+    old_username = current_user.username
+    user_id = current_user.id
+    
+    # Migrate answers from old username key (if exists) to numeric user_id
+    if old_username in user_answers_db:
+        if user_id not in user_answers_db:
+            user_answers_db[user_id] = {}
+        # Merge old data into numeric key
+        for category, answers in user_answers_db[old_username].items():
+            if category not in user_answers_db[user_id]:
+                user_answers_db[user_id][category] = {}
+            user_answers_db[user_id][category].update(answers)
+        # Remove old key
+        del user_answers_db[old_username]
+    
+    # Migrate missions from old username key (if exists) to numeric user_id
+    if old_username in user_missions_db:
+        if user_id not in user_missions_db:
+            user_missions_db[user_id] = {}
+        user_missions_db[user_id].update(user_missions_db[old_username])
+        del user_missions_db[old_username]
+    
+    return crud.update_user_username(db, current_user.id, new_username)
+
+@app.put("/users/me/first_name", response_model=schemas.User)
+async def update_user_first_name(new_first_name: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return crud.update_user_first_name(db, current_user.id, new_first_name)
+
+@app.put("/users/me/last_name", response_model=schemas.User)
+async def update_user_last_name(new_last_name: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return crud.update_user_last_name(db, current_user.id, new_last_name)
+
+@app.put("/users/me/password", response_model=schemas.User)
+async def update_user_password(current_password: str, new_password: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not crud.verify_password(current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Mot de passe actuel incorrect")
+    return crud.update_user_password(db, current_user.id, new_password)
 
 @app.get("/users", response_model=List[schemas.UserPublic])
 async def search_users(prefix: str = "", current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -587,7 +638,7 @@ async def get_questions_by_category(category: str):
     return QUESTIONS_DB[category]
 
 @app.get("/missions/{category}", response_model=List[Mission])
-async def get_missions_by_category(category: str, user_id: Optional[str] = None):
+async def get_missions_by_category(category: str, user_id: Optional[int] = None):
     """
     Récupère les missions d'une catégorie spécifique (ex: /missions/transport).
     Si user_id est fourni, retourne les statuts personnalisés.
@@ -597,10 +648,6 @@ async def get_missions_by_category(category: str, user_id: Optional[str] = None)
         raise HTTPException(status_code=404, detail="Catégorie de missions non trouvée")
 
     raw_missions = MISSIONS_DB[category]
-
-    # Si pas d'utilisateur, on renvoie tout en 'new' (ou tel quel si on veut garder le comportement par défaut)
-    # La demande est : "lorsque j'ai un nouvel utilisateur, les missions proposées soient toutes des missions 'à réaliser' / 'nouvelles missions'"
-    # Donc on va forcer le statut à 'new' si on ne connait pas le statut pour cet utilisateur.
 
     personalized_missions = []
     user_statuses = {}
@@ -626,7 +673,7 @@ async def get_missions_by_category(category: str, user_id: Optional[str] = None)
 
 class MissionUpdate(BaseModel):
     status: str
-    user_id: Optional[str] = None
+    user_id: Optional[int] = None
 
 
 @app.put("/missions/{mission_id}")
@@ -658,7 +705,7 @@ async def update_mission(mission_id: int, payload: MissionUpdate, db: Session = 
         # Enregistrement dans le feed des amis si terminé
         if payload.status == 'termine':
             # 1. Recuperer l'ID de l'utilisateur qui a terminé la mission
-            user = crud.get_user_by_username(db, payload.user_id)
+            user = crud.get_user(db, payload.user_id)
             if user:
                 # 2. Recuperer ses amis
                 friend_ids = crud.get_accepted_friends(db, user.id)
@@ -690,7 +737,7 @@ async def update_mission(mission_id: int, payload: MissionUpdate, db: Session = 
     raise HTTPException(status_code=404, detail="Mission non trouvée")
 
 @app.post("/answers/{category}/{user_id}")
-async def save_answer(category: str, user_id: str, answer: UserAnswer):
+async def save_answer(category: str, user_id: int, answer: UserAnswer):
     """
     Sauvegarde une réponse pour une catégorie et un utilisateur donnés.
     Calcule la progression de CETTE catégorie.
@@ -725,7 +772,7 @@ async def save_answer(category: str, user_id: str, answer: UserAnswer):
     }
 
 @app.get("/answers/{category}/{user_id}")
-async def get_user_category_progress(category: str, user_id: str):
+async def get_user_category_progress(category: str, user_id: int):
     """
     Récupère les réponses d'un utilisateur pour une catégorie spécifique.
     """
@@ -750,7 +797,7 @@ async def get_user_category_progress(category: str, user_id: str):
     }
 
 @app.delete("/answers/{category}/{user_id}")
-async def reset_category_progress(category: str, user_id: str):
+async def reset_category_progress(category: str, user_id: int):
     """
     Supprime les réponses d'un utilisateur pour une catégorie spécifique.
     """
@@ -775,7 +822,7 @@ async def reset_category_progress(category: str, user_id: str):
 # --- NOUVELLE ROUTE : CALCUL DE L'IDENTITÉ CARBONE ---
 
 @app.get("/carbon-score/{user_id}")
-async def get_carbon_score(user_id: str):
+async def get_carbon_score(user_id: int):
     """
     Calcule le score carbone total de l'utilisateur.
     Logique :
@@ -873,7 +920,7 @@ async def get_global_stats(db: Session = Depends(get_db)):
     category_sums = {cat: 0 for cat in QUESTIONS_DB}
 
     for user in all_users:
-        user_id = user.username # user_answers_db utilise le username comme clé
+        user_id = user.id # user_answers_db utilise numeric user_id comme clé
         user_data = user_answers_db.get(user_id, {})
 
         for category, questions in QUESTIONS_DB.items():

@@ -45,6 +45,46 @@ def create_user(db: Session, user: schemas.UserCreate):
     db.refresh(db_user)
     return db_user
 
+def update_user_email(db: Session, user_id: int, new_email: str):
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if db_user:
+        db_user.email = new_email
+        db.commit()
+        db.refresh(db_user)
+    return db_user
+
+def update_user_username(db: Session, user_id: int, new_username: str):
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if db_user:
+        db_user.username = new_username
+        db.commit()
+        db.refresh(db_user)
+    return db_user
+
+def update_user_first_name(db: Session, user_id: int, new_first_name: str):
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if db_user:
+        db_user.first_name = new_first_name
+        db.commit()
+        db.refresh(db_user)
+    return db_user
+
+def update_user_last_name(db: Session, user_id: int, new_last_name: str):
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if db_user:
+        db_user.last_name = new_last_name
+        db.commit()
+        db.refresh(db_user)
+    return db_user
+
+def update_user_password(db: Session, user_id: int, new_password: str):
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if db_user:
+        db_user.hashed_password = get_password_hash(new_password)
+        db.commit()
+        db.refresh(db_user)
+    return db_user
+
 def get_questions_by_category(db: Session, category_name: str):
     return db.query(models.Question).filter(models.Question.category_name == category_name).all()
 
