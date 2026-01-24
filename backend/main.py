@@ -429,6 +429,8 @@ async def read_users_me(current_user: models.User = Depends(get_current_user)):
 
 @app.get("/users", response_model=List[schemas.UserPublic])
 async def search_users(prefix: str = "", current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if len(prefix) < 3:
+        return []
     users = crud.search_users_by_prefix(db, prefix)
     # Get accepted friends and pending requests sent
     friend_ids = set(crud.get_accepted_friends(db, current_user.id))

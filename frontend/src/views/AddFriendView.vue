@@ -20,6 +20,10 @@ const confirmState = ref<{ open: boolean; user: UserSummary | null }>({
 const isBlurred = computed(() => confirmState.value.open)
 
 watch(query, async (val) => {
+  if (val.trim().length < 3) {
+    results.value = []
+    return
+  }
   loading.value = true
   error.value = ''
   success.value = ''
@@ -83,7 +87,7 @@ const goBack = () => router.push('/communaute/amis')
           <button class="add-btn" @click="openAdd(u.id)">+</button>
         </div>
       </div>
-      <p v-else class="empty">Tapez un pseudo pour voir des suggestions</p>
+      <p v-else class="empty">Tapez au moins 3 lettres pour voir des suggestions</p>
       <p v-if="success" class="success-msg">{{ success }}</p>
     </div>
   </div>

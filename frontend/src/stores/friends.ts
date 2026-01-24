@@ -121,7 +121,7 @@ export const useFriendsStore = defineStore('friends', () => {
 
   async function searchUsers(prefix: string): Promise<UserSummary[]> {
     const p = prefix.trim()
-    if (!p || p.length < 1 || !auth.token) return []
+    if (!p || p.length < 3 || !auth.token) return []
     const res = await fetch(`${API_URL}/users?prefix=${encodeURIComponent(p)}`, {
       headers: authHeaders(),
     })
