@@ -23,7 +23,7 @@ onMounted(async () => {
 <template>
   <div class="dashboard-wrapper">
     <Header
-      title="Activité des amis"
+      title="Évènements"
       :showResumeBtn="true"
       resumeBtnLabel="Retour"
       @resumeLater="goBack"

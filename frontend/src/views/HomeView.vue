@@ -337,7 +337,7 @@ watch(
         <Card title="Évènements communautaires " :hasArrow="true">
           <div v-if="isConnected" class="carousel-container">
             <div v-for="(event, i) in events" :key="i" class="mission-card">
-              <RouterLink to="/communaute/activites" class="unstyled-link inner-mission-link">
+              <RouterLink to="/communaute/evenements" class="unstyled-link inner-mission-link">
                 <div class="card-content">
                   <span class="card-icon">👥</span>
                   <div class="card-texts">
