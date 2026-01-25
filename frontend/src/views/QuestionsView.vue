@@ -303,6 +303,12 @@ const saveAndExit = () => {
         <div class="progress-section">
           <ProgressBar :value="progressValue" :showLabel="false" />
         </div>
+
+        <div class="message">
+          <p>
+            Toute non réponse vaudra la moyenne nationale.
+          </p>
+        </div>
       </div>
 
       <div v-else class="error-state">Erreur de chargement.</div>
@@ -450,5 +456,13 @@ const saveAndExit = () => {
 .quest-btn {
   background-color: #679436;
   color: white;
+}
+
+.message {
+  margin-top: 30px;
+  font-size: 0.9rem;
+  font-style: italic;
+  color: #888;
+  text-align: center;
 }
 </style>
