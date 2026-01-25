@@ -65,7 +65,7 @@ interface RawMission {
 // Load missions for this category from backend
 async function loadMissions() {
   try {
-    const userIdParam = authStore.user ? `?user_id=${authStore.user.username}` : ''
+    const userIdParam = authStore.user ? `?user_id=${authStore.user.id}` : ''
     const res = await fetch(`${API_URL}/missions/${category}${userIdParam}`, { cache: 'no-store' })
     if (res.ok) {
       const data = await res.json()
@@ -152,7 +152,7 @@ function updateMissionStatus(mission: Mission, newStatus: Mission['status']) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           status: newStatus,
-          user_id: authStore.user?.username,
+          user_id: authStore.user?.id,
         }),
       })
         .then(async (r) => {

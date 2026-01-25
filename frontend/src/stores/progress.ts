@@ -29,7 +29,7 @@ export const useProgressStore = defineStore('progress', () => {
   }
 
   // NOUVELLE ACTION : Charge tout depuis le backend
-  async function fetchAllProgress(userId: string) {
+  async function fetchAllProgress(userId: number) {
     const categories = [
       'transport',
       'logement',

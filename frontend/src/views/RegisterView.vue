@@ -14,9 +14,25 @@ const regFirstName = ref('')
 const regLastName = ref('')
 
 const errorMessage = ref('')
+const usernameError = ref('')
+
+function validateUsername() {
+  const trimmedUsername = regUsername.value.replace(/\s/g, '')
+  if (trimmedUsername.length < 3) {
+    usernameError.value = 'Le pseudo doit contenir au moins 3 caractères (espaces non comptés)'
+    return false
+  }
+  usernameError.value = ''
+  return true
+}
 
 async function handleRegister() {
   errorMessage.value = ''
+  
+  if (!validateUsername()) {
+    return
+  }
+  
   try {
     await authStore.register(
       regEmail.value,
@@ -54,7 +70,14 @@ async function handleRegister() {
             </div>
             <div class="form-group">
               <label>Pseudo *</label>
-              <input v-model="regUsername" type="text" required />
+              <input 
+                v-model="regUsername" 
+                type="text" 
+                required 
+                @blur="validateUsername"
+                @input="validateUsername"
+              />
+              <span v-if="usernameError" class="field-error">{{ usernameError }}</span>
             </div>
             <div class="form-group">
               <label>Prénom</label>
@@ -155,5 +178,11 @@ input {
   font-size: 0.8rem;
   color: #666;
   margin-top: -0.5rem;
+}
+
+.field-error {
+  font-size: 0.8rem;
+  color: #ff4d4d;
+  margin-top: -0.25rem;
 }
 </style>

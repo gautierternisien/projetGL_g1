@@ -33,7 +33,7 @@ onMounted(async () => {
       await authStore.fetchUser()
     }
     if (authStore.user) {
-      store.fetchAllProgress(authStore.user.username)
+      store.fetchAllProgress(authStore.user.id)
     }
   }
 })
@@ -42,7 +42,7 @@ watch(
   () => authStore.user,
   (newUser) => {
     if (newUser) {
-      store.fetchAllProgress(newUser.username)
+      store.fetchAllProgress(newUser.id)
     }
   },
 )

@@ -53,7 +53,7 @@ const displayMissions = ref<{ mission: Mission; category: string }[]>([])
 async function loadDashboardMissions() {
   try {
     const keys = Object.keys(CATEGORY_LABELS)
-    const userIdParam = authStore.user ? `?user_id=${authStore.user.username}` : ''
+    const userIdParam = authStore.user ? `?user_id=${authStore.user.id}` : ''
     const results = await Promise.all(
       keys.map((k) =>
         fetch(`${API_URL}/missions/${k}${userIdParam}`, { cache: 'no-store' })
@@ -189,13 +189,13 @@ onMounted(async () => {
 
   // 1. On lance le chargement des progressions en arrière-plan
   if (isConnected.value && authStore.user) {
-    store.fetchAllProgress(authStore.user.username)
+    store.fetchAllProgress(authStore.user.id)
   }
 
   try {
     let url = `${API_URL}/global-stats`
     if (isConnected.value) {
-      const userId = authStore.user ? authStore.user.username : USER_ID
+      const userId = authStore.user ? authStore.user.id : USER_ID
       url = `${API_URL}/carbon-score/${userId}`
     }
 
@@ -232,7 +232,7 @@ onActivated(async () => {
     await loadDashboardMissions()
     await friendsStore.fetchActivities()
     if (authStore.user) {
-      store.fetchAllProgress(authStore.user.username)
+      store.fetchAllProgress(authStore.user.id)
     }
   }
 })
@@ -243,7 +243,7 @@ window.addEventListener('focus', async () => {
     await loadDashboardMissions()
     await friendsStore.fetchActivities()
     if (authStore.user) {
-      store.fetchAllProgress(authStore.user.username)
+      store.fetchAllProgress(authStore.user.id)
     }
   }
 })
@@ -253,10 +253,10 @@ watch(
   () => authStore.user,
   async (newUser) => {
     if (newUser) {
-      store.fetchAllProgress(newUser.username)
+      store.fetchAllProgress(newUser.id)
       await loadDashboardMissions()
       await friendsStore.fetchActivities()
-      store.fetchAllProgress(newUser.username)
+      store.fetchAllProgress(newUser.id)
       await loadDashboardMissions()
     }
   },

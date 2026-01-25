@@ -1,2 +1,2 @@
 export const API_URL = 'http://localhost:8000'
-export const USER_ID = 'user123'
+export const USER_ID = 123
