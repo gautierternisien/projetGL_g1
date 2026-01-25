@@ -402,10 +402,10 @@ user_feed_db: Dict[str, List[Dict]] = {}
 def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user = crud.get_user_by_email(db, email=user.email)
     if db_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
+        raise HTTPException(status_code=400, detail="Email déjà utilisée")
     db_user = crud.get_user_by_username(db, username=user.username)
     if db_user:
-        raise HTTPException(status_code=400, detail="Username already registered")
+        raise HTTPException(status_code=400, detail="Pseudo déjà utilisé")
     return crud.create_user(db=db, user=user)
 
 @app.post("/token", response_model=schemas.Token)
@@ -419,7 +419,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     if not user or not crud.verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username/email or password",
+            detail="Pseudo/Email ou Mot de passe incorrect",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -435,10 +435,19 @@ async def read_users_me(current_user: models.User = Depends(get_current_user)):
 
 @app.put("/users/me/email", response_model=schemas.User)
 async def update_user_email(new_email: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Check if email already exists (excluding current user)
+    existing_user = crud.get_user_by_email(db, email=new_email)
+    if existing_user and existing_user.id != current_user.id:
+        raise HTTPException(status_code=400, detail="Adresse mail déjà utilisée")
     return crud.update_user_email(db, current_user.id, new_email)
 
 @app.put("/users/me/username", response_model=schemas.User)
 async def update_user_username(new_username: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Check if username already exists (excluding current user)
+    existing_user = crud.get_user_by_username(db, username=new_username)
+    if existing_user and existing_user.id != current_user.id:
+        raise HTTPException(status_code=400, detail="Pseudo déjà utilisé")
+    
     # Before updating, migrate data from old username to numeric user_id in in-memory stores
     old_username = current_user.username
     user_id = current_user.id
@@ -461,6 +470,14 @@ async def update_user_username(new_username: str, current_user: models.User = De
             user_missions_db[user_id] = {}
         user_missions_db[user_id].update(user_missions_db[old_username])
         del user_missions_db[old_username]
+
+    # Migrate personal feed key and refresh sender_username in existing activities
+    if old_username in user_feed_db:
+        user_feed_db[new_username] = user_feed_db.pop(old_username)
+    for feed in user_feed_db.values():
+        for act in feed:
+            if act.get("sender_id") == user_id:
+                act["sender_username"] = new_username
     
     return crud.update_user_username(db, current_user.id, new_username)
 
@@ -525,7 +542,7 @@ async def get_friends_activity(current_user: models.User = Depends(get_current_u
 async def send_friend_request(friend_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     target = crud.get_user(db, friend_id)
     if not target:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
     try:
         req = crud.send_friend_request(db, current_user.id, friend_id)
         return {"id": req.id, "status": "pending", "receiver": {"id": target.id, "username": target.username}}

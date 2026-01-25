@@ -12,26 +12,27 @@ const regUsername = ref('')
 const regPassword = ref('')
 const regFirstName = ref('')
 const regLastName = ref('')
+const usernameInput = ref<HTMLInputElement | null>(null)
 
 const errorMessage = ref('')
-const usernameError = ref('')
 
-function validateUsername() {
-  const trimmedUsername = regUsername.value.replace(/\s/g, '')
-  if (trimmedUsername.length < 3) {
-    usernameError.value = 'Le pseudo doit contenir au moins 3 caractères (espaces non comptés)'
-    return false
+function removeSpaces() {
+  regUsername.value = regUsername.value.replace(/\s/g, '')
+  validateUsernameLength()
+}
+
+function validateUsernameLength() {
+  if (usernameInput.value) {
+    if (regUsername.value.length < 3) {
+      usernameInput.value.setCustomValidity('Le pseudo doit contenir au minimum 3 caractères')
+    } else {
+      usernameInput.value.setCustomValidity('')
+    }
   }
-  usernameError.value = ''
-  return true
 }
 
 async function handleRegister() {
   errorMessage.value = ''
-  
-  if (!validateUsername()) {
-    return
-  }
   
   try {
     await authStore.register(
@@ -71,13 +72,13 @@ async function handleRegister() {
             <div class="form-group">
               <label>Pseudo *</label>
               <input 
+                ref="usernameInput"
                 v-model="regUsername" 
                 type="text" 
                 required 
-                @blur="validateUsername"
-                @input="validateUsername"
+                @input="removeSpaces"
+                @blur="validateUsernameLength"
               />
-              <span v-if="usernameError" class="field-error">{{ usernameError }}</span>
             </div>
             <div class="form-group">
               <label>Prénom</label>
@@ -180,9 +181,4 @@ input {
   margin-top: -0.5rem;
 }
 
-.field-error {
-  font-size: 0.8rem;
-  color: #ff4d4d;
-  margin-top: -0.25rem;
-}
 </style>

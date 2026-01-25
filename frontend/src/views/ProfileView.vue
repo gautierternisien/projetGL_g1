@@ -17,7 +17,6 @@ const selectedFieldLabel = ref('')
 const selectedFieldKey = ref('')
 const oldFieldValue = ref('')
 const newFieldValue = ref('')
-const newFieldPlaceholder = ref('')
 const newFieldType = ref<'text' | 'email' | 'password'>('text')
 const currentPassword = ref('')
 const modalErrorMessage = ref('')
@@ -65,36 +64,31 @@ function toggleEditMenu() {
 }
 
 function handleEditOption(option: string) {
-  const fieldMap: Record<string, { label: string; type: 'text' | 'email' | 'password'; old: string; placeholder: string }> = {
+  const fieldMap: Record<string, { label: string; type: 'text' | 'email' | 'password'; old: string }> = {
     email: {
       label: 'adresse mail',
       type: 'email',
       old: authStore.user?.email ?? '',
-      placeholder: 'Nouvelle adresse mail',
     },
     username: {
       label: 'pseudo',
       type: 'text',
       old: authStore.user?.username ?? '',
-      placeholder: 'Nouveau pseudo',
     },
     firstname: {
       label: 'prénom',
       type: 'text',
       old: authStore.user?.first_name ?? '',
-      placeholder: 'Nouveau prénom',
     },
     lastname: {
       label: 'nom',
       type: 'text',
       old: authStore.user?.last_name ?? '',
-      placeholder: 'Nouveau nom',
     },
     password: {
       label: 'mot de passe',
       type: 'password',
       old: '',
-      placeholder: 'Nouveau mot de passe',
     },
   }
 
@@ -105,7 +99,6 @@ function handleEditOption(option: string) {
   selectedFieldKey.value = option
   newFieldType.value = field.type
   oldFieldValue.value = field.old
-  newFieldPlaceholder.value = field.placeholder
   newFieldValue.value = ''
   currentPassword.value = ''
   modalErrorMessage.value = ''
@@ -158,6 +151,11 @@ function submitEditModal() {
   // Pour les autres champs (email, username, firstname, lastname)
   if (!newFieldValue.value.trim()) {
     modalErrorMessage.value = 'Nouvelle valeur requise'
+    return
+  }
+
+  if (selectedFieldKey.value === 'username' && newFieldValue.value.trim().length < 3) {
+    modalErrorMessage.value = 'Le pseudo doit contenir au minimum 3 caractères'
     return
   }
 
@@ -252,28 +250,29 @@ function submitEditModal() {
         <h3>Modifier {{ selectedFieldLabel }}</h3>
         <div v-if="modalErrorMessage" class="modal-error">{{ modalErrorMessage }}</div>
         <form class="edit-modal-form" @submit.prevent="submitEditModal">
-          <div v-if="selectedFieldKey !== 'password'">
+          <div v-if="selectedFieldKey !== 'password'" class="field-group">
             <label>Actuel</label>
-            <input :value="oldFieldValue" disabled />
+            <input v-if="oldFieldValue" :value="oldFieldValue" disabled />
+            <span v-else class="empty-value">Aucun</span>
           </div>
 
-          <div v-if="selectedFieldKey === 'password'">
-            <label>Mot de passe actuel</label>
+          <div v-if="selectedFieldKey === 'password'" class="field-group">
+            <label>Actuel *</label>
             <input
               v-model="currentPassword"
               type="password"
-              placeholder="Mot de passe actuel"
               required
             />
           </div>
 
-          <label>Nouveau</label>
-          <input
-            v-model="newFieldValue"
-            :type="newFieldType"
-            :placeholder="newFieldPlaceholder"
-            required
-          />
+          <div class="field-group">
+            <label>Nouveau *</label>
+            <input
+              v-model="newFieldValue"
+              :type="newFieldType"
+              required
+            />
+          </div>
 
           <div class="modal-actions">
             <button type="button" class="cancel-btn" @click="closeEditModal">Annuler</button>
@@ -541,5 +540,19 @@ function submitEditModal() {
   cursor: pointer;
   font-weight: 600;
   flex: 1;
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.empty-value {
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  font-size: 1rem;
+  color: #999;
 }
 </style>
