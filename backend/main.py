@@ -510,6 +510,7 @@ async def get_friends_activity(current_user: models.User = Depends(get_current_u
     response_activities = []
     for activity in reversed(my_feed):
         response_activities.append(schemas.FriendActivity(
+            friend_id=activity["sender_id"],
             friend_username=activity["sender_username"],
             mission_title=activity["mission_title"],
             mission_id=activity["mission_id"],
@@ -713,7 +714,8 @@ async def update_mission(mission_id: int, payload: MissionUpdate, db: Session = 
                 
                 # 3. Ajouter l'activité dans le feed de chaque ami
                 new_activity = {
-                    "sender_username": payload.user_id,
+                    "sender_id": payload.user_id,
+                    "sender_username": user.username,
                     "mission_id": mission_id,
                     "mission_title": mission_title,
                     "status": payload.status,

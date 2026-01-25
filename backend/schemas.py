@@ -33,6 +33,7 @@ class UserPublic(BaseModel):
         from_attributes = True
 
 class FriendActivity(BaseModel):
+    friend_id: int
     friend_username: str
     mission_title: str
     mission_id: int
