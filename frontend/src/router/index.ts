@@ -8,6 +8,7 @@ import ProfileView from '@/views/ProfileView.vue'
 import LoginView from '@/views/LoginView.vue'
 import RegisterView from '@/views/RegisterView.vue'
 import TrophiesView from '@/views/TrophiesView.vue'
+import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -75,11 +76,13 @@ const router = createRouter({
           path: 'amis',
           name: 'CommunityFriends',
           component: () => import('../views/FriendsView.vue'),
+          meta: { requiresAuth: true },
         },
         {
           path: 'amis/ajouter',
           name: 'CommunityFriendsAdd',
           component: () => import('../views/AddFriendView.vue'),
+          meta: { requiresAuth: true },
         },
         {
           path: 'ligues',
@@ -102,11 +105,13 @@ const router = createRouter({
       path: '/profile',
       name: 'profile',
       component: ProfileView,
+      meta: { requiresAuth: true },
     },
     {
       path: '/trophees',
       name: 'trophees',
       component: TrophiesView,
+      meta: { requiresAuth: true },
     },
     {
       path: '/about',
@@ -114,11 +119,25 @@ const router = createRouter({
       component: () => import('../views/AboutView.vue'),
     },
     {
-      path: '/:catchAll(.*)',
+      path: '/404',
       name: 'not-found',
       component: () => import('../views/NotFound.vue'),
     },
+    {
+      path: '/:catchAll(.*)',
+      redirect: '/404',
+    },
   ],
+})
+
+router.beforeEach((to, from, next) => {
+  const authStore = useAuthStore()
+
+  if (to.meta.requiresAuth && !authStore.isConnected) {
+    next({ name: 'not-found' })
+  } else {
+    next()
+  }
 })
 
 export default router
