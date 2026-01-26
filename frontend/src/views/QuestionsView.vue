@@ -25,7 +25,7 @@ const route = useRoute()
 const progressStore = useProgressStore()
 const authStore = useAuthStore()
 
-const userId = computed(() => (authStore.user ? authStore.user.username : USER_ID))
+const userId = computed(() => (authStore.user ? authStore.user.id : USER_ID))
 
 const currentCategory = computed(() => route.params.category as string)
 

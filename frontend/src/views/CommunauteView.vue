@@ -86,9 +86,7 @@ function handleCardClick(e: Event) {
           <Card title="Activité des Amis" :hasArrow="isConnected">
             <div class="dashboard-card-content">
               <span class="dashboard-emoji">🍾</span>
-              <p class="dashboard-text">
-                Dernières missions réalisées par les amis (bientôt par les gens des ligues)
-              </p>
+              <p class="dashboard-text">Dernières missions réalisées par les amis</p>
             </div>
           </Card>
         </RouterLink>

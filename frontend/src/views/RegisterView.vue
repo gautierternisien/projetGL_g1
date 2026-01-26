@@ -12,11 +12,28 @@ const regUsername = ref('')
 const regPassword = ref('')
 const regFirstName = ref('')
 const regLastName = ref('')
+const usernameInput = ref<HTMLInputElement | null>(null)
 
 const errorMessage = ref('')
 
+function removeSpaces() {
+  regUsername.value = regUsername.value.replace(/\s/g, '')
+  validateUsernameLength()
+}
+
+function validateUsernameLength() {
+  if (usernameInput.value) {
+    if (regUsername.value.length < 3) {
+      usernameInput.value.setCustomValidity('Le pseudo doit contenir au minimum 3 caractères')
+    } else {
+      usernameInput.value.setCustomValidity('')
+    }
+  }
+}
+
 async function handleRegister() {
   errorMessage.value = ''
+  
   try {
     await authStore.register(
       regEmail.value,
@@ -54,7 +71,14 @@ async function handleRegister() {
             </div>
             <div class="form-group">
               <label>Pseudo *</label>
-              <input v-model="regUsername" type="text" required />
+              <input 
+                ref="usernameInput"
+                v-model="regUsername" 
+                type="text" 
+                required 
+                @input="removeSpaces"
+                @blur="validateUsernameLength"
+              />
             </div>
             <div class="form-group">
               <label>Prénom</label>
@@ -156,4 +180,5 @@ input {
   color: #666;
   margin-top: -0.5rem;
 }
+
 </style>

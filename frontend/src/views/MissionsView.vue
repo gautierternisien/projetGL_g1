@@ -47,7 +47,7 @@ async function loadCategoryCounts() {
   if (!isConnected.value) return
 
   try {
-    const userIdParam = authStore.user ? `?user_id=${authStore.user.username}` : ''
+    const userIdParam = authStore.user ? `?user_id=${authStore.user.id}` : ''
     const results = await Promise.all(
       categoriesKeys.value.map((k) =>
         fetch(`${API_URL}/missions/${k}${userIdParam}`, { cache: 'no-store' })
