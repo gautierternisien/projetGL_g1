@@ -4,7 +4,7 @@ import Header from '@/components/AppHeader.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useFriendsStore } from '@/stores/friends'
 import { useRouter } from 'vue-router'
-import { computed, watchEffect, onUnmounted, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 
 const authStore = useAuthStore()
 const friendsStore = useFriendsStore()
@@ -21,20 +21,6 @@ onMounted(async () => {
   }
 })
 
-// Scroll lock si pas connecté
-watchEffect(() => {
-  if (!isConnected.value) {
-    document.body.style.overflow = 'hidden'
-  } else {
-    document.body.style.overflow = ''
-  }
-})
-
-// Scroll unlock au unmount
-onUnmounted(() => {
-  document.body.style.overflow = ''
-})
-
 function handleCardClick(e: Event) {
   if (!isConnected.value) {
     e.preventDefault()
@@ -45,7 +31,7 @@ function handleCardClick(e: Event) {
 <template>
   <div class="dashboard-wrapper">
     <Header title="Espace Communautaire" />
-    <div class="scrollable-area">
+    <div class="scrollable-area" :style="!isConnected ? { overflow: 'hidden' } : {}">
       <div v-if="!isConnected" class="blur-overlay">
         <div class="lock-message">
           <span class="lock-icon">🔒</span>

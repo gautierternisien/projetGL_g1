@@ -4,27 +4,13 @@ import ProgressBar from '@/components/ProgressBar.vue'
 import Header from '@/components/AppHeader.vue'
 import { useProgressStore } from '@/stores/progress'
 import { useAuthStore } from '@/stores/auth'
-import { onMounted, computed, watch, onUnmounted, watchEffect } from 'vue'
+import { onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 const store = useProgressStore()
 const authStore = useAuthStore()
 const router = useRouter()
 const isConnected = computed(() => authStore.isConnected)
-
-// Scroll lock si pas connecté
-watchEffect(() => {
-  if (!isConnected.value) {
-    document.body.style.overflow = 'hidden'
-  } else {
-    document.body.style.overflow = ''
-  }
-})
-
-// Scroll unlock au unmount
-onUnmounted(() => {
-  document.body.style.overflow = ''
-})
 
 // Au montage de la vue, on utilise l'action centralisée du store
 onMounted(async () => {
@@ -58,7 +44,7 @@ function handleCardClick(e: Event) {
   <div class="dashboard-wrapper">
     <Header title="Questionnaires" />
 
-    <div class="scrollable-area">
+    <div class="scrollable-area" :style="!isConnected ? { overflow: 'hidden' } : {}">
       <div v-if="!isConnected" class="blur-overlay">
         <div class="lock-message">
           <span class="lock-icon">🔒</span>

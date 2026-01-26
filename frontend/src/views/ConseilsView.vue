@@ -3,26 +3,12 @@ import Card from '@/components/AppCard.vue'
 import Header from '@/components/AppHeader.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
-import { computed, onUnmounted, watchEffect } from 'vue'
+import { computed } from 'vue'
 import { conseilHebdo } from '@/data/conseilHebdo.ts'
 
 const authStore = useAuthStore()
 const router = useRouter()
 const isConnected = computed(() => authStore.isConnected)
-
-// Scroll lock si pas connecté
-watchEffect(() => {
-  if (!isConnected.value) {
-    document.body.style.overflow = 'hidden'
-  } else {
-    document.body.style.overflow = ''
-  }
-})
-
-// Scroll unlock au unmount
-onUnmounted(() => {
-  document.body.style.overflow = ''
-})
 
 // --- FONCTION UTILITAIRE : Récupérer le numéro de la semaine (1-52) ---
 function getWeekNumber(d: Date): number {
@@ -50,7 +36,7 @@ const conseilActuel = computed(() => {
 <template>
   <div class="dashboard-wrapper">
     <Header title="Conseils" />
-    <div class="scrollable-area">
+    <div class="scrollable-area" :style="!isConnected ? { overflow: 'hidden' } : {}">
       <div v-if="!isConnected" class="blur-overlay">
         <div class="lock-message">
           <span class="lock-icon">🔒</span>
