@@ -177,42 +177,6 @@ function handleCardClick(e: Event) {
 </template>
 
 <style scoped>
-.blurred-content {
-  filter: blur(5px);
-  pointer-events: none;
-  user-select: none;
-}
-
-.blur-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 10;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  /* Ensure overlay covers the scrollable area properly */
-  min-height: 500px;
-}
-
-.lock-message {
-  background: rgba(255, 255, 255, 0.9);
-  padding: 2rem;
-  border-radius: 16px;
-  text-align: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-}
-
-.lock-icon {
-  font-size: 3rem;
-}
-
 .login-btn {
   background-color: #679436;
   color: white;

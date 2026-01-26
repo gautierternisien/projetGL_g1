@@ -38,6 +38,18 @@ const CATEGORY_COLORS: Record<string, string> = {
   quotidien: '#455A64', // Blue Grey
 }
 
+const getCategoryColor = (key: string) => {
+  const score = store.getCategoryScore(key)
+
+  // Si le score est 0 (ou inexistant), on retourne du GRIS
+  if (!score || score === 0) {
+    return '#BDBDBD' // Gris moyen (tu peux changer par '#E0E0E0' pour plus clair)
+  }
+
+  // Sinon, on retourne la couleur officielle de la catégorie
+  return CATEGORY_COLORS[key] // Fallback au cas où
+}
+
 // --- ÉTATS ---
 const userScore = ref(0)
 const averageScore = ref(0)
@@ -129,12 +141,12 @@ const calculateStatus = (score: number, avg: number) => {
 
   if (score < objetiveTreshold) {
     // Cas JAUNE : En dessous des 2 tonnes
-    scoreColor.value = '#FFC01F' // Jaune
+    scoreColor.value = '#4CAF50' // Jaune
     scoreEmoji.value = '👑'
     scoreComment.value = 'Objectif atteint !'
-  } else if (score < lowThreshold) {
+  } else if (score <= lowThreshold) {
     // Cas VERT : Bien en dessous de la moyenne
-    scoreColor.value = '#4CAF50' // Vert
+    scoreColor.value = '#FFC01F' // Vert
     scoreEmoji.value = '🌹'
     scoreComment.value = 'Excellent !'
   } else if (score > highThreshold) {
@@ -170,12 +182,13 @@ const processSectors = (details: Record<string, number>, total: number) => {
 
   // D. On applique la couleur selon la catégorie
   sectors.value = activeSectors.map((sector) => {
-    const color = CATEGORY_COLORS[sector.key] || '#333'
+    const color = getCategoryColor(sector.key) || '#333'
 
     return {
       name: sector.name,
       pct: sector.pct,
       color: String(color),
+      key: sector.key,
     }
   })
 }
@@ -275,6 +288,17 @@ watch(
               (userScore / 1000).toFixed(2)
             }}</span>
             <span class="unit-text">Tonnes CO₂</span>
+            <div v-if="store.globalAverage === 0" class="cta-container">
+              <RouterLink to="/questionnaires" class="cta-link">
+                ⚠️ Moyenne française 👉 Faites votre propre empreinte carbone !
+              </RouterLink>
+            </div>
+            <div v-if="store.globalAverage < 100 && store.globalAverage > 0" class="cta-container">
+              <RouterLink to="/questionnaires" class="cta-link">
+                ⚠️ Moyenne nationale prise en compte pour certaines catégories 👉 Continuer les
+                questionnaires
+              </RouterLink>
+            </div>
           </div>
           <div class="image-side">
             <span class="emoji-img">{{ scoreEmoji }}</span>
@@ -295,7 +319,6 @@ watch(
             </ul>
           </div>
           <div class="image-side">
-            <!-- Remplacement de l'emoji par le graphique Donut CSS -->
             <div class="donut-chart" :style="donutStyle"></div>
           </div>
         </div>
@@ -546,5 +569,24 @@ watch(
   font-size: 1.5rem;
   color: #999;
   padding: 10px;
+}
+
+/* Conteneur pour centrer ou caler le message */
+.cta-container {
+  margin-top: 8px; /* Un peu d'espace sous "Tonnes CO2" */
+}
+
+/* Style du lien */
+.cta-link {
+  color: #679436; /* Ta couleur verte principale */
+  font-size: 0.85rem; /* Un peu plus petit que le reste */
+  font-weight: 700; /* Gras pour attirer l'oeil */
+  text-decoration: none;
+  border-bottom: 1px solid #679436; /* Petit soulignement propre */
+  transition: opacity 0.2s;
+}
+
+.cta-link:hover {
+  opacity: 0.8;
 }
 </style>
