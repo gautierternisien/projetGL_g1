@@ -17,7 +17,10 @@
     </RouterLink>
 
     <RouterLink to="/communaute" class="nav-item">
-      <span>👥</span>
+      <div class="icon-wrapper">
+        <span>👥</span>
+        <span v-if="hasIncomingRequests" class="notification-badge"></span>
+      </div>
     </RouterLink>
 
     <RouterLink to="/conseils" class="nav-item">
@@ -29,8 +32,35 @@
 <script setup lang="ts">
 import { RouterView, RouterLink } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
+import { useFriendsStore } from '@/stores/friends'
+import { useAuthStore } from '@/stores/auth'
+import { computed, watch, onMounted } from 'vue'
 
 const uiStore = useUiStore()
+const friendsStore = useFriendsStore()
+const authStore = useAuthStore()
+
+const hasIncomingRequests = computed(() => friendsStore.incomingRequests.length > 0)
+
+async function checkRequests() {
+  if (authStore.isConnected) {
+    try {
+      await friendsStore.fetchIncomingRequests()
+    } catch {
+      // ignore
+    }
+  }
+}
+
+onMounted(() => {
+  checkRequests()
+})
+
+watch(() => authStore.isConnected, (connected) => {
+  if (connected) {
+    checkRequests()
+  }
+})
 </script>
 
 <style scoped>
@@ -91,5 +121,25 @@ const uiStore = useUiStore()
 
 .router-link-active {
   background-color: #9c9e89;
+}
+
+.icon-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.notification-badge {
+  position: absolute;
+  top: 3px; /* Ajusté pour être "en haut à droite" de l'icone visuellement dans le cercle */
+  right: 3px;
+  width: 10px;
+  height: 10px;
+  background-color: #ff0000;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px #5e5e5e; /* Petit contour pour séparer */
 }
 </style>
