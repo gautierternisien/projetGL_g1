@@ -80,6 +80,8 @@ class UserMissionStatus(Base):
     user = relationship("User", back_populates="mission_statuses")
     mission = relationship("Mission", back_populates="user_statuses")
 
+    completed_at = Column(String, nullable=True) # ISO Date timestamp
+
 
 class FriendLink(Base):
     __tablename__ = "friend_links"

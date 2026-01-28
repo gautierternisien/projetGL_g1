@@ -12,8 +12,11 @@ const friendsStore = useFriendsStore()
 const leagueId = Number(route.params.id)
 
 const showInviteModal = ref(false)
+const showLeaveModal = ref(false)
 const inviteSearchQuery = ref('')
 const inviteErrorMessage = ref('')
+const leaveErrorMessage = ref('')
+const selectedFriendIds = ref<number[]>([])
 
 onMounted(async () => {
     try {
@@ -35,9 +38,18 @@ const sortedMembers = computed(() => {
 const timeRemaining = computed(() => {
     if (!league.value || league.value.is_archived) return null
 
-    // Calculate difference between now and endDate
+    const start = new Date(league.value.start_date).getTime()
     const end = new Date(league.value.end_date).getTime()
     const now = new Date().getTime()
+
+    // Not started yet
+    if (now < start) {
+        const diff = start - now
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+        if (days > 0) return `Commence dans ${days} jours`
+        return "Commence bientôt"
+    }
+
     const diff = end - now
 
     if (diff <= 0) return "Terminée"
@@ -66,30 +78,71 @@ function goBack() {
 function openInviteModal() {
     showInviteModal.value = true
     inviteErrorMessage.value = ''
+    selectedFriendIds.value = []
 }
 
 function closeInviteModal() {
     showInviteModal.value = false
     inviteSearchQuery.value = ''
     inviteErrorMessage.value = ''
+    selectedFriendIds.value = []
 }
 
-async function inviteFriend(friendId: number) {
-    inviteErrorMessage.value = ''
+function openLeaveModal() {
+    showLeaveModal.value = true
+    leaveErrorMessage.value = ''
+}
+
+function closeLeaveModal() {
+    showLeaveModal.value = false
+    leaveErrorMessage.value = ''
+}
+
+async function confirmLeaveLeague() {
+    leaveErrorMessage.value = ''
     try {
-        await store.inviteUser(leagueId, friendId)
-        // Auto-close on success (implied success)
-        closeInviteModal()
+        await store.leaveLeague(leagueId)
+        router.push({ name: 'CommunityLeagues' })
     } catch {
-        inviteErrorMessage.value = "Impossible d'inviter cet ami (déjà membre ou invité ?)"
+        leaveErrorMessage.value = "Impossible de quitter la ligue."
     }
 }
 
-async function leaveLeague() {
-  if(confirm("Êtes-vous sûr de vouloir quitter cette ligue ?")) {
-      await store.leaveLeague(leagueId)
-      router.push({ name: 'CommunityLeagues' })
-  }
+function toggleSelection(friendId: number) {
+    if (selectedFriendIds.value.includes(friendId)) {
+        selectedFriendIds.value = selectedFriendIds.value.filter(id => id !== friendId)
+    } else {
+        selectedFriendIds.value.push(friendId)
+    }
+}
+
+async function sendInvitations() {
+    if (selectedFriendIds.value.length === 0) return
+
+    inviteErrorMessage.value = ''
+    let successCount = 0
+    let failCount = 0
+    const successfulIds: number[] = []
+
+    // Send invites in parallel
+    await Promise.all(selectedFriendIds.value.map(async (id) => {
+        try {
+            await store.inviteUser(leagueId, id)
+            successCount++
+            successfulIds.push(id)
+        } catch {
+            failCount++
+        }
+    }))
+
+    // Remove successful invites from selection
+    selectedFriendIds.value = selectedFriendIds.value.filter(id => !successfulIds.includes(id))
+
+    if (failCount > 0) {
+         inviteErrorMessage.value = `${successCount} invitation(s) envoyée(s). ${failCount} échec(s) (déjà membre ?).`
+    } else {
+        closeInviteModal()
+    }
 }
 
 </script>
@@ -103,7 +156,7 @@ async function leaveLeague() {
         @resumeLater="goBack"
     />
 
-    <div v-if="league" class="scrollable-area content-container" :class="{ 'blurred-content': showInviteModal }">
+    <div v-if="league" class="scrollable-area content-container" :class="{ 'blurred-content': showInviteModal || showLeaveModal }">
 
         <div class="league-header">
             <h2>{{ league.name }}</h2>
@@ -111,12 +164,12 @@ async function leaveLeague() {
 
         <div v-if="!league.is_archived" class="actions">
             <button class="action-btn invite" @click="openInviteModal">Inviter un membre</button>
-            <button class="action-btn leave" @click="leaveLeague">Quitter la ligue</button>
+            <button class="action-btn leave" @click="openLeaveModal">Quitter la ligue</button>
         </div>
 
         <div class="league-infos">
             <p v-if="!league.is_archived && timeRemaining" class="timer">
-                Cette ligue se termine dans {{ timeRemaining }}
+                {{ timeRemaining.includes('Commence') ? timeRemaining : 'Se termine dans ' + timeRemaining }}
             </p>
             <p v-else class="timer">Terminée le {{ new Date(league.end_date).toLocaleDateString() }}</p>
         </div>
@@ -158,7 +211,13 @@ async function leaveLeague() {
                 class="friend-modal-item"
             >
                 <div class="friend-name">{{ friend.username }}</div>
-                <button class="add-friend-btn" @click="inviteFriend(friend.id)">Inviter</button>
+                <button
+                    class="add-friend-btn"
+                    :class="{ 'selected': selectedFriendIds.includes(friend.id) }"
+                    @click="toggleSelection(friend.id)"
+                >
+                    {{ selectedFriendIds.includes(friend.id) ? 'Désélectionner' : 'Sélectionner' }}
+                </button>
             </div>
 
             <div v-if="filteredFriends.length === 0" class="empty-msg">
@@ -172,6 +231,24 @@ async function leaveLeague() {
 
         <div class="confirm-actions">
           <button @click="closeInviteModal" class="cancel-btn">Annuler</button>
+          <button @click="sendInvitations" class="confirm-btn">Envoyer les invitations</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Leave Modal -->
+    <div v-if="showLeaveModal" class="blur-overlay">
+      <div class="confirm-box leave-confirm">
+        <h3>Quitter la ligue</h3>
+        <p>Êtes-vous sûr de vouloir quitter cette ligue ?</p>
+
+        <div v-if="leaveErrorMessage" class="error-message">
+            {{ leaveErrorMessage }}
+        </div>
+
+        <div class="confirm-actions">
+          <button @click="closeLeaveModal" class="cancel-btn">Annuler</button>
+          <button @click="confirmLeaveLeague" class="confirm-btn">Oui, quitter</button>
         </div>
       </div>
     </div>
@@ -299,7 +376,7 @@ async function leaveLeague() {
 
 .confirm-box {
   background: white;
-  padding: 1.5rem;
+  padding: 2rem;
   border-radius: 16px;
   text-align: center;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
@@ -353,10 +430,6 @@ async function leaveLeague() {
     border: 1px solid #eee;
 }
 
-.friend-modal-item:hover {
-    background: #f1f1f1;
-}
-
 .friend-name {
     font-weight: 500;
     color: #333;
@@ -374,8 +447,10 @@ async function leaveLeague() {
     font-weight: 600;
 }
 
-.add-friend-btn:hover {
-    background: #d4eddb;
+.add-friend-btn.selected {
+    background: #f4e5e5;
+    color: #b23b3b;
+    border-color: #e7caca;
 }
 
 .empty-msg {
@@ -404,10 +479,6 @@ async function leaveLeague() {
   font-size: 1rem;
 }
 
-.cancel-btn:hover {
-    background: #e0e0e0;
-}
-
 .error-message {
     color: #b23b3b;
     background: #f8d7da;
@@ -416,5 +487,21 @@ async function leaveLeague() {
     margin-top: 8px;
     font-size: 0.9rem;
     border: 1px solid #f5c6cb;
+}
+
+.leave-confirm {
+  /* Specific styles for leave confirmation box */
+}
+
+.confirm-btn {
+  background-color: #679436;
+  color: white;
+  border: none;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  flex: 1;
+  font-size: 1rem;
 }
 </style>

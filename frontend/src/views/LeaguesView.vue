@@ -33,9 +33,19 @@ const sortedArchivedLeagues = computed(() => {
     return [...store.archivedLeagues].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 })
 
-function getTimeRemaining(endDateStr: string) {
-    const end = new Date(endDateStr).getTime()
+function getTimeRemaining(league: { start_date: string; end_date: string }) {
+    const start = new Date(league.start_date).getTime()
+    const end = new Date(league.end_date).getTime()
     const now = new Date().getTime()
+
+    // Not started yet
+    if (now < start) {
+        const diff = start - now
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+        if (days > 0) return `Commence dans ${days}j`
+        return "Commence bientôt"
+    }
+
     const diff = end - now
     if (diff <= 0) return "Terminée"
     const days = Math.floor(diff / (1000 * 60 * 60 * 24))
@@ -70,18 +80,37 @@ const newEndDate = ref('')
 const isBlurred = ref(false)
 const errorMessage = ref('')
 
+// Date constraints
+const now = new Date()
+const todayStr = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().substring(0, 10)
+
 // Computed for form validation
-const isFormValid = computed(() => {
-    if (!newStartDate.value || !newEndDate.value) return false
+const formValidationError = computed(() => {
+    if (!newStartDate.value || !newEndDate.value) return null
+
+    if (newStartDate.value < todayStr) {
+        return "La date de début ne peut pas être dans le passé."
+    }
+
     const start = new Date(newStartDate.value).getTime()
     const end = new Date(newEndDate.value).getTime()
+
+    if (end <= start) {
+        return "La date de fin doit être postérieure au début."
+    }
+
     const oneYearLater = new Date(start + 365*24*60*60*1000).getTime()
-    return end > start && end <= oneYearLater
+    if (end > oneYearLater) {
+        return "La durée max est de 1 an."
+    }
+
+    return null
 })
 
-// Date constraints
-const today = new Date()
-const todayStr = today.toISOString().split('T')[0]
+const isFormValid = computed(() => {
+    return newStartDate.value && newEndDate.value && !formValidationError.value
+})
+
 const minEndDate = computed(() => {
     if (!newStartDate.value) return ''
     const minDate = new Date(newStartDate.value)
@@ -168,7 +197,7 @@ async function confirmCreateLeague() {
                     <div class="league-meta">
                          <span class="members-count">{{ league.members_count }} membres</span>
                          <span class="separator">•</span>
-                         <span class="timer">Se termine dans {{ getTimeRemaining(league.end_date) }}</span>
+                         <span class="timer">{{ getTimeRemaining(league) }}</span>
                     </div>
                 </div>
                 <div class="arrow">›</div>
@@ -248,8 +277,8 @@ async function confirmCreateLeague() {
             </div>
         </div>
 
-        <p v-if="newStartDate && newEndDate && !isFormValid" class="error-msg">
-            La durée est max 1 an et la fin doit être après le début.
+        <p v-if="formValidationError" class="error-msg">
+            {{ formValidationError }}
         </p>
         <p v-if="errorMessage" class="error-msg">
             {{ errorMessage }}

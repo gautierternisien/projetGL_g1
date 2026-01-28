@@ -120,6 +120,9 @@ def update_mission_status(db: Session, user_id: int, mission_id: int, status: st
         db_status = models.UserMissionStatus(user_id=user_id, mission_id=mission_id, status=status)
         db.add(db_status)
 
+    if status == 'termine':
+        db_status.completed_at = datetime.now().isoformat()
+
     db.commit()
     db.refresh(db_status)
     return db_status
@@ -338,14 +341,31 @@ def get_league_members_with_stats(db: Session, league_id: int):
     members = db.query(models.LeagueMember).filter(models.LeagueMember.league_id == league_id).all()
     result = []
 
+    league = get_league(db, league_id)
+
     # For now, simplistic mission counting
     for m in members:
         user = get_user(db, m.user_id)
         # Count completed missions
-        completed_count = db.query(models.UserMissionStatus).filter(
+        query = db.query(models.UserMissionStatus).filter(
              models.UserMissionStatus.user_id == m.user_id,
              models.UserMissionStatus.status == "termine"
-        ).count()
+        )
+
+        # Filter by league dates
+        if league and league.start_date:
+             query = query.filter(models.UserMissionStatus.completed_at >= league.start_date)
+        if league and league.end_date:
+             # Assuming end_date (YYYY-MM-DD) includes the full day, we can compare string directly
+             # if completed_at is ISO including time, "2023-01-05" < "2023-01-05T10:00:00".
+             # So strictly speaking, <= end_date usually excludes the day's events if they have time.
+             # We should probably filter < (end_date + 1 day).
+             # But for simplicity let's rely on simple string compare but adding time suffix for safe measure
+             # or simply trusting standard string compare logic for now.
+             # A robust way: completed_at <= end_date + "T23:59:59"
+             query = query.filter(models.UserMissionStatus.completed_at <= league.end_date + "T23:59:59")
+
+        completed_count = query.count()
 
         result.append({
             "id": m.id,
