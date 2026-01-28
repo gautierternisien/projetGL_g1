@@ -3,15 +3,21 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Header from '@/components/AppHeader.vue'
 import { useLeaguesStore } from '@/stores/leagues'
+import { useFriendsStore } from '@/stores/friends'
 
 const route = useRoute()
 const router = useRouter()
 const store = useLeaguesStore()
+const friendsStore = useFriendsStore()
 const leagueId = Number(route.params.id)
+
+const showInviteModal = ref(false)
+const inviteSearchQuery = ref('')
 
 onMounted(async () => {
     try {
         await store.fetchLeagueDetail(leagueId)
+        await friendsStore.fetchFriends()
     } catch {
         // silent fail or redirect?
     }
@@ -42,21 +48,37 @@ const timeRemaining = computed(() => {
     return `${hours} heures`
 })
 
+const filteredFriends = computed(() => {
+    const q = inviteSearchQuery.value.toLowerCase()
+    // Exclude members already in league
+    const currentMemberIds = new Set(league.value?.members.map(m => m.user_id) || [])
+
+    return friendsStore.friends
+        .filter(f => !currentMemberIds.has(f.id)) // Filter out existing members
+        .filter(f => f.username.toLowerCase().includes(q))
+})
+
 function goBack() {
   router.back()
 }
 
-async function inviteMember() {
-  // Temporary interaction
-  const id = prompt("Entrez l'ID de l'utilisateur à inviter :")
-  if (id) {
+function openInviteModal() {
+    showInviteModal.value = true
+}
+
+function closeInviteModal() {
+    showInviteModal.value = false
+    inviteSearchQuery.value = ''
+}
+
+async function inviteFriend(friendId: number) {
     try {
-        await store.inviteUser(leagueId, parseInt(id))
+        await store.inviteUser(leagueId, friendId)
         alert("Invitation envoyée !")
+        closeInviteModal()
     } catch {
-        alert("Erreur lors de l'invitation")
+        alert("Impossible d'inviter cet ami (déjà membre ou invité ?)")
     }
-  }
 }
 
 async function leaveLeague() {
@@ -77,14 +99,14 @@ async function leaveLeague() {
         @resumeLater="goBack"
     />
 
-    <div v-if="league" class="scrollable-area content-container">
+    <div v-if="league" class="scrollable-area content-container" :class="{ 'blurred-content': showInviteModal }">
 
         <div class="league-header">
             <h2>{{ league.name }}</h2>
         </div>
 
         <div v-if="!league.is_archived" class="actions">
-            <button class="action-btn invite" @click="inviteMember">Inviter un membre</button>
+            <button class="action-btn invite" @click="openInviteModal">Inviter un membre</button>
             <button class="action-btn leave" @click="leaveLeague">Quitter la ligue</button>
         </div>
 
@@ -112,6 +134,40 @@ async function leaveLeague() {
     <div v-else class="loading">
         Chargement...
     </div>
+
+    <!-- Invite Modal -->
+    <div v-if="showInviteModal" class="blur-overlay">
+      <div class="confirm-box">
+        <h3>Inviter un ami</h3>
+
+        <input
+            type="text"
+            v-model="inviteSearchQuery"
+            placeholder="Rechercher un ami..."
+            class="search-input"
+        />
+
+        <div class="friends-list-modal">
+            <div
+                v-for="friend in filteredFriends"
+                :key="friend.id"
+                class="friend-modal-item"
+            >
+                <div class="friend-name">{{ friend.username }}</div>
+                <button class="add-friend-btn" @click="inviteFriend(friend.id)">Inviter</button>
+            </div>
+
+            <div v-if="filteredFriends.length === 0" class="empty-msg">
+                Aucun ami trouvé.
+            </div>
+        </div>
+
+        <div class="confirm-actions">
+          <button @click="closeInviteModal" class="cancel-btn">Annuler</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -219,5 +275,128 @@ async function leaveLeague() {
     padding: 40px;
     text-align: center;
     color: #666;
+}
+
+.blur-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.confirm-box {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 16px;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  width: 85%;
+  max-width: 320px;
+  animation: popIn 0.2s ease-out;
+  font-family: 'Instrument Sans', sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.confirm-box h3 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+@keyframes popIn {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.search-input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-family: inherit;
+}
+
+.friends-list-modal {
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.friend-modal-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border-radius: 8px;
+    background: #f9f9f9;
+    margin-bottom: 8px;
+    border: 1px solid #eee;
+}
+
+.friend-modal-item:hover {
+    background: #f1f1f1;
+}
+
+.friend-name {
+    font-weight: 500;
+    color: #333;
+}
+
+.add-friend-btn {
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: none;
+    background: #e0f5e9;
+    color: #1f7a3a;
+    border: 1px solid #bfe8cd;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.add-friend-btn:hover {
+    background: #d4eddb;
+}
+
+.empty-msg {
+    text-align: center;
+    color: #999;
+    font-size: 0.9rem;
+    padding: 10px;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.cancel-btn {
+  background-color: #f0f0f0;
+  color: #333;
+  border: none;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  flex: 1;
+  font-size: 1rem;
+}
+
+.cancel-btn:hover {
+    background: #e0e0e0;
 }
 </style>
