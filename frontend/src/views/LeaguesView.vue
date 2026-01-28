@@ -24,13 +24,23 @@ onMounted(async () => {
     }
 })
 
-// Sort logic: Most recent creation first
-const sortedActiveLeagues = computed(() => {
-    return [...store.activeLeagues].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+// Sort logic: Split active and upcoming, sort by start_date
+const startedLeagues = computed(() => {
+    const nowMs = Date.now()
+    const list = store.activeLeagues.filter(l => new Date(l.start_date).getTime() <= nowMs)
+    // Most recently started first
+    return list.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime())
+})
+
+const upcomingLeagues = computed(() => {
+    const nowMs = Date.now()
+    const list = store.activeLeagues.filter(l => new Date(l.start_date).getTime() > nowMs)
+    // Starting soonest first
+    return list.sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime())
 })
 
 const sortedArchivedLeagues = computed(() => {
-    return [...store.archivedLeagues].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    return [...store.archivedLeagues].sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime())
 })
 
 function getTimeRemaining(league: { start_date: string; end_date: string }) {
@@ -184,23 +194,52 @@ async function confirmCreateLeague() {
           <button class="add-btn" @click="openCreateModal">➕ Créer une ligue</button>
         </div>
 
-        <div v-if="sortedActiveLeagues.length" class="leagues-list">
-            <div
-                v-for="league in sortedActiveLeagues"
-                :key="league.id"
-                class="league-card"
-                @click="goToDetail(league.id)"
-            >
-                <div class="league-icon">🏆</div>
-                <div class="league-info">
-                    <div class="league-name">{{ league.name }}</div>
-                    <div class="league-meta">
-                         <span class="members-count">{{ league.members_count }} membres</span>
-                         <span class="separator">•</span>
-                         <span class="timer">{{ getTimeRemaining(league) }}</span>
+        <div v-if="startedLeagues.length || upcomingLeagues.length" class="leagues-container">
+            <!-- Started Leagues -->
+            <div v-if="startedLeagues.length" class="leagues-list">
+                <div
+                    v-for="league in startedLeagues"
+                    :key="league.id"
+                    class="league-card"
+                    @click="goToDetail(league.id)"
+                >
+                    <div class="league-icon">🏆</div>
+                    <div class="league-info">
+                        <div class="league-name">{{ league.name }}</div>
+                        <div class="league-meta">
+                            <span class="members-count">{{ league.members_count }} membres</span>
+                            <span class="separator">•</span>
+                            <span class="timer">{{ getTimeRemaining(league) }}</span>
+                        </div>
                     </div>
+                    <div class="arrow">›</div>
                 </div>
-                <div class="arrow">›</div>
+            </div>
+
+            <!-- Separator for Upcoming -->
+            <div v-if="upcomingLeagues.length > 0" class="league-separator">
+                <h3>Ligues qui commencent bientôt</h3>
+            </div>
+
+            <!-- Upcoming Leagues -->
+            <div v-if="upcomingLeagues.length" class="leagues-list">
+                <div
+                    v-for="league in upcomingLeagues"
+                    :key="league.id"
+                    class="league-card upcoming"
+                    @click="goToDetail(league.id)"
+                >
+                    <div class="league-icon blue">📅</div>
+                    <div class="league-info">
+                        <div class="league-name">{{ league.name }}</div>
+                        <div class="league-meta">
+                            <span class="members-count">{{ league.members_count }} membres</span>
+                            <span class="separator">•</span>
+                            <span class="timer">{{ getTimeRemaining(league) }}</span>
+                        </div>
+                    </div>
+                    <div class="arrow">›</div>
+                </div>
             </div>
         </div>
         <div v-else class="placeholder-content">
@@ -523,6 +562,25 @@ async function confirmCreateLeague() {
     filter: grayscale(100%);
     opacity: 0.6;
     background: #eee;
+}
+
+.league-icon.blue {
+    background: #e3f2fd;
+}
+
+.league-separator {
+    margin: 24px 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #eee;
+}
+
+.league-separator h3 {
+    font-size: 0.95rem;
+    color: #666;
+    font-weight: 600;
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .league-info {
