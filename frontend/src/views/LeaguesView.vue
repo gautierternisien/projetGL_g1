@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import Header from '@/components/AppHeader.vue'
 import { useRouter } from 'vue-router'
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useLeaguesStore } from '@/stores/leagues'
 
 const router = useRouter()
-const activeTab = ref(0) // 0: En cours, 2: Invitations, 1: Archives (using ID mapping similar to Friends for badge logic if needed)
+const store = useLeaguesStore()
+const activeTab = ref(0) // 0: En cours, 2: Invitations, 1: Archives
 
 const tabs = [
   { id: 0, label: "Ligues\nen cours" },
@@ -12,36 +14,23 @@ const tabs = [
   { id: 1, label: "Ligues\narchivées" },
 ]
 
-// Data Lists
-interface LeagueSummary {
-    id: string
-    name: string
-    endDate: string // ISO
-    startDate: string // ISO
-    membersCount: number
-    isArchived: boolean
-    createdAt: string // ISO
-}
-
-interface Invite {
-    id: number
-    leagueName: string
-    inviterName: string
-}
-
-const activeLeagues = ref<LeagueSummary[]>([])
-
-const invitations = ref<Invite[]>([])
-
-const archivedLeagues = ref<LeagueSummary[]>([])
+onMounted(async () => {
+    try {
+        await store.fetchActiveLeagues()
+        await store.fetchInvites()
+        await store.fetchArchivedLeagues()
+    } catch {
+        // silent fail
+    }
+})
 
 // Sort logic: Most recent creation first
 const sortedActiveLeagues = computed(() => {
-    return [...activeLeagues.value].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return [...store.activeLeagues].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 })
 
 const sortedArchivedLeagues = computed(() => {
-    return [...archivedLeagues.value].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    return [...store.archivedLeagues].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 })
 
 function getTimeRemaining(endDateStr: string) {
@@ -59,24 +48,19 @@ function goBack() {
     router.push('/communaute')
 }
 
-function goToDetail(id: string) {
-    router.push({ name: 'CommunityLeagueDetail', params: { id } })
+function goToDetail(id: number) {
+    router.push({ name: 'CommunityLeagueDetail', params: { id: id.toString() } })
 }
 
 // Invite actions
-function acceptInvite(id: number) {
-    // TODO: API call to accept invite
-    /*
-    const invite = invitations.value.find(i => i.id === id)
-    if (invite) {
-        invitations.value = invitations.value.filter(i => i.id !== id)
-    }
-    */
+async function acceptInvite(id: number) {
+    await store.acceptInvite(id)
 }
 
-function rejectInvite(id: number) {
-    invitations.value = invitations.value.filter(i => i.id !== id)
+async function rejectInvite(id: number) {
+    await store.rejectInvite(id)
 }
+
 
 // Modal logic
 const showCreateModal = ref(false)
@@ -124,10 +108,19 @@ function closeCreateModal() {
     newEndDate.value = ''
 }
 
-function confirmCreateLeague() {
+async function confirmCreateLeague() {
     if (!isFormValid.value) return
-    // TODO: Create league via API
-    closeCreateModal()
+    try {
+        await store.createLeague({
+            name: newLeagueName.value,
+            start_date: newStartDate.value,
+            end_date: newEndDate.value
+        })
+        closeCreateModal()
+    } catch (e) {
+        console.error(e)
+        alert("Erreur lors de la création")
+    }
 }
 
 </script>
@@ -146,8 +139,8 @@ function confirmCreateLeague() {
           @click="activeTab = t.id"
         >
           {{ t.label }}
-          <span v-if="t.id === 2 && invitations.length > 0" class="badge">
-            {{ invitations.length }}
+          <span v-if="t.id === 2 && store.invitations.length > 0" class="badge">
+            {{ store.invitations.length }}
           </span>
         </button>
       </div>
@@ -169,9 +162,9 @@ function confirmCreateLeague() {
                 <div class="league-info">
                     <div class="league-name">{{ league.name }}</div>
                     <div class="league-meta">
-                         <span class="members-count">{{ league.membersCount }} membres</span>
+                         <span class="members-count">{{ league.members_count }} membres</span>
                          <span class="separator">•</span>
-                         <span class="timer">Se termine dans {{ getTimeRemaining(league.endDate) }}</span>
+                         <span class="timer">Se termine dans {{ getTimeRemaining(league.end_date) }}</span>
                     </div>
                 </div>
                 <div class="arrow">›</div>
@@ -185,11 +178,11 @@ function confirmCreateLeague() {
 
       <!-- Tab 2: Invitations -->
       <div v-if="activeTab === 2">
-          <div v-if="invitations.length" class="requests-list">
-            <div v-for="invite in invitations" :key="invite.id" class="league-invite-card">
+          <div v-if="store.invitations.length" class="requests-list">
+            <div v-for="invite in store.invitations" :key="invite.id" class="league-invite-card">
                 <div class="invite-info">
-                    <div class="league-name">{{ invite.leagueName }}</div>
-                    <div class="inviter">Invité par {{ invite.inviterName }}</div>
+                    <div class="league-name">{{ invite.league_name }}</div>
+                    <div class="inviter">Invité par {{ invite.inviter_name }}</div>
                 </div>
                 <div class="invite-actions">
                     <button class="reject-btn" @click="rejectInvite(invite.id)">Refuser</button>
@@ -216,7 +209,7 @@ function confirmCreateLeague() {
                 <div class="league-info">
                     <div class="league-name">{{ league.name }}</div>
                     <div class="league-meta">
-                        Terminée le {{ new Date(league.endDate).toLocaleDateString() }}
+                        Terminée le {{ new Date(league.end_date).toLocaleDateString() }}
                     </div>
                 </div>
                 <div class="arrow">›</div>

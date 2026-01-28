@@ -977,3 +977,139 @@ async def get_global_stats(db: Session = Depends(get_db)):
         "details_by_category": avg_categories,
         "user_count": total_users
     }
+
+# --- LEAGUE ROUTES ---
+@app.post("/leagues/", response_model=schemas.League)
+def create_league_route(league: schemas.LeagueCreate, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return crud.create_league(db=db, league=league, creator_id=current_user.id)
+
+@app.get("/leagues/active", response_model=List[schemas.League])
+def get_active_leagues(current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return crud.get_active_leagues_for_user(db, current_user.id)
+
+@app.get("/leagues/archived", response_model=List[schemas.League])
+def get_archived_leagues(current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return crud.get_archived_leagues_for_user(db, current_user.id)
+
+@app.get("/leagues/invites", response_model=List[schemas.LeagueInvite])
+def get_invites(current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    invites = crud.get_pending_league_invites(db, current_user.id)
+    result = []
+    for inc in invites:
+        league = crud.get_league(db, inc.league_id)
+        inviter = crud.get_user(db, inc.inviter_id)
+        result.append(schemas.LeagueInvite(
+            id=inc.id,
+            league_id=inc.league_id,
+            league_name=league.name if league else "Unknown",
+            inviter_id=inc.inviter_id,
+            inviter_name=inviter.username if inviter else "Unknown",
+            invitee_id=inc.invitee_id,
+            status=inc.status
+        ))
+    return result
+
+@app.get("/leagues/{league_id}", response_model=schemas.LeagueDetail)
+def get_league_detail(league_id: int, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    league = crud.get_league(db, league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found")
+
+    # Check if user is member (security)
+    is_member = any(m.user_id == current_user.id for m in league.members)
+    if not is_member:
+        raise HTTPException(status_code=403, detail="Not a member of this league")
+
+    members_stats = crud.get_league_members_with_stats(db, league_id)
+
+    # Construct response
+    # Step 1: Validate against base League schema to ignore members relationship issue
+    league_base = schemas.League.model_validate(league)
+
+    # Step 2: Create LeagueDetail with computed members
+    members_schema = [schemas.LeagueMember(**m) for m in members_stats]
+
+    league_data = schemas.LeagueDetail(
+        **league_base.model_dump(),
+        members=members_schema
+    )
+
+    # Re-calculate members count
+    league_data.members_count = len(members_stats)
+
+    return league_data
+
+@app.post("/leagues/{league_id}/invite/{user_id}", response_model=schemas.LeagueInvite)
+def invite_user(league_id: int, user_id: int, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    league = crud.get_league(db, league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found")
+
+    is_member = any(m.user_id == current_user.id for m in league.members)
+    if not is_member:
+        raise HTTPException(status_code=403, detail="You must be a member to invite others")
+
+    if user_id == current_user.id:
+         raise HTTPException(status_code=400, detail="Cannot invite yourself")
+
+    invite = crud.invite_user_to_league(db, league_id, current_user.id, user_id)
+    if not invite:
+         raise HTTPException(status_code=400, detail="User already member or invited")
+
+    inviter = crud.get_user(db, current_user.id)
+
+    return schemas.LeagueInvite(
+        id=invite.id,
+        league_id=invite.league_id,
+        league_name=league.name,
+        inviter_id=invite.inviter_id,
+        inviter_name=inviter.username,
+        invitee_id=invite.invitee_id,
+        status=invite.status
+    )
+
+@app.put("/leagues/invites/{invite_id}/accept", response_model=schemas.LeagueInvite)
+def accept_invite_route(invite_id: int, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    invite = crud.respond_league_invite(db, invite_id, accept=True)
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invite not found")
+
+    league = crud.get_league(db, invite.league_id)
+    inviter = crud.get_user(db, invite.inviter_id)
+    return schemas.LeagueInvite(
+        id=invite.id,
+        league_id=invite.league_id,
+        league_name=league.name,
+        inviter_id=invite.inviter_id,
+        inviter_name=inviter.username,
+        invitee_id=invite.invitee_id,
+        status=invite.status
+    )
+
+@app.put("/leagues/invites/{invite_id}/reject", response_model=schemas.LeagueInvite)
+def reject_invite_route(invite_id: int, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    invite = crud.respond_league_invite(db, invite_id, accept=False)
+    if not invite:
+        raise HTTPException(status_code=404, detail="Invite not found")
+    league = crud.get_league(db, invite.league_id)
+    inviter = crud.get_user(db, invite.inviter_id)
+    return schemas.LeagueInvite(
+        id=invite.id,
+        league_id=invite.league_id,
+        league_name=league.name,
+        inviter_id=invite.inviter_id,
+        inviter_name=inviter.username,
+        invitee_id=invite.invitee_id,
+        status=invite.status
+    )
+
+@app.delete("/leagues/{league_id}/leave")
+def leave_league(league_id: int, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    member = db.query(models.LeagueMember).filter(
+        models.LeagueMember.league_id == league_id,
+        models.LeagueMember.user_id == current_user.id
+    ).first()
+    if member:
+        db.delete(member)
+        db.commit()
+    return {"status": "left"}

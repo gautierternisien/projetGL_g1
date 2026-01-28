@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 import models, schemas
+from datetime import datetime
 
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
@@ -281,3 +282,133 @@ def get_accepted_friends(db: Session, user_id: int):
         else:
             friend_ids.append(req.sender_id)
     return friend_ids
+
+# --- LEAGUES ---
+def create_league(db: Session, league: schemas.LeagueCreate, creator_id: int):
+    now_iso = datetime.now().isoformat()
+    db_league = models.League(
+        name=league.name,
+        start_date=league.start_date,
+        end_date=league.end_date,
+        created_at=now_iso,
+        is_archived=False
+    )
+    db.add(db_league)
+    db.commit()
+    db.refresh(db_league)
+
+    # Add creator as member
+    member = models.LeagueMember(
+        league_id=db_league.id,
+        user_id=creator_id,
+        joined_at=now_iso
+    )
+    db.add(member)
+    db.commit()
+    db.refresh(db_league)
+
+    db_league.members_count = 1
+    return db_league
+
+def get_active_leagues_for_user(db: Session, user_id: int):
+    # Find leagues where user is member and not archived
+    leagues = db.query(models.League).join(models.LeagueMember).filter(
+        models.LeagueMember.user_id == user_id,
+        models.League.is_archived == False
+    ).all()
+    # Compute user count
+    for l in leagues:
+        l.members_count = db.query(models.LeagueMember).filter(models.LeagueMember.league_id == l.id).count()
+    return leagues
+
+def get_archived_leagues_for_user(db: Session, user_id: int):
+    leagues = db.query(models.League).join(models.LeagueMember).filter(
+        models.LeagueMember.user_id == user_id,
+        models.League.is_archived == True
+    ).all()
+    for l in leagues:
+        l.members_count = db.query(models.LeagueMember).filter(models.LeagueMember.league_id == l.id).count()
+    return leagues
+
+def get_league(db: Session, league_id: int):
+    return db.query(models.League).filter(models.League.id == league_id).first()
+
+def get_league_members_with_stats(db: Session, league_id: int):
+    # Get members
+    members = db.query(models.LeagueMember).filter(models.LeagueMember.league_id == league_id).all()
+    result = []
+
+    # For now, simplistic mission counting
+    for m in members:
+        user = get_user(db, m.user_id)
+        # Count completed missions
+        completed_count = db.query(models.UserMissionStatus).filter(
+             models.UserMissionStatus.user_id == m.user_id,
+             models.UserMissionStatus.status == "completed"
+        ).count()
+
+        result.append({
+            "id": m.id,
+            "user_id": m.user_id,
+            "username": user.username,
+            "joined_at": m.joined_at,
+            "missions_completed": completed_count
+        })
+    return result
+
+def invite_user_to_league(db: Session, league_id: int, inviter_id: int, invitee_id: int):
+    # Check if already member
+    exists = db.query(models.LeagueMember).filter(
+        models.LeagueMember.league_id == league_id,
+        models.LeagueMember.user_id == invitee_id
+    ).first()
+    if exists:
+        return None # Already member
+
+    # Check if invite exists
+    invite = db.query(models.LeagueInvite).filter(
+        models.LeagueInvite.league_id == league_id,
+        models.LeagueInvite.invitee_id == invitee_id,
+        models.LeagueInvite.status == "pending"
+    ).first()
+
+    if invite:
+        return invite
+
+    new_invite = models.LeagueInvite(
+        league_id=league_id,
+        inviter_id=inviter_id,
+        invitee_id=invitee_id,
+        status="pending"
+    )
+    db.add(new_invite)
+    db.commit()
+    db.refresh(new_invite)
+    return new_invite
+
+def get_pending_league_invites(db: Session, user_id: int):
+    return db.query(models.LeagueInvite).filter(
+        models.LeagueInvite.invitee_id == user_id,
+        models.LeagueInvite.status == "pending"
+    ).all()
+
+def respond_league_invite(db: Session, invite_id: int, accept: bool):
+    invite = db.query(models.LeagueInvite).filter(models.LeagueInvite.id == invite_id).first()
+    if not invite:
+        return None
+
+    if accept:
+        invite.status = "accepted"
+        # Add to members
+        new_member = models.LeagueMember(
+            league_id=invite.league_id,
+            user_id=invite.invitee_id,
+            joined_at=datetime.now().isoformat()
+        )
+        db.add(new_member)
+    else:
+        invite.status = "rejected"
+
+    db.commit()
+    return invite
+

@@ -2,46 +2,34 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Header from '@/components/AppHeader.vue'
+import { useLeaguesStore } from '@/stores/leagues'
 
 const route = useRoute()
 const router = useRouter()
-const leagueId = route.params.id
+const store = useLeaguesStore()
+const leagueId = Number(route.params.id)
 
-// Interfaces
-interface Member {
-  id: number
-  username: string
-  missionsCompleted: number
-}
-
-interface League {
-  id: string
-  name: string
-  endDate: string // ISO date string
-  startDate: string // ISO date string
-  isArchived: boolean
-  members: Member[]
-}
-
-const league = ref<League | null>(null)
-
-// Mock fetching logic
-onMounted(() => {
-  // In a real app, fetch from API using leagueId
-  // TODO: Fetch league details from API
+onMounted(async () => {
+    try {
+        await store.fetchLeagueDetail(leagueId)
+    } catch {
+        // silent fail or redirect?
+    }
 })
+
+const league = computed(() => store.currentLeague)
 
 const sortedMembers = computed(() => {
   if (!league.value) return []
   // Sort by missionsCompleted descending
-  return [...league.value.members].sort((a, b) => b.missionsCompleted - a.missionsCompleted)
+  return [...league.value.members].sort((a, b) => (b.missions_completed || 0) - (a.missions_completed || 0))
 })
 
 const timeRemaining = computed(() => {
-    if (!league.value || league.value.isArchived) return null
+    if (!league.value || league.value.is_archived) return null
 
     // Calculate difference between now and endDate
-    const end = new Date(league.value.endDate).getTime()
+    const end = new Date(league.value.end_date).getTime()
     const now = new Date().getTime()
     const diff = end - now
 
@@ -58,16 +46,23 @@ function goBack() {
   router.back()
 }
 
-function inviteMember() {
-  // TODO: Implement invitation logic via API
-  console.log("Invitation feature to be implemented")
+async function inviteMember() {
+  // Temporary interaction
+  const id = prompt("Entrez l'ID de l'utilisateur à inviter :")
+  if (id) {
+    try {
+        await store.inviteUser(leagueId, parseInt(id))
+        alert("Invitation envoyée !")
+    } catch {
+        alert("Erreur lors de l'invitation")
+    }
+  }
 }
 
-function leaveLeague() {
-  // TODO: Implement leave logic via API
+async function leaveLeague() {
   if(confirm("Êtes-vous sûr de vouloir quitter cette ligue ?")) {
-      // Call API then redirect
-      // router.push({ name: 'CommunityLeagues' })
+      await store.leaveLeague(leagueId)
+      router.push({ name: 'CommunityLeagues' })
   }
 }
 
@@ -76,7 +71,7 @@ function leaveLeague() {
 <template>
   <div class="dashboard-wrapper">
     <Header
-        :title="league?.isArchived ? 'Ligue archivée' : 'Détails de la ligue'"
+        :title="league?.is_archived ? 'Ligue archivée' : 'Détails de la ligue'"
         :showResumeBtn="true"
         resumeBtnLabel="Retour"
         @resumeLater="goBack"
@@ -88,16 +83,16 @@ function leaveLeague() {
             <h2>{{ league.name }}</h2>
         </div>
 
-        <div v-if="!league.isArchived" class="actions">
+        <div v-if="!league.is_archived" class="actions">
             <button class="action-btn invite" @click="inviteMember">Inviter un membre</button>
             <button class="action-btn leave" @click="leaveLeague">Quitter la ligue</button>
         </div>
 
         <div class="league-infos">
-            <p v-if="!league.isArchived && timeRemaining" class="timer">
+            <p v-if="!league.is_archived && timeRemaining" class="timer">
                 Cette ligue se termine dans {{ timeRemaining }}
             </p>
-            <p v-else class="timer">Terminée le {{ new Date(league.endDate).toLocaleDateString() }}</p>
+            <p v-else class="timer">Terminée le {{ new Date(league.end_date).toLocaleDateString() }}</p>
         </div>
 
         <div class="ranking-section">
@@ -107,7 +102,7 @@ function leaveLeague() {
                     <div class="rank-pos">{{ index + 1 }}</div>
                     <div class="rank-info">
                         <div class="username">{{ member.username }}</div>
-                        <div class="missions">{{ member.missionsCompleted }} missions</div>
+                        <div class="missions">{{ member.missions_completed }} missions</div>
                     </div>
                 </div>
             </div>

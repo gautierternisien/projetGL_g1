@@ -110,3 +110,42 @@ class FriendRequest(Base):
 
     sender = relationship("User", foreign_keys=[sender_id])
     receiver = relationship("User", foreign_keys=[receiver_id])
+
+
+class League(Base):
+    __tablename__ = "leagues"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String)
+    start_date = Column(String) # ISO 8601 string
+    end_date = Column(String)
+    is_archived = Column(Boolean, default=False)
+    created_at = Column(String) # ISO Date
+
+    members = relationship("LeagueMember", back_populates="league")
+    invites = relationship("LeagueInvite", back_populates="league")
+
+class LeagueMember(Base):
+    __tablename__ = "league_members"
+
+    id = Column(Integer, primary_key=True, index=True)
+    league_id = Column(Integer, ForeignKey("leagues.id"))
+    user_id = Column(Integer, ForeignKey("users.id"))
+    joined_at = Column(String) # ISO Date
+
+    league = relationship("League", back_populates="members")
+    user = relationship("User")
+
+class LeagueInvite(Base):
+    __tablename__ = "league_invites"
+
+    id = Column(Integer, primary_key=True, index=True)
+    league_id = Column(Integer, ForeignKey("leagues.id"))
+    inviter_id = Column(Integer, ForeignKey("users.id"))
+    invitee_id = Column(Integer, ForeignKey("users.id"))
+    status = Column(String, default="pending") # pending, accepted, rejected
+
+    league = relationship("League", back_populates="invites")
+    inviter = relationship("User", foreign_keys=[inviter_id])
+    invitee = relationship("User", foreign_keys=[invitee_id])
+
