@@ -68,6 +68,7 @@ const newLeagueName = ref('')
 const newStartDate = ref('')
 const newEndDate = ref('')
 const isBlurred = ref(false)
+const errorMessage = ref('')
 
 // Computed for form validation
 const isFormValid = computed(() => {
@@ -97,6 +98,7 @@ const maxEndDate = computed(() => {
 function openCreateModal() {
     isBlurred.value = true
     showCreateModal.value = true
+    errorMessage.value = ''
 }
 
 function closeCreateModal() {
@@ -106,10 +108,12 @@ function closeCreateModal() {
     newLeagueName.value = ''
     newStartDate.value = ''
     newEndDate.value = ''
+    errorMessage.value = ''
 }
 
 async function confirmCreateLeague() {
     if (!isFormValid.value) return
+    errorMessage.value = ''
     try {
         await store.createLeague({
             name: newLeagueName.value,
@@ -119,7 +123,7 @@ async function confirmCreateLeague() {
         closeCreateModal()
     } catch (e) {
         console.error(e)
-        alert("Erreur lors de la création")
+        errorMessage.value = "Erreur lors de la création de la ligue."
     }
 }
 
@@ -246,6 +250,9 @@ async function confirmCreateLeague() {
 
         <p v-if="newStartDate && newEndDate && !isFormValid" class="error-msg">
             La durée est max 1 an et la fin doit être après le début.
+        </p>
+        <p v-if="errorMessage" class="error-msg">
+            {{ errorMessage }}
         </p>
 
         <div class="confirm-actions">

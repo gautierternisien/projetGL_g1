@@ -13,6 +13,7 @@ const leagueId = Number(route.params.id)
 
 const showInviteModal = ref(false)
 const inviteSearchQuery = ref('')
+const inviteErrorMessage = ref('')
 
 onMounted(async () => {
     try {
@@ -64,20 +65,23 @@ function goBack() {
 
 function openInviteModal() {
     showInviteModal.value = true
+    inviteErrorMessage.value = ''
 }
 
 function closeInviteModal() {
     showInviteModal.value = false
     inviteSearchQuery.value = ''
+    inviteErrorMessage.value = ''
 }
 
 async function inviteFriend(friendId: number) {
+    inviteErrorMessage.value = ''
     try {
         await store.inviteUser(leagueId, friendId)
-        alert("Invitation envoyée !")
+        // Auto-close on success (implied success)
         closeInviteModal()
     } catch {
-        alert("Impossible d'inviter cet ami (déjà membre ou invité ?)")
+        inviteErrorMessage.value = "Impossible d'inviter cet ami (déjà membre ou invité ?)"
     }
 }
 
@@ -160,6 +164,10 @@ async function leaveLeague() {
             <div v-if="filteredFriends.length === 0" class="empty-msg">
                 Aucun ami trouvé.
             </div>
+        </div>
+
+        <div v-if="inviteErrorMessage" class="error-message">
+            {{ inviteErrorMessage }}
         </div>
 
         <div class="confirm-actions">
@@ -398,5 +406,15 @@ async function leaveLeague() {
 
 .cancel-btn:hover {
     background: #e0e0e0;
+}
+
+.error-message {
+    color: #b23b3b;
+    background: #f8d7da;
+    padding: 10px;
+    border-radius: 8px;
+    margin-top: 8px;
+    font-size: 0.9rem;
+    border: 1px solid #f5c6cb;
 }
 </style>
