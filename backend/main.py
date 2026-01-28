@@ -717,9 +717,12 @@ async def update_mission(mission_id: int, payload: MissionUpdate, db: Session = 
 
     if payload.user_id:
         if payload.user_id not in user_missions_db:
-            user_missions_db[payload.user_id] = {}
+             user_missions_db[payload.user_id] = {}
         user_missions_db[payload.user_id][mission_id] = payload.status
         
+        # Persist to DB for leagues
+        crud.update_mission_status(db, payload.user_id, mission_id, payload.status)
+
         # Enregistrement dans le feed des amis si terminé
         if payload.status == 'termine':
             # 1. Recuperer l'ID de l'utilisateur qui a terminé la mission

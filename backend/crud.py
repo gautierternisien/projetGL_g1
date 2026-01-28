@@ -344,7 +344,7 @@ def get_league_members_with_stats(db: Session, league_id: int):
         # Count completed missions
         completed_count = db.query(models.UserMissionStatus).filter(
              models.UserMissionStatus.user_id == m.user_id,
-             models.UserMissionStatus.status == "completed"
+             models.UserMissionStatus.status == "termine"
         ).count()
 
         result.append({

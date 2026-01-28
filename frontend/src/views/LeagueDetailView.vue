@@ -124,7 +124,7 @@ async function leaveLeague() {
                     <div class="rank-pos">{{ index + 1 }}</div>
                     <div class="rank-info">
                         <div class="username">{{ member.username }}</div>
-                        <div class="missions">{{ member.missions_completed }} missions</div>
+                        <div class="missions">{{ member.missions_completed }} mission{{ (member.missions_completed || 0) > 1 ? 's' : '' }}</div>
                     </div>
                 </div>
             </div>
