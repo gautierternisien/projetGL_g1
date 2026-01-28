@@ -1,127 +1,143 @@
 <script setup lang="ts">
 import Header from '@/components/AppHeader.vue'
-import { useLeaguesStore } from '@/stores/leagues'
-import type { League } from '@/types/league'
 import { useRouter } from 'vue-router'
-import { ref, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 
 const router = useRouter()
-const store = useLeaguesStore()
+const activeTab = ref(0) // 0: En cours, 2: Invitations, 1: Archives (using ID mapping similar to Friends for badge logic if needed)
 
-onMounted(() => {
-  store.fetchLeagues()
-  store.fetchInvitations()
-})
-
-// --- Navigation / State ---
-const goBack = () => router.push('/communaute')
-
-const activeTab = ref(0) // 0: Active, 1: Invites, 2: Archived
-// Note: User requested order: "Ligues en cours", "Invitations en attente", "Ligues archivées"
 const tabs = [
-  { id: 0, label: 'Ligues\nen cours' },
-  { id: 1, label: 'Invitations\nen attente' },
-  { id: 2, label: 'Ligues\narchivées' },
+  { id: 0, label: "Ligues\nen cours" },
+  { id: 2, label: "Invitations\nen attente" },
+  { id: 1, label: "Ligues\narchivées" },
 ]
 
-function openLeagueDetail(league: League) {
-  router.push({ name: 'CommunityLeaguesDetail', params: { id: league.id } })
+// Data Lists
+interface LeagueSummary {
+    id: string
+    name: string
+    endDate: string // ISO
+    startDate: string // ISO
+    membersCount: number
+    isArchived: boolean
+    createdAt: string // ISO
 }
 
-// --- Create League State ---
-const isCreateOpen = ref(false)
-const createForm = ref({
-  name: '',
-  startDate: '',
-  endDate: '',
+interface Invite {
+    id: number
+    leagueName: string
+    inviterName: string
+}
+
+const activeLeagues = ref<LeagueSummary[]>([])
+
+const invitations = ref<Invite[]>([])
+
+const archivedLeagues = ref<LeagueSummary[]>([])
+
+// Sort logic: Most recent creation first
+const sortedActiveLeagues = computed(() => {
+    return [...activeLeagues.value].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 })
 
-function openCreate() {
-  const today = new Date().toISOString().split('T')[0] || ''
-  createForm.value = {
-    name: '',
-    startDate: today,
-    endDate: '', // User must pick
-  }
-  isCreateOpen.value = true
+const sortedArchivedLeagues = computed(() => {
+    return [...archivedLeagues.value].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+})
+
+function getTimeRemaining(endDateStr: string) {
+    const end = new Date(endDateStr).getTime()
+    const now = new Date().getTime()
+    const diff = end - now
+    if (diff <= 0) return "Terminée"
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+    if (days > 0) return `${days}j`
+    const hours = Math.floor(diff / (1000 * 60 * 60))
+    return `${hours}h`
 }
 
-function closeCreate() {
-  isCreateOpen.value = false
+function goBack() {
+    router.push('/communaute')
 }
 
-async function confirmCreate() {
-  if (!createForm.value.name || !createForm.value.startDate || !createForm.value.endDate) return
-
-  // Basic validation (example: max 1 year)
-  const start = new Date(createForm.value.startDate)
-  const end = new Date(createForm.value.endDate)
-  const oneYear = 365 * 24 * 60 * 60 * 1000
-
-  if (end.getTime() < start.getTime()) {
-    alert('La date de fin doit être après la date de début.')
-    return
-  }
-  if (end.getTime() - start.getTime() > oneYear) {
-    alert('La durée maximale est de 1 an.')
-    return
-  }
-
-  await store.createLeague({
-    name: createForm.value.name,
-    startDate: createForm.value.startDate,
-    endDate: createForm.value.endDate
-  })
-  closeCreate()
-  activeTab.value = 0 // Go to active leagues
+function goToDetail(id: string) {
+    router.push({ name: 'CommunityLeagueDetail', params: { id } })
 }
 
-// --- Invitations Actions ---
-async function acceptInvite(id: number) {
-  await store.joinLeague(id)
-  activeTab.value = 0 // Go to active leagues to see it
+// Invite actions
+function acceptInvite(id: number) {
+    // TODO: API call to accept invite
+    /*
+    const invite = invitations.value.find(i => i.id === id)
+    if (invite) {
+        invitations.value = invitations.value.filter(i => i.id !== id)
+    }
+    */
 }
 
-async function rejectInvite(id: number) {
-  await store.rejectInvitation(id)
+function rejectInvite(id: number) {
+    invitations.value = invitations.value.filter(i => i.id !== id)
 }
 
-// --- Helpers ---
-function formatTimeRemaining(endDateStr: string): string {
-  if (!endDateStr) return '?'
+// Modal logic
+const showCreateModal = ref(false)
+const newLeagueName = ref('')
+const newStartDate = ref('')
+const newEndDate = ref('')
+const isBlurred = ref(false)
 
-  const end = new Date(endDateStr)
-  if (isNaN(end.getTime())) return 'Date invalide'
+// Computed for form validation
+const isFormValid = computed(() => {
+    if (!newStartDate.value || !newEndDate.value) return false
+    const start = new Date(newStartDate.value).getTime()
+    const end = new Date(newEndDate.value).getTime()
+    const oneYearLater = new Date(start + 365*24*60*60*1000).getTime()
+    return end > start && end <= oneYearLater
+})
 
-  const now = new Date()
-  const diff = end.getTime() - now.getTime()
+// Date constraints
+const today = new Date()
+const todayStr = today.toISOString().split('T')[0]
+const minEndDate = computed(() => {
+    if (!newStartDate.value) return ''
+    const minDate = new Date(newStartDate.value)
+    minDate.setDate(minDate.getDate() + 1)
+    return minDate.toISOString().split('T')[0]
+})
+const maxEndDate = computed(() => {
+    if (!newStartDate.value) return ''
+    const maxDate = new Date(newStartDate.value)
+    maxDate.setFullYear(maxDate.getFullYear() + 1)
+    return maxDate.toISOString().split('T')[0]
+})
 
-  if (diff <= 0) return 'Terminée'
-
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-  if (days > 365) {
-     return 'Plus d\'un an'
-  }
-  if (days > 30) {
-    const months = Math.floor(days / 30)
-    return `${months} mois`
-  }
-  if (days > 0) return `${days} jours`
-
-  const hours = Math.floor(diff / (1000 * 60 * 60))
-  if (hours > 0) return `${hours} heures`
-
-  return 'Moins d\'une heure'
+function openCreateModal() {
+    isBlurred.value = true
+    showCreateModal.value = true
 }
+
+function closeCreateModal() {
+    isBlurred.value = false
+    showCreateModal.value = false
+    // Reset form
+    newLeagueName.value = ''
+    newStartDate.value = ''
+    newEndDate.value = ''
+}
+
+function confirmCreateLeague() {
+    if (!isFormValid.value) return
+    // TODO: Create league via API
+    closeCreateModal()
+}
+
 </script>
 
 <template>
   <div class="dashboard-wrapper">
     <Header title="Ligues" :showResumeBtn="true" resumeBtnLabel="Retour" @resumeLater="goBack" />
+    <div class="scrollable-area" :class="{ 'blurred-content': isBlurred }">
 
-    <div class="scrollable-area">
-
-      <!-- TABS -->
+      <!-- Tabs -->
       <div class="tabs">
         <button
           v-for="t in tabs"
@@ -130,118 +146,248 @@ function formatTimeRemaining(endDateStr: string): string {
           @click="activeTab = t.id"
         >
           {{ t.label }}
-          <span v-if="t.id === 1 && store.pendingInvitations.length > 0" class="badge">
-            {{ store.pendingInvitations.length }}
+          <span v-if="t.id === 2 && invitations.length > 0" class="badge">
+            {{ invitations.length }}
           </span>
         </button>
       </div>
 
-      <!-- TAB 0: Active Leagues -->
+      <!-- Tab 0: Ligues en cours -->
       <div v-if="activeTab === 0">
         <div class="top-actions">
-          <button class="add-btn" @click="openCreate">➕ Créer une ligue</button>
+          <button class="add-btn" @click="openCreateModal">➕ Créer une ligue</button>
         </div>
 
-        <div v-if="store.activeLeagues.length" class="leagues-list">
-          <div
-            v-for="league in store.activeLeagues"
-            :key="league.id"
-            class="league-card"
-            @click="openLeagueDetail(league)"
-          >
-            <div class="league-header">
-              <span class="league-icon">🏆</span>
-              <span class="league-name">{{ league.name }}</span>
+        <div v-if="sortedActiveLeagues.length" class="leagues-list">
+            <div
+                v-for="league in sortedActiveLeagues"
+                :key="league.id"
+                class="league-card"
+                @click="goToDetail(league.id)"
+            >
+                <div class="league-icon">🏆</div>
+                <div class="league-info">
+                    <div class="league-name">{{ league.name }}</div>
+                    <div class="league-meta">
+                         <span class="members-count">{{ league.membersCount }} membres</span>
+                         <span class="separator">•</span>
+                         <span class="timer">Se termine dans {{ getTimeRemaining(league.endDate) }}</span>
+                    </div>
+                </div>
+                <div class="arrow">›</div>
             </div>
-            <div class="league-timer">
-              Cette ligue se termine dans {{ formatTimeRemaining(league.endDate) }}
-            </div>
-          </div>
         </div>
         <div v-else class="placeholder-content">
-          <span class="emoji">🏆</span>
-          <p>Rejoignez ou créez une ligue !</p>
+             <span class="emoji">🏆</span>
+             <p>Vous ne participez à aucune ligue pour le moment.</p>
         </div>
       </div>
 
-      <!-- TAB 1: Invitations -->
-      <div v-if="activeTab === 1">
-        <div v-if="store.pendingInvitations.length" class="requests-list">
-          <div v-for="inv in store.pendingInvitations" :key="inv.id" class="request-item incoming">
-             <div class="avatar">📩</div>
-             <div class="request-info">
-               <div class="name">{{ inv.league.name }}</div>
-               <div class="status">Invitation à rejoindre</div>
-             </div>
-             <div class="request-actions">
-               <button class="reject-btn" @click="rejectInvite(inv.id)">Refuser</button>
-               <button class="accept-btn" @click="acceptInvite(inv.id)">Rejoindre</button>
-             </div>
-          </div>
-        </div>
-        <div v-else class="placeholder-content">
-          <span class="emoji">📭</span>
-          <p>Aucune invitation en attente</p>
-        </div>
-      </div>
-
-      <!-- TAB 2: Archived Leagues -->
+      <!-- Tab 2: Invitations -->
       <div v-if="activeTab === 2">
-        <div v-if="store.archivedLeagues.length" class="leagues-list">
-          <div
-            v-for="league in store.archivedLeagues"
-            :key="league.id"
-            class="league-card archived"
-            @click="openLeagueDetail(league)"
-          >
-            <div class="league-header">
-              <span class="league-icon">📜</span>
-              <span class="league-name">{{ league.name }}</span>
+          <div v-if="invitations.length" class="requests-list">
+            <div v-for="invite in invitations" :key="invite.id" class="league-invite-card">
+                <div class="invite-info">
+                    <div class="league-name">{{ invite.leagueName }}</div>
+                    <div class="inviter">Invité par {{ invite.inviterName }}</div>
+                </div>
+                <div class="invite-actions">
+                    <button class="reject-btn" @click="rejectInvite(invite.id)">Refuser</button>
+                    <button class="accept-btn" @click="acceptInvite(invite.id)">Rejoindre</button>
+                </div>
             </div>
-            <div class="league-timer">Terminée le {{ new Date(league.endDate).toLocaleDateString() }}</div>
           </div>
+          <div v-else class="placeholder-content">
+             <span class="emoji">📭</span>
+             <p>Aucune invitation en attente.</p>
+          </div>
+      </div>
+
+      <!-- Tab 1: Archives -->
+      <div v-if="activeTab === 1">
+        <div v-if="sortedArchivedLeagues.length" class="leagues-list">
+            <div
+                v-for="league in sortedArchivedLeagues"
+                :key="league.id"
+                class="league-card archived"
+                @click="goToDetail(league.id)"
+            >
+                <div class="league-icon gray">🏆</div>
+                <div class="league-info">
+                    <div class="league-name">{{ league.name }}</div>
+                    <div class="league-meta">
+                        Terminée le {{ new Date(league.endDate).toLocaleDateString() }}
+                    </div>
+                </div>
+                <div class="arrow">›</div>
+            </div>
         </div>
         <div v-else class="placeholder-content">
-          <span class="emoji">🕸️</span>
-          <p>Aucune ligue archivée</p>
+            <span class="emoji">📦</span>
+            <p>Aucune ligue archivée.</p>
         </div>
       </div>
 
     </div>
 
-    <!-- MODAL: CREATE LEAGUE -->
-    <div v-if="isCreateOpen" class="fullscreen-overlay">
-       <div class="modal-content">
-         <div class="modal-header">
-            <h3>Créer une ligue</h3>
-            <button class="close-icon-btn" @click="closeCreate">✕</button>
-         </div>
+    <!-- Create League Modal -->
+    <div v-if="showCreateModal" class="blur-overlay">
+      <div class="confirm-box create-modal">
+        <h3>Créer une ligue</h3>
 
-         <div class="form-group">
+        <div class="form-group">
             <label>Nom de la ligue</label>
-            <input v-model="createForm.name" type="text" placeholder="Ex: Challenge Vélo" />
-         </div>
+            <input v-model="newLeagueName" type="text" placeholder="Ex: Ligue d'été" />
+        </div>
 
-         <div class="form-row">
+        <div class="form-row">
             <div class="form-group">
-              <label>Début</label>
-              <input v-model="createForm.startDate" type="date" />
+                <label>Début</label>
+                <input v-model="newStartDate" type="date" :min="todayStr" />
             </div>
             <div class="form-group">
-              <label>Fin</label>
-              <input v-model="createForm.endDate" type="date" />
+                <label>Fin</label>
+                <input v-model="newEndDate" type="date" :min="minEndDate" :max="maxEndDate" />
             </div>
-         </div>
-         <p class="hint">La durée maximale est de 1 an.</p>
+        </div>
 
-         <button class="action-btn-primary" @click="confirmCreate">Créer</button>
-       </div>
+        <p v-if="newStartDate && newEndDate && !isFormValid" class="error-msg">
+            La durée est max 1 an et la fin doit être après le début.
+        </p>
+
+        <div class="confirm-actions">
+          <button @click="closeCreateModal" class="cancel-btn">Annuler</button>
+          <button @click="confirmCreateLeague" class="confirm-btn" :disabled="!isFormValid">Créer</button>
+        </div>
+      </div>
     </div>
 
   </div>
 </template>
 
 <style scoped>
+/* Modal styles */
+.blurred-content {
+  filter: blur(4px);
+  pointer-events: none;
+  user-select: none;
+}
+
+.blur-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.confirm-box {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 16px;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  width: 85%;
+  max-width: 320px;
+  animation: popIn 0.2s ease-out;
+  font-family: 'Instrument Sans', sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.confirm-box h3 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+    gap: 6px;
+}
+
+.form-group label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.form-group input {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-family: inherit;
+}
+
+.form-row {
+    display: flex;
+    gap: 12px;
+}
+.form-row .form-group {
+    flex: 1;
+}
+
+.error-msg {
+    color: #d32f2f;
+    font-size: 0.8rem;
+    margin: 0;
+}
+
+@keyframes popIn {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.cancel-btn {
+  background-color: #f0f0f0;
+  color: #333;
+  border: none;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  flex: 1;
+  font-size: 1rem;
+}
+
+.confirm-btn {
+  background-color: #679436; /* Using the green theme */
+  color: white;
+  border: none;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  flex: 1;
+  font-size: 1rem;
+}
+
+.confirm-btn:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+/* Reusing Friend View styles logic */
 .tabs {
   display: flex;
   gap: 8px;
@@ -250,13 +396,13 @@ function formatTimeRemaining(endDateStr: string): string {
 }
 
 .tab-btn {
-  padding: 8px 6px;
+  padding: 8px 12px;
   border-radius: 8px;
   border: none;
   background: #f0f0f0;
   cursor: pointer;
-  flex: 1;
-  height: 60px; /* matched FriendsView */
+  width: 100%;
+  height: 60px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -269,8 +415,8 @@ function formatTimeRemaining(endDateStr: string): string {
 }
 
 .tab-btn.active {
-  background: #679436;
-  color: white;
+    background-color: #679436;
+    color: #fff;
 }
 
 .badge {
@@ -279,204 +425,164 @@ function formatTimeRemaining(endDateStr: string): string {
   right: -5px;
   background-color: #ff4d4d;
   color: white;
-  min-width: 20px;
-  height: 20px;
   border-radius: 50%;
-  border: 2px solid white;
-  font-size: 0.7rem;
+  width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  border: 2px solid white;
 }
 
-/* Lists */
-.leagues-list, .requests-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.top-actions {
+    display: flex;
+    justify-content: flex-end; /* Match FriendsView right alignment */
+    margin-bottom: 20px;
+}
+
+.add-btn {
+    background: #e0f5e9;
+    border: 1px solid #bfe8cd;
+    color: #1f7a3a;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.leagues-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
 .league-card {
-  background: #f7f9f5;
-  border: 1px solid #dbe5d3;
-  padding: 16px;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: transform 0.1s;
+    display: flex;
+    align-items: center;
+    background: #f7f9f5;
+    color: #1f2a2c;
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid #dbe5d3;
+    cursor: pointer;
+    transition: background 0.2s;
 }
+
 .league-card:active {
-  transform: scale(0.98);
-}
-.league-card.archived {
-  background: #f0f0f0;
-  border-color: #ddd;
-  opacity: 0.8;
+    background: #e3eddd;
 }
 
-.league-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 6px;
-}
 .league-icon {
-  font-size: 1.5rem;
+    font-size: 1.5rem;
+    margin-right: 16px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #e3eddd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
+
+.league-icon.gray {
+    filter: grayscale(100%);
+    opacity: 0.6;
+    background: #eee;
+}
+
+.league-info {
+    flex: 1;
+}
+
 .league-name {
-  font-weight: 600;
-  font-size: 1.1rem;
-  color: #1f2a2c;
-}
-.league-timer {
-  font-size: 0.85rem;
-  color: #666;
-  margin-left: 36px; /* align with text */
+    font-weight: 600;
+    font-size: 1.05rem;
+    margin-bottom: 4px;
 }
 
-/* Request items (copied from FriendsView slightly adapted) */
-.request-item {
-  display: flex;
-  align-items: center;
-  background: #f5f5f5;
-  padding: 12px;
-  border-radius: 12px;
-  border-left: 4px solid #679436;
-  gap: 10px;
+.league-meta {
+    font-size: 0.85rem;
+    color: #666;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
-.avatar {
-  font-size: 1.5rem;
-}
-.request-info {
-  flex: 1;
-}
-.request-info .name {
-  font-weight: 600;
-}
-.request-info .status {
-  font-size: 0.8rem;
-  color: #666;
-}
-.request-actions {
-  display: flex;
-  gap: 6px;
-}
-.accept-btn, .reject-btn {
-  border: none;
-  padding: 6px 10px;
-  border-radius: 6px;
-  cursor: pointer;
-  color: white;
-  font-size: 0.8rem;
-}
-.accept-btn { background: #679436; }
-.reject-btn { background: #f44336; }
 
-/* Placeholder */
+.timer {
+    color: #d32f2f; /* Red-ish for urgency */
+    font-weight: 500;
+}
+
+.arrow {
+    font-size: 1.5rem;
+    color: #999;
+    margin-left: 8px;
+}
+
+.requests-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.league-invite-card {
+    background: #f5f5f5;
+    border: none;
+    border-left: 4px solid #679436; /* Incoming green type */
+    padding: 16px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.inviter {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.invite-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.reject-btn, .accept-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.reject-btn {
+    background: #f44336;
+    color: #fff;
+}
+
+.accept-btn {
+    background: #679436;
+    color: #fff;
+}
+
 .placeholder-content {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 40px;
-  color: #666;
-  gap: 10px;
-}
-.emoji { font-size: 3rem; }
-
-/* Top Actions */
-.top-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 12px;
-}
-.add-btn {
-  background: #e0f5e9;
-  border: 1px solid #bfe8cd;
-  color: #1f7a3a;
-  border-radius: 10px;
-  padding: 8px 12px;
-  cursor: pointer;
-  font-weight: 500;
-}
-
-/* Modal Styles */
-.fullscreen-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.8);
-  display: flex;
-  align-items: center;
   justify-content: center;
-  z-index: 1000;
+  padding: 40px;
+  text-align: center;
+  color: #666;
+  gap: 20px;
 }
 
-.modal-content {
-  background: white;
-  border-radius: 12px;
-  padding: 24px;
-  width: 90%;
-  max-width: 500px;
-  position: relative;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.close-icon-btn {
-  background: none;
-  border: none;
-  font-size: 1.2rem;
-  cursor: pointer;
-}
-
-.form-group {
-  margin-bottom: 16px;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 8px;
-  font-weight: 500;
-}
-
-.form-group input {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  font-size: 1rem;
-}
-
-.form-row {
-  display: flex;
-  gap: 12px;
-}
-
-.hint {
-  font-size: 0.9rem;
-  color: #888;
-  margin-top: -8px;
-  margin-bottom: 16px;
-}
-
-.action-btn-primary {
-  background: #679436;
-  color: white;
-  padding: 10px 16px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 1rem;
-  width: 100%;
-  transition: background 0.3s;
-}
-.action-btn-primary:hover {
-  background: #5a7e2d;
+.emoji {
+  font-size: 4rem;
 }
 </style>

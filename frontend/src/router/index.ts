@@ -90,6 +90,11 @@ const router = createRouter({
           component: () => import('../views/LeaguesView.vue'),
         },
         {
+          path: 'ligues/:id',
+          name: 'CommunityLeagueDetail',
+          component: () => import('../views/LeagueDetailView.vue'),
+        },
+        {
           path: 'evenements',
           name: 'CommunityEvents',
           component: () => import('../views/EvenementsView.vue'),
