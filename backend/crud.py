@@ -212,19 +212,28 @@ def send_friend_request(db: Session, sender_id: int, receiver_id: int):
     if existing:
         if existing.status == "pending":
             return existing
+        if existing.status == "accepted":
+            raise ValueError("Already friends")
         # If rejected before, create new one
         if existing.status == "rejected":
             db.delete(existing)
             db.commit()
 
-    # Check if reverse request exists (already friends)
+    # Check if reverse request exists
     reverse = db.query(models.FriendRequest).filter(
         models.FriendRequest.sender_id == receiver_id,
-        models.FriendRequest.receiver_id == sender_id,
-        models.FriendRequest.status == "accepted"
+        models.FriendRequest.receiver_id == sender_id
     ).first()
+
     if reverse:
-        raise ValueError("Already friends")
+        if reverse.status == "accepted":
+            raise ValueError("Already friends")
+        if reverse.status == "pending":
+            # Mutual request: Accept the existing request
+            reverse.status = "accepted"
+            db.commit()
+            db.refresh(reverse)
+            return reverse
 
     req = models.FriendRequest(sender_id=sender_id, receiver_id=receiver_id, status="pending")
     db.add(req)

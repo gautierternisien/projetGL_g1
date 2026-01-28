@@ -545,7 +545,7 @@ async def send_friend_request(friend_id: int, current_user: models.User = Depend
         raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
     try:
         req = crud.send_friend_request(db, current_user.id, friend_id)
-        return {"id": req.id, "status": "pending", "receiver": {"id": target.id, "username": target.username}}
+        return {"id": req.id, "status": req.status, "receiver": {"id": target.id, "username": target.username}}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

@@ -39,10 +39,20 @@ watch(query, async (val) => {
 onMounted(async () => {
   try {
     await store.fetchFriends()
+    await store.fetchIncomingRequests()
   } catch {
     // silent fallback
   }
 })
+
+function isIncoming(userId: number) {
+  return store.incomingRequests.some((req) => req.sender.id === userId)
+}
+
+function getIncomingRequestId(userId: number) {
+  const req = store.incomingRequests.find((r) => r.sender.id === userId)
+  return req ? req.id : null
+}
 
 function openAdd(userId: number) {
   const user = results.value.find((u) => u.id === userId) || null
@@ -55,10 +65,39 @@ function closeAdd() {
 
 async function confirmAdd() {
   if (!confirmState.value.user) return
+
+  // Si c'est une demande entrante, on ne fait rien ici (les boutons Accepter/Refuser s'en chargent)
+  // Mais si on utilise le bouton "Envoyer" standard, on garde le comportement sendFriendRequest
+  // qui fera l'auto-accept côté backend.
+  // Cependant, l'utilisateur veut des boutons "Accepter" / "Refuser" explicites.
+
   await store.sendFriendRequest(confirmState.value.user.id)
   success.value = `Demande d'ami envoyée à ${confirmState.value.user.username}`
   closeAdd()
   router.push({ name: 'CommunityFriends' })
+}
+
+async function handleAccept() {
+  if (!confirmState.value.user) return
+  const reqId = getIncomingRequestId(confirmState.value.user.id)
+  if (reqId) {
+    await store.acceptRequest(reqId)
+    success.value = `Vous êtes maintenant ami avec ${confirmState.value.user.username}`
+    closeAdd()
+    router.push({ name: 'CommunityFriends' })
+  }
+}
+
+async function handleReject() {
+  if (!confirmState.value.user) return
+  const reqId = getIncomingRequestId(confirmState.value.user.id)
+  if (reqId) {
+    await store.rejectRequest(reqId)
+    success.value = `Demande refusée`
+    closeAdd()
+    // On peut rester sur la page ou recharger les requêtes
+    await store.fetchIncomingRequests()
+  }
 }
 
 const goBack = () => router.push('/communaute/amis')
@@ -92,11 +131,19 @@ const goBack = () => router.push('/communaute/amis')
     </div>
   </div>
   <div v-if="confirmState.open && confirmState.user" class="blur-overlay">
-    <div class="confirm-box">
+    <div class="confirm-box" v-if="isIncoming(confirmState.user.id)">
+      <h3>{{ confirmState.user.username }} vous demande en ami</h3>
+      <p>Cette personne vous a déjà envoyé une demande.</p>
+      <div class="confirm-actions">
+        <button @click="handleReject" class="cancel-btn">Refuser</button>
+        <button @click="handleAccept" class="confirm-btn">Accepter</button>
+      </div>
+    </div>
+    <div class="confirm-box" v-else>
       <h3>Ajouter {{ confirmState.user.username }} ?</h3>
       <p>Une demande d'ami sera envoyée à cette personne.</p>
       <div class="confirm-actions">
-        <button @click="closeAdd" class="cancel-btn">Annuler</button>
+        <button @click="closeAdd" class="annuler-btn">Annuler</button>
         <button @click="confirmAdd" class="confirm-btn">Envoyer</button>
       </div>
     </div>
@@ -108,20 +155,6 @@ const goBack = () => router.push('/communaute/amis')
   filter: blur(4px);
   pointer-events: none;
   user-select: none;
-}
-
-.top-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 12px;
-}
-
-.back-btn {
-  background: #eaeaea;
-  border: 1px solid #d0d0d0;
-  border-radius: 10px;
-  padding: 8px 12px;
-  cursor: pointer;
 }
 
 .search-box {
@@ -148,22 +181,24 @@ const goBack = () => router.push('/communaute/amis')
   display: flex;
   align-items: center;
   gap: 12px;
-  background: #2d4a5b;
-  color: #fff;
+  background: #f7f9f5;
+  color: #1f2a2c;
   padding: 12px;
   border-radius: 12px;
+  border: 1px solid #dbe5d3;
 }
 
 .avatar {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: #c9b6ff;
-  color: #333;
+  background: #e3eddd;
+  color: #2f3b2f;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 600;
+  flex-shrink: 0;
 }
 
 .name {
@@ -244,9 +279,21 @@ const goBack = () => router.push('/communaute/amis')
   justify-content: center;
 }
 
-.cancel-btn {
+.annuler-btn {
   background-color: #f0f0f0;
   color: #333;
+  border: none;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  flex: 1;
+}
+
+
+.cancel-btn {
+  background-color: #f44336;
+  color: #fff;
   border: none;
   padding: 0.75rem 1rem;
   border-radius: 10px;

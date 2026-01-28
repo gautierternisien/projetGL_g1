@@ -115,7 +115,7 @@ const goBack = () => router.push('/communaute')
               <div class="name">{{ r.receiver.username }}</div>
               <div class="status">Demande en attente</div>
             </div>
-            <button class="cancel-btn" @click="cancelRequest(r.id)">Annuler</button>
+            <button class="cancel-btn" @click="cancelRequest(r.id)">✕</button>
           </div>
         </div>
         <div v-else class="placeholder-content">
@@ -354,13 +354,19 @@ const goBack = () => router.push('/communaute')
 }
 
 .cancel-btn {
-  background: #ff9800;
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 6px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #f8d7b3;
+  color: #d97706;
+  border: 1px solid #ffa500;
+  font-size: 1rem;
   cursor: pointer;
-  font-size: 0.9rem;
+  flex-shrink: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .blur-overlay {
