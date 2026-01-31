@@ -182,7 +182,13 @@ const processSectors = (details: Record<string, number>, total: number) => {
 
   // D. On applique la couleur selon la catégorie
   sectors.value = activeSectors.map((sector) => {
-    const color = getCategoryColor(sector.key) || '#333'
+    let color
+
+    if (!isConnected.value) {
+      color = CATEGORY_COLORS[sector.key] || '#333'
+    } else {
+      color = getCategoryColor(sector.key)
+    }
 
     return {
       name: sector.name,
@@ -288,16 +294,26 @@ watch(
               (userScore / 1000).toFixed(2)
             }}</span>
             <span class="unit-text">Tonnes CO₂</span>
-            <div v-if="store.globalAverage === 0" class="cta-container">
-              <RouterLink to="/questionnaires" class="cta-link">
-                ⚠️ Moyenne française 👉 Faites votre propre empreinte carbone !
+            <div v-if="!isConnected" class="cta-container">
+              <RouterLink to="/login" class="cta-link">
+                ⚠️ Moyenne française 👉 Connectez vous pour voir votre propre empreinte carbone !
               </RouterLink>
             </div>
-            <div v-if="store.globalAverage < 100 && store.globalAverage > 0" class="cta-container">
-              <RouterLink to="/questionnaires" class="cta-link">
-                ⚠️ Moyenne nationale prise en compte pour certaines catégories 👉 Continuer les
-                questionnaires
-              </RouterLink>
+            <div v-else class="cta-container">
+              <div v-if="store.globalAverage === 0" class="cta-container">
+                <RouterLink to="/questionnaires" class="cta-link">
+                  ⚠️ Moyenne française 👉 Faites votre propre empreinte carbone !
+                </RouterLink>
+              </div>
+              <div
+                v-if="store.globalAverage < 100 && store.globalAverage > 0"
+                class="cta-container"
+              >
+                <RouterLink to="/questionnaires" class="cta-link">
+                  ⚠️ Moyenne nationale prise en compte pour certaines catégories 👉 Continuer les
+                  questionnaires
+                </RouterLink>
+              </div>
             </div>
           </div>
           <div class="image-side">
