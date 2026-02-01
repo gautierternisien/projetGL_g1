@@ -10,6 +10,7 @@ const API_URL = 'http://localhost:8000'
 const authStore = useAuthStore()
 const router = useRouter()
 const isConnected = computed(() => authStore.isConnected)
+const user = computed(() => authStore.user)
 
 const countsByCategory = ref<
   Record<string, { completed: number; total: number; inProgress: number }>
@@ -32,8 +33,12 @@ const categoriesKeys = ref(CATEGORY_DATA.map((c) => c.key))
 async function loadCategoryCounts() {
   if (!isConnected.value) return
 
+  // Si l'utilisateur n'est pas encore chargé (ex: F5, token présent main user null), on ne charge pas encore
+  // On attendra que le watcher le déclenche
+  if (!user.value) return;
+
   try {
-    const userIdParam = authStore.user ? `?user_id=${authStore.user.id}` : ''
+    const userIdParam = user.value ? `?user_id=${user.value.id}` : ''
     const results = await Promise.all(
       categoriesKeys.value.map((k) =>
         fetch(`${API_URL}/missions/${k}${userIdParam}`, { cache: 'no-store' })
@@ -65,7 +70,19 @@ async function loadCategoryCounts() {
   }
 }
 
-onMounted(loadCategoryCounts)
+onMounted(() => {
+    if (user.value) {
+        loadCategoryCounts()
+    }
+})
+
+// Watch user changes (e.g. after login or refreshing page when user is fetched)
+import { watch } from 'vue'
+watch(user, (newUser) => {
+  if (newUser) {
+    loadCategoryCounts()
+  }
+})
 
 // Computed categories avec progression
 const categoriesWithProgress = computed(() => {

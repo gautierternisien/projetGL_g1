@@ -60,6 +60,11 @@ async function checkRequests() {
 }
 
 onMounted(() => {
+  if (authStore.isConnected && !authStore.user) {
+    authStore.fetchUser().catch(() => {
+      // Token invalid or expired, optional handling here
+    })
+  }
   checkRequests()
 })
 
