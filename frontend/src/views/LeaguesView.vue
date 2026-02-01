@@ -52,6 +52,13 @@ function getTimeRemaining(league: { start_date: string; end_date: string }) {
     if (now < start) {
         const diff = start - now
         const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+
+        // Check for tomorrow specifically
+        const tomorrow = new Date()
+        tomorrow.setDate(tomorrow.getDate() + 1)
+        const tomorrowStr = tomorrow.toISOString().substring(0, 10)
+        if (league.start_date === tomorrowStr) return "Commence demain"
+
         if (days > 0) return `Commence dans ${days}j`
         return "Commence bientôt"
     }
@@ -85,7 +92,7 @@ async function rejectInvite(id: number) {
 // Modal logic
 const showCreateModal = ref(false)
 const newLeagueName = ref('')
-const newStartDate = ref('')
+const newStartDate = ref(new Date().toISOString().substring(0, 10))
 const newEndDate = ref('')
 const isBlurred = ref(false)
 const errorMessage = ref('')
@@ -97,6 +104,10 @@ const todayStr = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toI
 // Computed for form validation
 const formValidationError = computed(() => {
     if (!newStartDate.value || !newEndDate.value) return null
+
+    if (!newLeagueName.value.trim()) {
+        return "Le nom de la ligue est requis."
+    }
 
     if (newStartDate.value < todayStr) {
         return "La date de début ne peut pas être dans le passé."

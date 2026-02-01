@@ -1012,6 +1012,31 @@ def get_invites(current_user: schemas.User = Depends(get_current_user), db: Sess
         ))
     return result
 
+@app.get("/leagues/{league_id}/invites", response_model=List[schemas.LeagueInvite])
+def get_league_invites_route(league_id: int, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    league = crud.get_league(db, league_id)
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found")
+
+    is_member = any(m.user_id == current_user.id for m in league.members)
+    if not is_member:
+        raise HTTPException(status_code=403, detail="Not a member of this league")
+
+    invites = crud.get_league_invites(db, league_id)
+    result = []
+    for inc in invites:
+        inviter = crud.get_user(db, inc.inviter_id)
+        result.append(schemas.LeagueInvite(
+            id=inc.id,
+            league_id=inc.league_id,
+            league_name=league.name,
+            inviter_id=inc.inviter_id,
+            inviter_name=inviter.username if inviter else "Unknown",
+            invitee_id=inc.invitee_id,
+            status=inc.status
+        ))
+    return result
+
 @app.get("/leagues/{league_id}", response_model=schemas.LeagueDetail)
 def get_league_detail(league_id: int, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
     league = crud.get_league(db, league_id)

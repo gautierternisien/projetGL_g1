@@ -16,7 +16,8 @@ const showLeaveModal = ref(false)
 const inviteSearchQuery = ref('')
 const inviteErrorMessage = ref('')
 const leaveErrorMessage = ref('')
-const selectedFriendIds = ref<number[]>([])
+const invitedFriends = ref<number[]>([]) // track invited in this session
+const isFetchingInvites = ref(false)
 
 onMounted(async () => {
     try {
@@ -43,12 +44,7 @@ const timeRemaining = computed(() => {
     const now = new Date().getTime()
 
     // Not started yet
-    if (now < start) {
-        const diff = start - now
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-        if (days > 0) return `Commence dans ${days} jours`
-        return "Commence bientôt"
-    }
+    if (now < start) return null // Display date range instead
 
     const diff = end - now
 
@@ -75,17 +71,28 @@ function goBack() {
   router.back()
 }
 
-function openInviteModal() {
+async function openInviteModal() {
     showInviteModal.value = true
     inviteErrorMessage.value = ''
-    selectedFriendIds.value = []
+    invitedFriends.value = []
+    isFetchingInvites.value = true
+
+    // Fetch pending invites to disable buttons for already invited
+    try {
+        const invites = await store.fetchLeaguePendingInvites(leagueId)
+        invitedFriends.value = invites.map(i => i.invitee_id)
+    } catch {
+        console.error("Impossible de récupérer les invitations en cours")
+    } finally {
+        isFetchingInvites.value = false
+    }
 }
 
 function closeInviteModal() {
     showInviteModal.value = false
     inviteSearchQuery.value = ''
     inviteErrorMessage.value = ''
-    selectedFriendIds.value = []
+    invitedFriends.value = []
 }
 
 function openLeaveModal() {
@@ -108,40 +115,14 @@ async function confirmLeaveLeague() {
     }
 }
 
-function toggleSelection(friendId: number) {
-    if (selectedFriendIds.value.includes(friendId)) {
-        selectedFriendIds.value = selectedFriendIds.value.filter(id => id !== friendId)
-    } else {
-        selectedFriendIds.value.push(friendId)
-    }
-}
+async function inviteFriend(friendId: number) {
+    if (invitedFriends.value.includes(friendId)) return
 
-async function sendInvitations() {
-    if (selectedFriendIds.value.length === 0) return
-
-    inviteErrorMessage.value = ''
-    let successCount = 0
-    let failCount = 0
-    const successfulIds: number[] = []
-
-    // Send invites in parallel
-    await Promise.all(selectedFriendIds.value.map(async (id) => {
-        try {
-            await store.inviteUser(leagueId, id)
-            successCount++
-            successfulIds.push(id)
-        } catch {
-            failCount++
-        }
-    }))
-
-    // Remove successful invites from selection
-    selectedFriendIds.value = selectedFriendIds.value.filter(id => !successfulIds.includes(id))
-
-    if (failCount > 0) {
-         inviteErrorMessage.value = `${successCount} invitation(s) envoyée(s). ${failCount} échec(s) (déjà membre ?).`
-    } else {
-        closeInviteModal()
+    try {
+        await store.inviteUser(leagueId, friendId)
+        invitedFriends.value.push(friendId)
+    } catch {
+        inviteErrorMessage.value = "Erreur lors de l'invitation."
     }
 }
 
@@ -168,8 +149,13 @@ async function sendInvitations() {
         </div>
 
         <div class="league-infos">
-            <p v-if="!league.is_archived && timeRemaining" class="timer">
-                {{ timeRemaining.includes('Commence') ? timeRemaining : 'Se termine dans ' + timeRemaining }}
+             <p v-if="!league.is_archived">
+                <span v-if="new Date().getTime() < new Date(league.start_date).getTime()" class="timer">
+                    Du {{ new Date(league.start_date).toLocaleDateString() }} au {{ new Date(league.end_date).toLocaleDateString() }}
+                </span>
+                <span v-else-if="timeRemaining" class="timer">
+                   Se termine dans {{ timeRemaining }}
+                </span>
             </p>
             <p v-else class="timer">Terminée le {{ new Date(league.end_date).toLocaleDateString() }}</p>
         </div>
@@ -205,22 +191,28 @@ async function sendInvitations() {
         />
 
         <div class="friends-list-modal">
-            <div
-                v-for="friend in filteredFriends"
-                :key="friend.id"
-                class="friend-modal-item"
-            >
-                <div class="friend-name">{{ friend.username }}</div>
-                <button
-                    class="add-friend-btn"
-                    :class="{ 'selected': selectedFriendIds.includes(friend.id) }"
-                    @click="toggleSelection(friend.id)"
+            <div v-if="isFetchingInvites" class="loading-small">
+                 Chargement...
+            </div>
+            <div v-else-if="filteredFriends.length > 0">
+                 <div
+                    v-for="friend in filteredFriends"
+                    :key="friend.id"
+                    class="friend-modal-item"
                 >
-                    {{ selectedFriendIds.includes(friend.id) ? 'Désélectionner' : 'Sélectionner' }}
-                </button>
+                    <div class="friend-name">{{ friend.username }}</div>
+                    <button
+                        class="add-friend-btn"
+                        :class="{ 'selected': invitedFriends.includes(friend.id) }"
+                        :disabled="invitedFriends.includes(friend.id)"
+                        @click="inviteFriend(friend.id)"
+                    >
+                        {{ invitedFriends.includes(friend.id) ? 'Invité' : 'Inviter' }}
+                    </button>
+                </div>
             </div>
 
-            <div v-if="filteredFriends.length === 0" class="empty-msg">
+            <div v-if="!isFetchingInvites && filteredFriends.length === 0" class="empty-msg">
                 Aucun ami trouvé.
             </div>
         </div>
@@ -230,8 +222,7 @@ async function sendInvitations() {
         </div>
 
         <div class="confirm-actions">
-          <button @click="closeInviteModal" class="cancel-btn">Annuler</button>
-          <button @click="sendInvitations" class="confirm-btn">Envoyer les invitations</button>
+          <button @click="closeInviteModal" class="cancel-btn">Fermer</button>
         </div>
       </div>
     </div>
@@ -503,5 +494,12 @@ async function sendInvitations() {
   font-weight: 600;
   flex: 1;
   font-size: 1rem;
+}
+
+.loading-small {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+    font-style: italic;
 }
 </style>

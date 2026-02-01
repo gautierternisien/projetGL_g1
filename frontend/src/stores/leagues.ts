@@ -76,6 +76,15 @@ export const useLeaguesStore = defineStore('leagues', () => {
         if (res.ok) invitations.value = await res.json()
     }
 
+    async function fetchLeaguePendingInvites(leagueId: number) {
+        if (!auth.token) return []
+        const res = await fetch(`${API_URL}/leagues/${leagueId}/invites`, { headers: authHeaders() })
+        if (res.ok) {
+             return await res.json() as LeagueInvite[]
+        }
+        return []
+    }
+
     async function createLeague(payload: CreateLeaguePayload) {
         const res = await fetch(`${API_URL}/leagues/`, {
             method: 'POST',
@@ -142,6 +151,7 @@ export const useLeaguesStore = defineStore('leagues', () => {
         fetchActiveLeagues,
         fetchArchivedLeagues,
         fetchInvites,
+        fetchLeaguePendingInvites,
         createLeague,
         fetchLeagueDetail,
         inviteUser,

@@ -322,7 +322,23 @@ def create_league(db: Session, league: schemas.LeagueCreate, creator_id: int):
     db_league.members_count = 1
     return db_league
 
+
+def _archive_expired_leagues(db: Session):
+    today = datetime.now().strftime("%Y-%m-%d")
+    # Find active leagues that have ended (end_date < today)
+    expired_leagues = db.query(models.League).filter(
+        models.League.is_archived == False,
+        models.League.end_date < today
+    ).all()
+
+    if expired_leagues:
+        for l in expired_leagues:
+            l.is_archived = True
+        db.commit()
+
+
 def get_active_leagues_for_user(db: Session, user_id: int):
+    _archive_expired_leagues(db)
     # Find leagues where user is member and not archived
     leagues = db.query(models.League).join(models.LeagueMember).filter(
         models.LeagueMember.user_id == user_id,
@@ -334,6 +350,7 @@ def get_active_leagues_for_user(db: Session, user_id: int):
     return leagues
 
 def get_archived_leagues_for_user(db: Session, user_id: int):
+    _archive_expired_leagues(db)
     leagues = db.query(models.League).join(models.LeagueMember).filter(
         models.LeagueMember.user_id == user_id,
         models.League.is_archived == True
@@ -418,6 +435,12 @@ def invite_user_to_league(db: Session, league_id: int, inviter_id: int, invitee_
 def get_pending_league_invites(db: Session, user_id: int):
     return db.query(models.LeagueInvite).filter(
         models.LeagueInvite.invitee_id == user_id,
+        models.LeagueInvite.status == "pending"
+    ).all()
+
+def get_league_invites(db: Session, league_id: int):
+    return db.query(models.LeagueInvite).filter(
+        models.LeagueInvite.league_id == league_id,
         models.LeagueInvite.status == "pending"
     ).all()
 
