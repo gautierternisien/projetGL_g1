@@ -10,13 +10,14 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const category = route.params.category as string
+const user = computed(() => authStore.user)
 
 onMounted(() => {
   if (!authStore.isConnected) {
     router.push('/login')
     return
   }
-  loadMissions()
+  // loadMissions() // Retiré, on gère avec le watcher et onMounted combinés plus bas
 })
 
 // ref to the scrolling container so we scroll relative to it
@@ -64,6 +65,8 @@ interface RawMission {
 
 // Load missions for this category from backend
 async function loadMissions() {
+  if (!authStore.user) return // Attendre le user
+
   try {
     const userIdParam = authStore.user ? `?user_id=${authStore.user.id}` : ''
     const res = await fetch(`${API_URL}/missions/${category}${userIdParam}`, { cache: 'no-store' })
@@ -86,8 +89,27 @@ async function loadMissions() {
   }
 }
 
+// Watch user for changes (F5 load)
+import { watch } from 'vue'
+
 onMounted(() => {
-  loadMissions().then(async () => {
+  const init = async () => {
+     if (user.value) {
+        await loadMissions()
+        handleScrollQuery()
+     }
+  }
+  init()
+})
+
+watch(user, async (newUser) => {
+    if (newUser) {
+        await loadMissions()
+        handleScrollQuery()
+    }
+})
+
+async function handleScrollQuery() {
     const q = route.query.missionId
     if (q) {
       const id = Number(q)
@@ -104,8 +126,7 @@ onMounted(() => {
         scrollToMission(id)
       }
     }
-  })
-})
+}
 
 function scrollToMission(id: number) {
   const container = containerRef.value || document.querySelector('.scrollable-area')

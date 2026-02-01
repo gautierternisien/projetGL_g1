@@ -268,6 +268,31 @@ def get_incoming_requests(db: Session, user_id: int):
     ).all()
     return requests
 
+def get_user_mission_status(db: Session, user_id: int, mission_id: int):
+    return db.query(models.UserMissionStatus).filter(
+        models.UserMissionStatus.user_id == user_id,
+        models.UserMissionStatus.mission_id == mission_id
+    ).first()
+
+def update_user_mission_status(db: Session, user_id: int, mission_id: int, status: str):
+    db_status = get_user_mission_status(db, user_id, mission_id)
+    if db_status:
+        db_status.status = status
+        db.commit()
+        db.refresh(db_status)
+        return db_status
+    else:
+        db_status = models.UserMissionStatus(user_id=user_id, mission_id=mission_id, status=status)
+        db.add(db_status)
+        db.commit()
+        db.refresh(db_status)
+        return db_status
+
+def get_all_user_mission_statuses(db: Session, user_id: int):
+    results = db.query(models.UserMissionStatus).filter(models.UserMissionStatus.user_id == user_id).all()
+    # Convert list of objects to dict {mission_id: status} for easier lookup
+    return {status.mission_id: status.status for status in results}
+
 def get_accepted_friends(db: Session, user_id: int):
     # Get all accepted requests where user is sender or receiver
     requests = db.query(models.FriendRequest).filter(

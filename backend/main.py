@@ -11,6 +11,8 @@ from database import SessionLocal, engine
 
 models.Base.metadata.create_all(bind=engine)
 
+
+
 app = FastAPI()
 
 # Dependency
@@ -396,6 +398,46 @@ user_missions_db: Dict[int, Dict[int, str]] = {}
 # Feed des activités : { "username_receiver": [ { "sender_username": "...", "mission_id": 1, ... } ] }
 user_feed_db: Dict[str, List[Dict]] = {} 
 
+
+def init_db_data():
+    db = SessionLocal()
+    try:
+        # 1. Initialize Categories
+        existing_cats = {c.name for c in db.query(models.Category).all()}
+        all_cats = set(QUESTIONS_DB.keys()) | set(MISSIONS_DB.keys())
+        for cat_name in all_cats:
+            if cat_name not in existing_cats:
+                db.add(models.Category(name=cat_name))
+        db.commit()
+
+        # 2. Initialize Missions
+        # Check if we have missions. If not, populate from MISSIONS_DB
+        if db.query(models.Mission).count() == 0:
+            for cat_name, missions in MISSIONS_DB.items():
+                for m_data in missions:
+                    # m_data: { "id": 1, "title": "...", "description": "...", "status": "..." }
+                    # We ignore 'status' here as it is user-specific
+                    count = db.query(models.Mission).filter(models.Mission.id == m_data['id']).count()
+                    if count == 0:
+                        db_mission = models.Mission(
+                            id=m_data['id'],
+                            title=m_data['title'],
+                            description=m_data.get('description', ''),
+                            category_name=cat_name
+                        )
+                        db.add(db_mission)
+            db.commit()
+
+    except Exception as e:
+        print(f"Error initializing DB: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+# Initialize data on startup
+init_db_data()
+
+
 # --- ROUTES API ---
 
 @app.post("/register", response_model=schemas.User)
@@ -452,7 +494,7 @@ async def update_user_username(new_username: str, current_user: models.User = De
     old_username = current_user.username
     user_id = current_user.id
     
-    # Migrate answers from old username key (if exists) to numeric user_id
+    # Migrate answers from old username key (if exists) to numeric key
     if old_username in user_answers_db:
         if user_id not in user_answers_db:
             user_answers_db[user_id] = {}
@@ -464,7 +506,7 @@ async def update_user_username(new_username: str, current_user: models.User = De
         # Remove old key
         del user_answers_db[old_username]
     
-    # Migrate missions from old username key (if exists) to numeric user_id
+    # Migrate missions from old username key (if exists) to numeric key
     if old_username in user_missions_db:
         if user_id not in user_missions_db:
             user_missions_db[user_id] = {}
@@ -655,38 +697,20 @@ async def get_questions_by_category(category: str):
 
     return QUESTIONS_DB[category]
 
-@app.get("/missions/{category}", response_model=List[Mission])
-async def get_missions_by_category(category: str, user_id: Optional[int] = None):
+@app.get("/missions/{category}", response_model=List[schemas.Mission])
+async def get_missions_by_category(category: str, user_id: Optional[int] = None, db: Session = Depends(get_db)):
     """
     Récupère les missions d'une catégorie spécifique (ex: /missions/transport).
     Si user_id est fourni, retourne les statuts personnalisés.
     Sinon, retourne les missions avec statut 'new' par défaut.
     """
-    if category not in MISSIONS_DB:
-        raise HTTPException(status_code=404, detail="Catégorie de missions non trouvée")
+    # Si on a un user_id, on utilise la DB pour avoir les statuts
+    if user_id:
+        return crud.get_missions_by_category(db, category, user_id)
 
-    raw_missions = MISSIONS_DB[category]
-
-    personalized_missions = []
-    user_statuses = {}
-    if user_id and user_id in user_missions_db:
-        user_statuses = user_missions_db[user_id]
-
-    for m in raw_missions:
-        # On crée une copie pour ne pas modifier la DB globale
-        m_copy = m.copy()
-
-        # Si on a un statut pour cet utilisateur, on l'utilise
-        # Sinon, c'est 'new'
-        if user_id:
-            m_copy['status'] = user_statuses.get(m['id'], 'new')
-        else:
-            # Si pas d'user_id (ex: appel anonyme), on met 'new' par défaut pour ne pas montrer de fausses progressions
-            m_copy['status'] = 'new'
-
-        personalized_missions.append(m_copy)
-
-    return personalized_missions
+    # Sinon (non connecté), on renvoie les missions par défaut (depuis la DB, sans statuts personnalisés)
+    # On simule un user_id 0 ou inexistant pour avoir 'new' partout
+    return crud.get_missions_by_category(db, category, -1)
 
 
 class MissionUpdate(BaseModel):
@@ -701,25 +725,14 @@ async def update_mission(mission_id: int, payload: MissionUpdate, db: Session = 
     Si user_id est fourni, met à jour le statut pour cet utilisateur uniquement.
     """
     # Vérifier si la mission existe
-    mission_exists = False
-    mission_title = "Mission"
-    for cat, missions in MISSIONS_DB.items():
-        for m in missions:
-            if int(m.get('id')) == mission_id:
-                mission_exists = True
-                mission_title = m.get('title', 'Mission')
-                break
-        if mission_exists:
-            break
-
-    if not mission_exists:
+    mission = db.query(models.Mission).filter(models.Mission.id == mission_id).first()
+    if not mission:
         raise HTTPException(status_code=404, detail="Mission non trouvée")
 
     if payload.user_id:
-        if payload.user_id not in user_missions_db:
-            user_missions_db[payload.user_id] = {}
-        user_missions_db[payload.user_id][mission_id] = payload.status
-        
+        # Utiliser CRUD pour persister le statut
+        crud.update_user_mission_status(db, payload.user_id, mission_id, payload.status)
+
         # Enregistrement dans le feed des amis si terminé
         if payload.status == 'termine':
             # 1. Recuperer l'ID de l'utilisateur qui a terminé la mission
@@ -734,26 +747,20 @@ async def update_mission(mission_id: int, payload: MissionUpdate, db: Session = 
                     "sender_id": payload.user_id,
                     "sender_username": user.username,
                     "mission_id": mission_id,
-                    "mission_title": mission_title,
+                    "mission_title": mission.title,
                     "status": payload.status,
                     "timestamp": datetime.now()
                 }
                 
                 for friend in friends:
-                    if friend.username not in user_feed_db:
+                    if friend.username not in user_feed_db: # user_feed_db est encore en RAM, ok
                         user_feed_db[friend.username] = []
                     user_feed_db[friend.username].append(new_activity)
             
         return {"id": mission_id, "status": payload.status}
     else:
-        # Fallback legacy : update global DB (déconseillé si multi-user)
-        for cat, missions in MISSIONS_DB.items():
-            for m in missions:
-                if int(m.get('id')) == mission_id:
-                    m['status'] = payload.status
-                    return m
-
-    raise HTTPException(status_code=404, detail="Mission non trouvée")
+        # User ID manquant
+        raise HTTPException(status_code=400, detail="User ID requis pour sauvegarder la progression")
 
 @app.post("/answers/{category}/{user_id}")
 async def save_answer(category: str, user_id: int, answer: UserAnswer):
