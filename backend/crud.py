@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 import models, schemas
+from datetime import datetime
 
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
@@ -119,6 +120,9 @@ def update_mission_status(db: Session, user_id: int, mission_id: int, status: st
         db_status = models.UserMissionStatus(user_id=user_id, mission_id=mission_id, status=status)
         db.add(db_status)
 
+    if status == 'termine':
+        db_status.completed_at = datetime.now().isoformat()
+
     db.commit()
     db.refresh(db_status)
     return db_status
@@ -208,19 +212,28 @@ def send_friend_request(db: Session, sender_id: int, receiver_id: int):
     if existing:
         if existing.status == "pending":
             return existing
+        if existing.status == "accepted":
+            raise ValueError("Already friends")
         # If rejected before, create new one
         if existing.status == "rejected":
             db.delete(existing)
             db.commit()
 
-    # Check if reverse request exists (already friends)
+    # Check if reverse request exists
     reverse = db.query(models.FriendRequest).filter(
         models.FriendRequest.sender_id == receiver_id,
-        models.FriendRequest.receiver_id == sender_id,
-        models.FriendRequest.status == "accepted"
+        models.FriendRequest.receiver_id == sender_id
     ).first()
+
     if reverse:
-        raise ValueError("Already friends")
+        if reverse.status == "accepted":
+            raise ValueError("Already friends")
+        if reverse.status == "pending":
+            # Mutual request: Accept the existing request
+            reverse.status = "accepted"
+            db.commit()
+            db.refresh(reverse)
+            return reverse
 
     req = models.FriendRequest(sender_id=sender_id, receiver_id=receiver_id, status="pending")
     db.add(req)
@@ -274,6 +287,10 @@ def get_user_mission_status(db: Session, user_id: int, mission_id: int):
         models.UserMissionStatus.mission_id == mission_id
     ).first()
 
+def get_user_mission_statuses_dict(db: Session, user_id: int):
+    statuses = db.query(models.UserMissionStatus).filter(models.UserMissionStatus.user_id == user_id).all()
+    return {s.mission_id: s.status for s in statuses}
+
 def update_user_mission_status(db: Session, user_id: int, mission_id: int, status: str):
     db_status = get_user_mission_status(db, user_id, mission_id)
     if db_status:
@@ -306,3 +323,173 @@ def get_accepted_friends(db: Session, user_id: int):
         else:
             friend_ids.append(req.sender_id)
     return friend_ids
+
+# --- LEAGUES ---
+def create_league(db: Session, league: schemas.LeagueCreate, creator_id: int):
+    now_iso = datetime.now().isoformat()
+    db_league = models.League(
+        name=league.name,
+        start_date=league.start_date,
+        end_date=league.end_date,
+        created_at=now_iso,
+        is_archived=False
+    )
+    db.add(db_league)
+    db.commit()
+    db.refresh(db_league)
+
+    # Add creator as member
+    member = models.LeagueMember(
+        league_id=db_league.id,
+        user_id=creator_id,
+        joined_at=now_iso
+    )
+    db.add(member)
+    db.commit()
+    db.refresh(db_league)
+
+    db_league.members_count = 1
+    return db_league
+
+
+def _archive_expired_leagues(db: Session):
+    today = datetime.now().strftime("%Y-%m-%d")
+    # Find active leagues that have ended (end_date < today)
+    expired_leagues = db.query(models.League).filter(
+        models.League.is_archived == False,
+        models.League.end_date < today
+    ).all()
+
+    if expired_leagues:
+        for l in expired_leagues:
+            l.is_archived = True
+        db.commit()
+
+
+def get_active_leagues_for_user(db: Session, user_id: int):
+    _archive_expired_leagues(db)
+    # Find leagues where user is member and not archived
+    leagues = db.query(models.League).join(models.LeagueMember).filter(
+        models.LeagueMember.user_id == user_id,
+        models.League.is_archived == False
+    ).all()
+    # Compute user count
+    for l in leagues:
+        l.members_count = db.query(models.LeagueMember).filter(models.LeagueMember.league_id == l.id).count()
+    return leagues
+
+def get_archived_leagues_for_user(db: Session, user_id: int):
+    _archive_expired_leagues(db)
+    leagues = db.query(models.League).join(models.LeagueMember).filter(
+        models.LeagueMember.user_id == user_id,
+        models.League.is_archived == True
+    ).all()
+    for l in leagues:
+        l.members_count = db.query(models.LeagueMember).filter(models.LeagueMember.league_id == l.id).count()
+    return leagues
+
+def get_league(db: Session, league_id: int):
+    return db.query(models.League).filter(models.League.id == league_id).first()
+
+def get_league_members_with_stats(db: Session, league_id: int):
+    # Get members
+    members = db.query(models.LeagueMember).filter(models.LeagueMember.league_id == league_id).all()
+    result = []
+
+    league = get_league(db, league_id)
+
+    # For now, simplistic mission counting
+    for m in members:
+        user = get_user(db, m.user_id)
+        # Count completed missions
+        query = db.query(models.UserMissionStatus).filter(
+             models.UserMissionStatus.user_id == m.user_id,
+             models.UserMissionStatus.status == "termine"
+        )
+
+        # Filter by league dates
+        if league and league.start_date:
+             query = query.filter(models.UserMissionStatus.completed_at >= league.start_date)
+        if league and league.end_date:
+             # Assuming end_date (YYYY-MM-DD) includes the full day, we can compare string directly
+             # if completed_at is ISO including time, "2023-01-05" < "2023-01-05T10:00:00".
+             # So strictly speaking, <= end_date usually excludes the day's events if they have time.
+             # We should probably filter < (end_date + 1 day).
+             # But for simplicity let's rely on simple string compare but adding time suffix for safe measure
+             # or simply trusting standard string compare logic for now.
+             # A robust way: completed_at <= end_date + "T23:59:59"
+             query = query.filter(models.UserMissionStatus.completed_at <= league.end_date + "T23:59:59")
+
+        completed_count = query.count()
+
+        result.append({
+            "id": m.id,
+            "user_id": m.user_id,
+            "username": user.username,
+            "joined_at": m.joined_at,
+            "missions_completed": completed_count
+        })
+    return result
+
+def invite_user_to_league(db: Session, league_id: int, inviter_id: int, invitee_id: int):
+    # Check if already member
+    exists = db.query(models.LeagueMember).filter(
+        models.LeagueMember.league_id == league_id,
+        models.LeagueMember.user_id == invitee_id
+    ).first()
+    if exists:
+        return None # Already member
+
+    # Check if invite exists
+    invite = db.query(models.LeagueInvite).filter(
+        models.LeagueInvite.league_id == league_id,
+        models.LeagueInvite.invitee_id == invitee_id,
+        models.LeagueInvite.status == "pending"
+    ).first()
+
+    if invite:
+        return invite
+
+    new_invite = models.LeagueInvite(
+        league_id=league_id,
+        inviter_id=inviter_id,
+        invitee_id=invitee_id,
+        status="pending"
+    )
+    db.add(new_invite)
+    db.commit()
+    db.refresh(new_invite)
+    return new_invite
+
+def get_pending_league_invites(db: Session, user_id: int):
+    return db.query(models.LeagueInvite).filter(
+        models.LeagueInvite.invitee_id == user_id,
+        models.LeagueInvite.status == "pending"
+    ).all()
+
+def get_league_invites(db: Session, league_id: int):
+    return db.query(models.LeagueInvite).filter(
+        models.LeagueInvite.league_id == league_id,
+        models.LeagueInvite.status == "pending"
+    ).all()
+
+def respond_league_invite(db: Session, invite_id: int, accept: bool):
+    invite = db.query(models.LeagueInvite).filter(models.LeagueInvite.id == invite_id).first()
+    if not invite:
+        return None
+
+    if accept:
+        invite.status = "accepted"
+        # Add to members
+        new_member = models.LeagueMember(
+            league_id=invite.league_id,
+            user_id=invite.invitee_id,
+            joined_at=datetime.now().isoformat()
+        )
+        db.add(new_member)
+    else:
+        invite.status = "rejected"
+
+    db.commit()
+    return invite
+

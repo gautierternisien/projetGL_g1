@@ -33,19 +33,26 @@
 import { RouterView, RouterLink } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
 import { useFriendsStore } from '@/stores/friends'
+import { useLeaguesStore } from '@/stores/leagues'
 import { useAuthStore } from '@/stores/auth'
 import { computed, watch, onMounted } from 'vue'
 
 const uiStore = useUiStore()
 const friendsStore = useFriendsStore()
+const leaguesStore = useLeaguesStore()
 const authStore = useAuthStore()
 
-const hasIncomingRequests = computed(() => friendsStore.incomingRequests.length > 0)
+const hasIncomingRequests = computed(() => {
+  return friendsStore.incomingRequests.length > 0 || leaguesStore.invitations.length > 0
+})
 
 async function checkRequests() {
   if (authStore.isConnected) {
     try {
-      await friendsStore.fetchIncomingRequests()
+      await Promise.all([
+        friendsStore.fetchIncomingRequests(),
+        leaguesStore.fetchInvites()
+      ])
     } catch {
       // ignore
     }

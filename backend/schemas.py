@@ -93,3 +93,46 @@ class UserAnswer(UserAnswerBase):
     user_id: int
     class Config:
         from_attributes = True
+
+# --- LEAGUE ---
+class LeagueBase(BaseModel):
+    name: str
+    start_date: str
+    end_date: str
+
+class LeagueCreate(LeagueBase):
+    pass
+
+class League(LeagueBase):
+    id: int
+    is_archived: bool
+    created_at: str
+    members_count: int = 0
+
+    class Config:
+        from_attributes = True
+
+class LeagueMember(BaseModel):
+    id: int
+    user_id: int
+    username: str
+    joined_at: str
+    missions_completed: Optional[int] = 0 # Computed for ranking
+
+    class Config:
+        from_attributes = True
+
+class LeagueInvite(BaseModel):
+    id: int
+    league_id: int
+    league_name: str
+    inviter_id: int
+    inviter_name: str
+    invitee_id: int
+    status: str
+
+    class Config:
+        from_attributes = True
+
+class LeagueDetail(League):
+    members: List[LeagueMember] = []
