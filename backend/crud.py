@@ -287,6 +287,10 @@ def get_user_mission_status(db: Session, user_id: int, mission_id: int):
         models.UserMissionStatus.mission_id == mission_id
     ).first()
 
+def get_user_mission_statuses_dict(db: Session, user_id: int):
+    statuses = db.query(models.UserMissionStatus).filter(models.UserMissionStatus.user_id == user_id).all()
+    return {s.mission_id: s.status for s in statuses}
+
 def update_user_mission_status(db: Session, user_id: int, mission_id: int, status: str):
     db_status = get_user_mission_status(db, user_id, mission_id)
     if db_status:

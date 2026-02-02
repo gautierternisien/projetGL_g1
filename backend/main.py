@@ -656,7 +656,7 @@ async def get_questions_by_category(category: str):
     return QUESTIONS_DB[category]
 
 @app.get("/missions/{category}", response_model=List[Mission])
-async def get_missions_by_category(category: str, user_id: Optional[int] = None):
+async def get_missions_by_category(category: str, user_id: Optional[int] = None, db: Session = Depends(get_db)):
     """
     Récupère les missions d'une catégorie spécifique (ex: /missions/transport).
     Si user_id est fourni, retourne les statuts personnalisés.
@@ -667,10 +667,12 @@ async def get_missions_by_category(category: str, user_id: Optional[int] = None)
 
     raw_missions = MISSIONS_DB[category]
 
-    personalized_missions = []
     user_statuses = {}
-    if user_id and user_id in user_missions_db:
-        user_statuses = user_missions_db[user_id]
+    if user_id:
+        # Récupérer les statuts depuis la BD au lieu de la variable globale volatile
+        user_statuses = crud.get_all_user_mission_statuses(db, user_id)
+
+    personalized_missions = []
 
     for m in raw_missions:
         # On crée une copie pour ne pas modifier la DB globale
@@ -986,8 +988,12 @@ async def get_global_stats(db: Session = Depends(get_db)):
 
 # --- LEAGUE ROUTES ---
 @app.post("/leagues/", response_model=schemas.League)
-def create_league_route(league: schemas.LeagueCreate, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    return crud.create_league(db=db, league=league, creator_id=current_user.id)
+async def create_league_route(league: schemas.LeagueCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        return crud.create_league(db=db, league=league, creator_id=current_user.id)
+    except Exception as e:
+        print(f"Error creating league: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/leagues/active", response_model=List[schemas.League])
 def get_active_leagues(current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
