@@ -46,7 +46,7 @@ defineEmits(['resumeLater'])
       </button>
 
       <RouterLink to="/profile" v-if="isConnected">
-        <div class="user-avatar">👤</div>
+        <div class="user-avatar">{{ authStore.user?.username.charAt(0).toUpperCase() }}</div>
       </RouterLink>
       <div v-else class="auth-buttons">
         <RouterLink to="/login" class="login-btn"> Se connecter </RouterLink>
@@ -166,16 +166,17 @@ defineEmits(['resumeLater'])
 }
 
 .user-avatar {
-  font-size: 1.5rem;
-  background: rgba(255, 255, 255, 0.2);
+  font-size: 1rem;
+  background: #e3eddd;
+  color: #2f3b2f;
   width: 40px;
   height: 40px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(5px);
   flex-shrink: 0;
+  font-weight: 600;
 }
 
 .auth-buttons {
