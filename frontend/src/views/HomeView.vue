@@ -296,13 +296,15 @@ watch(
             <span class="unit-text">Tonnes CO₂</span>
             <div v-if="!isConnected" class="cta-container">
               <RouterLink to="/login" class="cta-link">
-                ⚠️ Moyenne française 👉 Connectez vous pour voir votre propre empreinte carbone !
+                ⚠️ Moyenne des utilisateurs 👉 Connectez vous pour voir votre propre empreinte
+                carbone !
               </RouterLink>
             </div>
             <div v-else class="cta-container">
               <div v-if="store.globalAverage === 0" class="cta-container">
                 <RouterLink to="/questionnaires" class="cta-link">
-                  ⚠️ Moyenne française 👉 Faites votre propre empreinte carbone !
+                  ⚠️ Moyenne française prise en compte pour le calcul 👉 Commencez les
+                  questionnaires !
                 </RouterLink>
               </div>
               <div
@@ -310,7 +312,7 @@ watch(
                 class="cta-container"
               >
                 <RouterLink to="/questionnaires" class="cta-link">
-                  ⚠️ Moyenne nationale prise en compte pour certaines catégories 👉 Continuer les
+                  ⚠️ Moyenne nationale prise en compte pour certaines catégories 👉 Continuez les
                   questionnaires
                 </RouterLink>
               </div>
