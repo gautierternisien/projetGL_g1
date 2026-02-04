@@ -83,6 +83,7 @@ class Mission(MissionBase):
 
 class MissionUpdate(BaseModel):
     status: str
+    user_id: Optional[int] = None
 
 class UserAnswerBase(BaseModel):
     question_id: int

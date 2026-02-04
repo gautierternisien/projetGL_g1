@@ -33,6 +33,7 @@ app.add_middleware(
 )
 
 
+# Validated user getter
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -55,34 +56,10 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     except (ValueError, TypeError):
         # Fall back to username lookup (old token format for backward compatibility)
         user = crud.get_user_by_username(db, username=token_data.email)
-    
+
     if user is None:
         raise credentials_exception
     return user
-
-# --- MODÈLES DE DONNÉES (Pydantic) ---
-
-class Option(BaseModel):
-    label: str
-    value: str
-    score: int
-    is_default: bool = False
-
-class Question(BaseModel):
-    id: int
-    text: str
-    options: List[Option]
-
-
-class Mission(BaseModel):
-    id: int
-    title: str
-    description: Optional[str] = None
-    status: Optional[str] = None
-
-class UserAnswer(BaseModel):
-    question_id: int
-    answer_value: str
 
 # --- SIMULATION DE BASE DE DONNÉES ---
 # Dans un vrai projet, utilisez SQLite ou PostgreSQL
@@ -375,23 +352,30 @@ MISSIONS_DB = {
 }
 
 
-# --- STOCKAGE TEMPORAIRE DES RÉPONSES ---
-# Nouvelle Structure :
-# {
-#    123: {
-#        "transport": { 1: "car", 2: "low" },
-#        "alimentation": { 101: "high" }
-#    }
-# }
-user_answers_db: Dict[int, Dict[str, Dict[int, str]]] = {}
+# --- DATA INITIALIZATION ---
+def init_db_from_static_data(db: Session):
+    for category_name, questions in QUESTIONS_DB.items():
+        # Get or create category
+        cat = crud.get_category_by_name(db, category_name)
+        if not cat:
+            cat = crud.create_category(db, category_name)
 
-# {
-#    123: {
-#        1: "en_cours",
-#        2: "termine"
-#    }
-# }
-user_missions_db: Dict[int, Dict[int, str]] = {}
+        # Questions
+        for q_data in questions:
+            crud.create_question(db, q_data, category_name)
+
+    # Also init missions
+    for category_name, missions in MISSIONS_DB.items():
+         for m_data in missions:
+             crud.create_mission(db, m_data, category_name)
+
+@app.on_event("startup")
+def startup_event():
+    db = SessionLocal()
+    try:
+        init_db_from_static_data(db)
+    finally:
+        db.close()
 
 # Feed des activités : { "username_receiver": [ { "sender_username": "...", "mission_id": 1, ... } ] }
 user_feed_db: Dict[str, List[Dict]] = {} 
@@ -452,25 +436,6 @@ async def update_user_username(new_username: str, current_user: models.User = De
     old_username = current_user.username
     user_id = current_user.id
     
-    # Migrate answers from old username key (if exists) to numeric user_id
-    if old_username in user_answers_db:
-        if user_id not in user_answers_db:
-            user_answers_db[user_id] = {}
-        # Merge old data into numeric key
-        for category, answers in user_answers_db[old_username].items():
-            if category not in user_answers_db[user_id]:
-                user_answers_db[user_id][category] = {}
-            user_answers_db[user_id][category].update(answers)
-        # Remove old key
-        del user_answers_db[old_username]
-    
-    # Migrate missions from old username key (if exists) to numeric user_id
-    if old_username in user_missions_db:
-        if user_id not in user_missions_db:
-            user_missions_db[user_id] = {}
-        user_missions_db[user_id].update(user_missions_db[old_username])
-        del user_missions_db[old_username]
-
     # Migrate personal feed key and refresh sender_username in existing activities
     if old_username in user_feed_db:
         user_feed_db[new_username] = user_feed_db.pop(old_username)
@@ -645,88 +610,89 @@ async def root():
         "available_categories": list(QUESTIONS_DB.keys())
     }
 
-@app.get("/questions/{category}", response_model=List[Question])
-async def get_questions_by_category(category: str):
+@app.get("/questions/{category}", response_model=List[schemas.Question])
+async def get_questions_by_category(category: str, db: Session = Depends(get_db)):
     """
     Récupère les questions d'une catégorie spécifique (ex: /questions/transport)
     """
-    if category not in QUESTIONS_DB:
-        raise HTTPException(status_code=404, detail="Catégorie non trouvée")
+    # Use DB
+    qs = crud.get_questions_by_category(db, category)
+    if not qs:
+         # Fallback to dictionary if not in DB yet (or empty)
+         if category in QUESTIONS_DB:
+             return QUESTIONS_DB[category]
+         raise HTTPException(status_code=404, detail="Catégorie non trouvée")
+    return qs # Pydantic will serialize SQL Alchemy objects
 
-    return QUESTIONS_DB[category]
-
-@app.get("/missions/{category}", response_model=List[Mission])
+@app.get("/missions/{category}", response_model=List[schemas.Mission])
 async def get_missions_by_category(category: str, user_id: Optional[int] = None, db: Session = Depends(get_db)):
     """
     Récupère les missions d'une catégorie spécifique (ex: /missions/transport).
     Si user_id est fourni, retourne les statuts personnalisés.
     Sinon, retourne les missions avec statut 'new' par défaut.
     """
-    if category not in MISSIONS_DB:
-        raise HTTPException(status_code=404, detail="Catégorie de missions non trouvée")
+    # Check category existence
+    if category not in QUESTIONS_DB and category not in MISSIONS_DB:
+        # Note: MISSIONS_DB used as reference for category existence,
+        # but better to check DB if possible.
+        pass
 
-    raw_missions = MISSIONS_DB[category]
-
-    user_statuses = {}
     if user_id:
-        # Récupérer les statuts depuis la BD au lieu de la variable globale volatile
-        user_statuses = crud.get_all_user_mission_statuses(db, user_id)
+        return crud.get_missions_by_category(db, category, user_id)
+    else:
+        # anonymous view -> default status
+        missions = db.query(models.Mission).filter(models.Mission.category_name == category).all()
+        result = []
+        for m in missions:
+            m_data = schemas.Mission.model_validate(m)
+            m_data.status = "new"
+            result.append(m_data)
 
-    personalized_missions = []
+        # Fallback if DB empty but static has it (should not happen due to init)
+        if not result and category in MISSIONS_DB:
+             for m in MISSIONS_DB[category]:
+                  # Convert dict to schema
+                  m_obj = schemas.Mission(**m)
+                  m_obj.status = "new"
+                  result.append(m_obj)
 
-    for m in raw_missions:
-        # On crée une copie pour ne pas modifier la DB globale
-        m_copy = m.copy()
+        if not result:
+             raise HTTPException(status_code=404, detail="Catégorie de missions non trouvée")
 
-        # Si on a un statut pour cet utilisateur, on l'utilise
-        # Sinon, c'est 'new'
-        if user_id:
-            m_copy['status'] = user_statuses.get(m['id'], 'new')
-        else:
-            # Si pas d'user_id (ex: appel anonyme), on met 'new' par défaut pour ne pas montrer de fausses progressions
-            m_copy['status'] = 'new'
-
-        personalized_missions.append(m_copy)
-
-    return personalized_missions
+        return result
 
 
-class MissionUpdate(BaseModel):
-    status: str
-    user_id: Optional[int] = None
 
 
 @app.put("/missions/{mission_id}")
-async def update_mission(mission_id: int, payload: MissionUpdate, db: Session = Depends(get_db)):
+async def update_mission(mission_id: int, payload: schemas.MissionUpdate, db: Session = Depends(get_db)):
     """
     Met à jour le statut d'une mission identifiée par son `id`.
     Si user_id est fourni, met à jour le statut pour cet utilisateur uniquement.
     """
-    # Vérifier si la mission existe
-    mission_exists = False
-    mission_title = "Mission"
-    for cat, missions in MISSIONS_DB.items():
-        for m in missions:
-            if int(m.get('id')) == mission_id:
-                mission_exists = True
-                mission_title = m.get('title', 'Mission')
-                break
-        if mission_exists:
-            break
+    # 1. Vérifier si la mission existe (via DB)
+    mission_db = db.query(models.Mission).filter(models.Mission.id == mission_id).first()
 
-    if not mission_exists:
-        raise HTTPException(status_code=404, detail="Mission non trouvée")
+    # Fallback sur MISSIONS_DB si pas trouvé en base (cas hybride)
+    if not mission_db:
+         # Try finding in static DB
+         found = False
+         for cat, missions in MISSIONS_DB.items():
+            for m in missions:
+                if int(m.get('id')) == mission_id:
+                    mission_title = m.get('title', 'Mission')
+                    found = True
+                    break
+            if found: break
+         if not found:
+            raise HTTPException(status_code=404, detail="Mission non trouvée")
+    else:
+        mission_title = mission_db.title
 
     if payload.user_id:
         # Utiliser CRUD pour persister le statut
+        # Note: update_user_mission_status handles created_at/completed_at logic
         crud.update_user_mission_status(db, payload.user_id, mission_id, payload.status)
-
-        if payload.user_id not in user_missions_db:
-             user_missions_db[payload.user_id] = {}
-        user_missions_db[payload.user_id][mission_id] = payload.status
-
-        # Persist to DB for leagues
-        crud.update_mission_status(db, payload.user_id, mission_id, payload.status)
 
         # Enregistrement dans le feed des amis si terminé
         if payload.status == 'termine':
@@ -754,17 +720,11 @@ async def update_mission(mission_id: int, payload: MissionUpdate, db: Session = 
             
         return {"id": mission_id, "status": payload.status}
     else:
-        # Fallback legacy : update global DB (déconseillé si multi-user)
-        for cat, missions in MISSIONS_DB.items():
-            for m in missions:
-                if int(m.get('id')) == mission_id:
-                    m['status'] = payload.status
-                    return m
+        raise HTTPException(status_code=400, detail="User ID is required for mission update")
 
-    raise HTTPException(status_code=404, detail="Mission non trouvée")
 
 @app.post("/answers/{category}/{user_id}")
-async def save_answer(category: str, user_id: int, answer: UserAnswer):
+async def save_answer(category: str, user_id: int, answer: schemas.UserAnswerBase, db: Session = Depends(get_db)):
     """
     Sauvegarde une réponse pour une catégorie et un utilisateur donnés.
     Calcule la progression de CETTE catégorie.
@@ -773,46 +733,41 @@ async def save_answer(category: str, user_id: int, answer: UserAnswer):
     if category not in QUESTIONS_DB:
         raise HTTPException(status_code=404, detail="Catégorie inconnue")
 
-    # 2. Initialiser la structure si elle n'existe pas
-    if user_id not in user_answers_db:
-        user_answers_db[user_id] = {}
+    # 2. Sauvegarder en DB
+    crud.save_user_answer(db, user_id, schemas.UserAnswerBase(
+        question_id=answer.question_id,
+        answer_value=answer.answer_value
+    ))
 
-    if category not in user_answers_db[user_id]:
-        user_answers_db[user_id][category] = {}
+    # 3. Calcul de progression pour CETTE catégorie
+    answers_list = crud.get_user_answers_by_category(db, user_id, category)
 
-    # 3. Sauvegarder la réponse
-    user_answers_db[user_id][category][answer.question_id] = answer.answer_value
-
-    # 4. Calcul de progression pour CETTE catégorie
     total_questions = len(QUESTIONS_DB[category])
-    answered_count = len(user_answers_db[user_id][category])
+    answered_count = len(answers_list)
 
     progress = 0
     if total_questions > 0:
         progress = round((answered_count / total_questions) * 100)
+
+    current_answers_dict = {a.question_id: a.answer_value for a in answers_list}
 
     return {
         "status": "saved",
         "category": category,
         "progress": progress,
-        "current_answers": user_answers_db[user_id][category]
+        "current_answers": current_answers_dict
     }
 
 @app.get("/answers/{category}/{user_id}")
-async def get_user_category_progress(category: str, user_id: int):
+async def get_user_category_progress(category: str, user_id: int, db: Session = Depends(get_db)):
     """
     Récupère les réponses d'un utilisateur pour une catégorie spécifique.
     """
-    if user_id not in user_answers_db or category not in user_answers_db[user_id]:
-        return {
-            "progress": 0,
-            "answers": {}
-        }
+    answers_list = crud.get_user_answers_by_category(db, user_id, category)
 
-    # Recalcul de la progression à la volée
+    current_answers_dict = {a.question_id: a.answer_value for a in answers_list}
+    answered_count = len(answers_list)
     total_questions = len(QUESTIONS_DB.get(category, []))
-    answers = user_answers_db[user_id][category]
-    answered_count = len(answers)
 
     progress = 0
     if total_questions > 0:
@@ -820,28 +775,18 @@ async def get_user_category_progress(category: str, user_id: int):
 
     return {
         "progress": progress,
-        "answers": answers
+        "answers": current_answers_dict
     }
 
 @app.delete("/answers/{category}/{user_id}")
-async def reset_category_progress(category: str, user_id: int):
+async def reset_category_progress(category: str, user_id: int, db: Session = Depends(get_db)):
     """
     Supprime les réponses d'un utilisateur pour une catégorie spécifique.
     """
-    # On vérifie si l'utilisateur et la catégorie existent dans la "DB"
-    if user_id in user_answers_db and category in user_answers_db[user_id]:
-        # On supprime uniquement la clé de cette catégorie
-        del user_answers_db[user_id][category]
+    crud.reset_user_answers_by_category(db, user_id, category)
 
-        return {
-            "status": "reset",
-            "category": category,
-            "progress": 0
-        }
-
-    # Si rien n'a été trouvé à supprimer, on renvoie quand même un succès
     return {
-        "status": "no_data_found",
+        "status": "reset",
         "category": category,
         "progress": 0
     }
@@ -849,51 +794,46 @@ async def reset_category_progress(category: str, user_id: int):
 # --- NOUVELLE ROUTE : CALCUL DE L'IDENTITÉ CARBONE ---
 
 @app.get("/carbon-score/{user_id}")
-async def get_carbon_score(user_id: int):
+async def get_carbon_score(user_id: int, db: Session = Depends(get_db)):
     """
     Calcule le score carbone total de l'utilisateur.
-    Logique :
-    1. Parcourt toutes les questions de toutes les catégories.
-    2. Si l'utilisateur a répondu, on prend le score de sa réponse.
-    3. Si l'utilisateur n'a PAS répondu, on prend le score de l'option "is_default=True".
     """
 
     global_score = 0
     category_scores = {}
-    user_data = user_answers_db.get(user_id, {})
 
-    # On parcourt chaque catégorie disponible dans la DB
+    # Récupérer TOUTES les réponses de l'utilisateur
+    # Pour faire simple, on itère par catégorie
+
     for category, questions in QUESTIONS_DB.items():
         cat_score = 0
-        user_cat_answers = user_data.get(category, {})
+
+        # Récupérer réponses en DB
+        answers_list = crud.get_user_answers_by_category(db, user_id, category)
+        user_cat_answers = {a.question_id: a.answer_value for a in answers_list}
 
         for question in questions:
-            # Réponse de l'utilisateur pour cette question (ex: 'car') ou None
             user_val = user_cat_answers.get(question['id'])
-
             score_added = False
 
             # On cherche l'option correspondante
             for option in question['options']:
-                # Cas 1 : L'utilisateur a choisi cette option
                 if user_val == option['value']:
                     cat_score += option['score']
                     score_added = True
                     break
 
-            # Cas 2 : L'utilisateur n'a pas répondu, on cherche la valeur par défaut
+            # Cas 2 : L'utilisateur n'a pas répondu, valeur par défaut
             if not score_added:
                 for option in question['options']:
                     if option.get('is_default'):
                         cat_score += option['score']
                         break
 
-        # On enregistre le score de la catégorie
         category_scores[category] = cat_score
         global_score += cat_score
 
-    # Calcul de la moyenne française (juste pour info, en additionnant tous les defaults)
-    # Dans un vrai cas, on pourrait stocker cette valeur en constante
+    # Calcul de la moyenne française
     average_score = 0
     for cat, questions in QUESTIONS_DB.items():
         for q in questions:
@@ -904,16 +844,15 @@ async def get_carbon_score(user_id: int):
     return {
         "user_id": user_id,
         "global_score": global_score,
-        "average_national_score": average_score, # Score de comparaison
+        "average_national_score": average_score,
         "details_by_category": category_scores,
-        "unit": "points_impact" # ou kgCO2e
+        "unit": "points_impact"
     }
 
 @app.get("/global-stats")
 async def get_global_stats(db: Session = Depends(get_db)):
     """
     Calcule la moyenne des scores de tous les utilisateurs enregistrés.
-    Prend en compte tous les utilisateurs en base de données.
     """
     # 1. Calcul du score national de référence (somme des defaults)
     sum_of_defaults = 0
@@ -947,18 +886,19 @@ async def get_global_stats(db: Session = Depends(get_db)):
     category_sums = {cat: 0 for cat in QUESTIONS_DB}
 
     for user in all_users:
-        user_id = user.id # user_answers_db utilise numeric user_id comme clé
-        user_data = user_answers_db.get(user_id, {})
-
+        # Pour chaque utilisateur, calculer son score
         for category, questions in QUESTIONS_DB.items():
             cat_score = 0
-            user_cat_answers = user_data.get(category, {})
+
+            # Optimisation: charger toutes les réponses utilisateur d'un coup serait mieux,
+            # mais on va garder simple via crud par catégorie
+            answers_list = crud.get_user_answers_by_category(db, user.id, category)
+            user_cat_answers = {a.question_id: a.answer_value for a in answers_list}
 
             for question in questions:
                 user_val = user_cat_answers.get(question['id'])
                 score_added = False
 
-                # Chercher si l'utilisateur a répondu
                 if user_val:
                     for option in question['options']:
                         if user_val == option['value']:
@@ -966,7 +906,6 @@ async def get_global_stats(db: Session = Depends(get_db)):
                             score_added = True
                             break
 
-                # Sinon valeur par défaut
                 if not score_added:
                     for option in question['options']:
                         if option.get('is_default'):

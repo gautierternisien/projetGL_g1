@@ -108,24 +108,9 @@ def get_missions_by_category(db: Session, category_name: str, user_id: int):
 
     return result
 
-def update_mission_status(db: Session, user_id: int, mission_id: int, status: str):
-    db_status = db.query(models.UserMissionStatus).filter(
-        models.UserMissionStatus.user_id == user_id,
-        models.UserMissionStatus.mission_id == mission_id
-    ).first()
 
-    if db_status:
-        db_status.status = status
-    else:
-        db_status = models.UserMissionStatus(user_id=user_id, mission_id=mission_id, status=status)
-        db.add(db_status)
+# update_mission_status merged into update_user_mission_status
 
-    if status == 'termine':
-        db_status.completed_at = datetime.now().isoformat()
-
-    db.commit()
-    db.refresh(db_status)
-    return db_status
 
 def save_user_answer(db: Session, user_id: int, answer: schemas.UserAnswerBase):
     db_answer = db.query(models.UserAnswer).filter(
@@ -293,17 +278,19 @@ def get_user_mission_statuses_dict(db: Session, user_id: int):
 
 def update_user_mission_status(db: Session, user_id: int, mission_id: int, status: str):
     db_status = get_user_mission_status(db, user_id, mission_id)
+
     if db_status:
         db_status.status = status
-        db.commit()
-        db.refresh(db_status)
-        return db_status
     else:
         db_status = models.UserMissionStatus(user_id=user_id, mission_id=mission_id, status=status)
         db.add(db_status)
-        db.commit()
-        db.refresh(db_status)
-        return db_status
+
+    if status == 'termine':
+        db_status.completed_at = datetime.now().isoformat()
+
+    db.commit()
+    db.refresh(db_status)
+    return db_status
 
 def get_all_user_mission_statuses(db: Session, user_id: int):
     results = db.query(models.UserMissionStatus).filter(models.UserMissionStatus.user_id == user_id).all()
@@ -493,3 +480,51 @@ def respond_league_invite(db: Session, invite_id: int, accept: bool):
     db.commit()
     return invite
 
+def get_category_by_name(db: Session, name: str):
+    return db.query(models.Category).filter(models.Category.name == name).first()
+
+def create_category(db: Session, name: str):
+    cat = models.Category(name=name)
+    db.add(cat)
+    db.commit()
+    db.refresh(cat)
+    return cat
+
+def create_question(db: Session, question_data: dict, category_name: str):
+    # Check if exists by ID
+    q = db.query(models.Question).filter(models.Question.id == question_data['id']).first()
+    if not q:
+        q = models.Question(
+            id=question_data['id'],
+            text=question_data['text'],
+            category_name=category_name
+        )
+        db.add(q)
+        db.commit()
+        db.refresh(q)
+
+        # Create options
+        for opt in question_data.get('options', []):
+            o = models.Option(
+                question_id=q.id,
+                label=opt['label'],
+                value=opt['value'],
+                score=opt.get('score', 0),
+                is_default=opt.get('is_default', False)
+            )
+            db.add(o)
+        db.commit()
+    return q
+
+def create_mission(db: Session, mission_data: dict, category_name: str):
+    m = db.query(models.Mission).filter(models.Mission.id == mission_data['id']).first()
+    if not m:
+        m = models.Mission(
+            id=mission_data['id'],
+            title=mission_data['title'],
+            description=mission_data.get('description', ""),
+            category_name=category_name
+        )
+        db.add(m)
+        db.commit()
+    return m
