@@ -25,7 +25,7 @@ export const conseilHebdo = [
   '🍓 Attendez encore un peu pour les fraises ! Elles arrivent vraiment en mai/juin.',
 
   // --- MAI (Jardinage, Biodiversité) ---
-  '🐝 Plantez des fleurs mellifères sur votre balcon pour aider les abeilles.',
+  '🐝 Vous avez des amis un peu partout ',
   '🗑️ Installez un composteur (ou trouvez un bac collectif) pour vos épluchures.',
   '🥩 Essayez de remplacer la viande rouge par des légumineuses une fois par semaine.',
   "📱 Gardez votre smartphone un an de plus, c'est le geste le plus fort pour le numérique.",

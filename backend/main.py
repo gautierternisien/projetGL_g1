@@ -189,7 +189,7 @@ QUESTIONS_DB = {
             ],
         }
     ],
-    "consommation": [
+    "divers": [
         {
             "id": 301,
             "text": 'Achat vêtements neufs ?',
@@ -209,110 +209,6 @@ QUESTIONS_DB = {
             ],
         },
     ],
-    "recyclage": [
-        {
-            "id": 401,
-            "text": 'Tri des déchets ?',
-            "options": [
-                { "label": 'Toujours', "value": 'always', "score": -50, "is_default": True },
-                { "label": 'Parfois', "value": 'sometimes', "score": 0 },
-                { "label": 'Jamais', "value": 'never', "score": 50 },
-            ],
-        },
-        {
-            "id": 402,
-            "text": 'Compost ?',
-            "options": [
-                { "label": 'Oui', "value": 'yes', "score": -50 },
-                { "label": 'Non', "value": 'no', "score": 0, "is_default": True },
-            ],
-        },
-    ],
-    "numerique": [
-        {
-            "id": 501,
-            "text": 'Streaming vidéo par jour ?',
-            "options": [
-                { "label": '+2h', "value": 'high', "score": 300 },
-                { "label": '-1h', "value": 'low', "score": 100, "is_default": True },
-                { "label": 'Aucun', "value": 'none', "score": 0 },
-            ],
-        },
-        {
-            "id": 502,
-            "text": 'Changement smartphone ?',
-            "options": [
-                { "label": '1 an', "value": '1year', "score": 500 },
-                { "label": '2-3 ans', "value": '3years', "score": 200, "is_default": True },
-                { "label": '+4 ans', "value": 'max', "score": 50 },
-            ],
-        },
-        {
-            "id": 503,
-            "text": 'Nettoyage mails ?',
-            "options": [
-                { "label": 'Oui', "value": 'yes', "score": -10 },
-                { "label": 'Non', "value": 'no', "score": 10, "is_default": True },
-            ],
-        },
-        {
-            "id": 504,
-            "text": 'Appareils éteints la nuit ?',
-            "options": [
-                { "label": 'Oui', "value": 'off', "score": -20 },
-                { "label": 'Non (veille)', "value": 'standby', "score": 20, "is_default": True },
-            ],
-        },
-    ],
-    "loisirs": [
-        {
-            "id": 601,
-            "text": 'Type de vacances ?',
-            "options": [
-                { "label": 'Lointain', "value": 'far', "score": 2000 },
-                { "label": 'Local', "value": 'local', "score": 500, "is_default": True },
-                { "label": 'Chez soi', "value": 'home', "score": 100 },
-            ],
-        },
-        {
-            "id": 602,
-            "text": 'Matériel neuf ?',
-            "options": [
-                { "label": 'Souvent', "value": 'new', "score": 300 },
-                { "label": 'Occasion/Loc', "value": 'used', "score": 100, "is_default": True },
-                { "label": 'Garde longtemps', "value": 'keep', "score": 50 },
-            ],
-        },
-        {
-            "id": 603,
-            "text": 'Loisirs motorisés ?',
-            "options": [
-                { "label": 'Oui', "value": 'motor', "score": 500 },
-                { "label": 'Parfois', "value": 'mixed', "score": 200 },
-                { "label": 'Non', "value": 'soft', "score": 0, "is_default": True },
-            ],
-        },
-    ],
-    "quotidien": [
-        {
-            "id": 701,
-            "text": 'Bains ou douches ?',
-            "options": [
-                { "label": 'Bains', "value": 'bath', "score": 300 },
-                { "label": 'Douches longues', "value": 'long_shower', "score": 150 },
-                { "label": 'Douches rapides', "value": 'quick_shower', "score": 50, "is_default": True },
-            ],
-        },
-        {
-            "id": 703,
-            "text": 'Lumière ?',
-            "options": [
-                { "label": 'Toujours éteinte', "value": 'always', "score": 0, "is_default": True },
-                { "label": 'Oubli parfois', "value": 'sometimes', "score": 20 },
-                { "label": 'Rarement', "value": 'rarely', "score": 50 },
-            ],
-        },
-    ],
 }
 
 # --- SIMULATION FAUSSE DES MISSIONS ---
@@ -329,23 +225,7 @@ MISSIONS_DB = {
         { "id": 4, "title": 'Recette végétarienne', "description": 'Essayez une recette végétarienne', "status": 'new' },
         { "id": 5, "title": 'Acheter local', "description": 'Acheter au moins un produit local et de saison', "status": 'termine' },
     ],
-    "numerique": [
-        { "id": 6, "title": 'Nettoyer boîte mail', "description": 'Supprimez les anciens emails volumineux', "status": 'new' },
-        { "id": 7, "title": 'Éteindre la nuit', "description": 'Éteindre ou débrancher les appareils non utilisés la nuit', "status": 'en_cours' },
-    ],
-    "loisirs": [
-        { "id": 8, "title": 'Activité locale', "description": 'Privilégier une sortie proche à faible empreinte', "status": 'new' },
-        { "id": 9, "title": 'Week‑end sans avion', "description": 'Planifier un week‑end sans prendre l’avion', "status": 'termine' },
-    ],
-    "quotidien": [
-        { "id": 10, "title": 'Éteindre veille', "description": 'Éteindre les appareils en veille chaque soir', "status": 'en_cours' },
-        { "id": 11, "title": 'Utiliser une gourde', "description": 'Remplacer les bouteilles plastiques par une gourde', "status": 'new' },
-    ],
-    "recyclage": [
-        { "id": 12, "title": 'Compostage', "description": 'Mettre en place un compost ou collecter les déchets organiques', "status": 'new' },
-        { "id": 13, "title": 'Réemploi', "description": 'Donner ou réparer un objet au lieu de le jeter', "status": 'termine' },
-    ],
-    "consommation": [
+    "divers": [
         { "id": 14, "title": 'Acheter d’occasion', "description": 'Acheter un article d’occasion cette semaine', "status": 'en_cours' },
         { "id": 15, "title": 'Attendre avant achat', "description": 'Attendre 48h avant un achat non essentiel', "status": 'new' },
     ],

@@ -9,11 +9,7 @@ export const useProgressStore = defineStore('progress', () => {
   const progressValueTransport = ref(0)
   const progressValueLogement = ref(0)
   const progressValueAlimentation = ref(0)
-  const progressValueConsommation = ref(0)
-  const progressValueRecyclage = ref(0)
-  const progressValueNumerique = ref(0)
-  const progressValueLoisirs = ref(0)
-  const progressValueQuotidien = ref(0)
+  const progressValueDivers = ref(0)
 
   // --- 2. ACTIONS (Pour modifier les données) ---
   // Ces fonctions seront appelées par ta page Questionnaire
@@ -21,25 +17,12 @@ export const useProgressStore = defineStore('progress', () => {
     if (category === 'transport') progressValueTransport.value = value
     if (category === 'logement') progressValueLogement.value = value
     if (category === 'alimentation') progressValueAlimentation.value = value
-    if (category === 'consommation') progressValueConsommation.value = value
-    if (category === 'recyclage') progressValueRecyclage.value = value
-    if (category === 'numerique') progressValueNumerique.value = value
-    if (category === 'loisirs') progressValueLoisirs.value = value
-    if (category === 'quotidien') progressValueQuotidien.value = value
+    if (category === 'divers') progressValueDivers.value = value
   }
 
   // NOUVELLE ACTION : Charge tout depuis le backend
   async function fetchAllProgress(userId: number) {
-    const categories = [
-      'transport',
-      'logement',
-      'alimentation',
-      'consommation',
-      'recyclage',
-      'numerique',
-      'loisirs',
-      'quotidien',
-    ]
+    const categories = ['transport', 'logement', 'alimentation', 'divers']
 
     await Promise.all(
       categories.map(async (category) => {
@@ -66,23 +49,15 @@ export const useProgressStore = defineStore('progress', () => {
       progressValueTransport.value +
       progressValueLogement.value +
       progressValueAlimentation.value +
-      progressValueConsommation.value +
-      progressValueRecyclage.value +
-      progressValueNumerique.value +
-      progressValueLoisirs.value +
-      progressValueQuotidien.value
-    return Math.round(total / 8)
+      progressValueDivers.value
+    return Math.round(total / 4)
   })
 
   function getCategoryScore(category: string): number {
     if (category === 'transport') return progressValueTransport.value
     if (category === 'alimentation') return progressValueAlimentation.value
     if (category === 'logement') return progressValueLogement.value
-    if (category === 'consommation') return progressValueConsommation.value
-    if (category === 'recyclage') return progressValueRecyclage.value
-    if (category === 'numerique') return progressValueNumerique.value
-    if (category === 'loisirs') return progressValueLoisirs.value
-    if (category === 'quotidien') return progressValueQuotidien.value
+    if (category === 'divers') return progressValueDivers.value
 
     return 0 // Valeur par défaut si catégorie inconnue
   }

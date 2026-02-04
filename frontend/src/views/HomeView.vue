@@ -28,14 +28,10 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 // Couleurs fixes par catégorie
 const CATEGORY_COLORS: Record<string, string> = {
-  transport: '#5D4037', // Brown
+  transport: '#f3ab70', // Brown
   alimentation: '#D84315', // Deep Orange
-  logement: '#9f8a50', // Yellow
-  consommation: '#8E24AA', // Purple
-  recyclage: '#388E3C', // Green
-  numerique: '#1976D2', // Blue
-  loisirs: '#0097A7', // Cyan
-  quotidien: '#455A64', // Blue Grey
+  logement: '#3951a6', // Yellow
+  divers: '#24aa26', // Purple
 }
 
 const getCategoryColor = (key: string) => {

@@ -93,67 +93,12 @@ function handleCardClick(e: Event) {
           </Card>
         </RouterLink>
 
-        <RouterLink to="/questionnaires/consommation" @click="handleCardClick">
-          <Card title="Consommation" :has-arrow="isConnected">
+        <RouterLink to="/questionnaires/divers" @click="handleCardClick">
+          <Card title="Divers" :has-arrow="isConnected">
             <div class="image-center">
               <span class="emoji-img">📦️</span>
             </div>
-            <ProgressBar
-              v-if="isConnected"
-              :value="store.getCategoryScore('consommation')"
-            ></ProgressBar>
-            <div v-else class="lock-placeholder">🔒</div>
-          </Card>
-        </RouterLink>
-
-        <RouterLink to="/questionnaires/recyclage" @click="handleCardClick">
-          <Card title="Déchets & Recyclage" :has-arrow="isConnected">
-            <div class="image-center">
-              <span class="emoji-img">♻️️</span>
-            </div>
-            <ProgressBar
-              v-if="isConnected"
-              :value="store.getCategoryScore('recyclage')"
-            ></ProgressBar>
-            <div v-else class="lock-placeholder">🔒</div>
-          </Card>
-        </RouterLink>
-
-        <RouterLink to="/questionnaires/numerique" @click="handleCardClick">
-          <Card title="Numérique" :has-arrow="isConnected">
-            <div class="image-center">
-              <span class="emoji-img">💻️</span>
-            </div>
-            <ProgressBar
-              v-if="isConnected"
-              :value="store.getCategoryScore('numerique')"
-            ></ProgressBar>
-            <div v-else class="lock-placeholder">🔒</div>
-          </Card>
-        </RouterLink>
-
-        <RouterLink to="/questionnaires/loisirs" @click="handleCardClick">
-          <Card title="Loisirs" :has-arrow="isConnected">
-            <div class="image-center">
-              <span class="emoji-img">🃏️</span>
-            </div>
-            <ProgressBar
-              v-if="isConnected"
-              :value="store.getCategoryScore('loisirs')"
-            ></ProgressBar>
-            <div v-else class="lock-placeholder">🔒</div>
-          </Card>
-        </RouterLink>
-
-        <RouterLink to="/questionnaires/quotidien" @click="handleCardClick">
-          <Card title="Habitudes Quotidiennes" :has-arrow="isConnected">
-            <div class="image-center">
-              <span class="emoji-img">🗓️️</span>
-            </div>
-            <ProgressBar
-              v-if="isConnected"
-              :value="store.getCategoryScore('quotidien')"
-            ></ProgressBar>
+            <ProgressBar v-if="isConnected" :value="store.getCategoryScore('divers')"></ProgressBar>
             <div v-else class="lock-placeholder">🔒</div>
           </Card>
         </RouterLink>

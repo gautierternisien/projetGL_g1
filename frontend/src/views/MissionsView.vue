@@ -21,11 +21,7 @@ const CATEGORY_DATA = [
   { key: 'transport', title: 'Transport & Mobilité', emoji: '🚗' },
   { key: 'logement', title: 'Logement & Énergie', emoji: '🏠' },
   { key: 'alimentation', title: 'Alimentation', emoji: '🍽️' },
-  { key: 'consommation', title: 'Consommation', emoji: '📦️' },
-  { key: 'recyclage', title: 'Déchets & Recyclage', emoji: '♻️️' },
-  { key: 'numerique', title: 'Numérique', emoji: '💻️' },
-  { key: 'loisirs', title: 'Loisirs', emoji: '🃏️' },
-  { key: 'quotidien', title: 'Habitudes Quotidiennes', emoji: '🗓️️' },
+  { key: 'divers', title: 'Divers', emoji: '📦️' },
 ]
 
 const categoriesKeys = ref(CATEGORY_DATA.map((c) => c.key))
@@ -35,7 +31,7 @@ async function loadCategoryCounts() {
 
   // Si l'utilisateur n'est pas encore chargé (ex: F5, token présent main user null), on ne charge pas encore
   // On attendra que le watcher le déclenche
-  if (!user.value) return;
+  if (!user.value) return
 
   try {
     const userIdParam = user.value ? `?user_id=${user.value.id}` : ''
@@ -71,9 +67,9 @@ async function loadCategoryCounts() {
 }
 
 onMounted(() => {
-    if (user.value) {
-        loadCategoryCounts()
-    }
+  if (user.value) {
+    loadCategoryCounts()
+  }
 })
 
 // Watch user changes (e.g. after login or refreshing page when user is fetched)
