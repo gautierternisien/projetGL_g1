@@ -30,7 +30,7 @@
 </template>
 
 <script setup lang="ts">
-import { RouterView, RouterLink } from 'vue-router'
+import { RouterView, RouterLink, useRoute } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
 import { useFriendsStore } from '@/stores/friends'
 import { useLeaguesStore } from '@/stores/leagues'
@@ -41,6 +41,7 @@ const uiStore = useUiStore()
 const friendsStore = useFriendsStore()
 const leaguesStore = useLeaguesStore()
 const authStore = useAuthStore()
+const route = useRoute()
 
 const hasIncomingRequests = computed(() => {
   return friendsStore.incomingRequests.length > 0 || leaguesStore.invitations.length > 0
@@ -72,6 +73,11 @@ watch(() => authStore.isConnected, (connected) => {
   if (connected) {
     checkRequests()
   }
+})
+
+// Check for notifications on every route change
+watch(() => route.path, () => {
+  checkRequests()
 })
 </script>
 
@@ -146,7 +152,7 @@ watch(() => authStore.isConnected, (connected) => {
 
 .notification-badge {
   position: absolute;
-  top: 3px; /* Ajusté pour être "en haut à droite" de l'icone visuellement dans le cercle */
+  top: 3px; /* Ajusté pour être "en haut à droite" de l'icône visuellement dans le cercle */
   right: 3px;
   width: 10px;
   height: 10px;
