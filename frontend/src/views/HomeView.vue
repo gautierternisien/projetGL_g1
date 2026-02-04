@@ -19,11 +19,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   transport: 'Transport',
   alimentation: 'Alimentation',
   logement: 'Logement',
-  consommation: 'Achats & Divers',
-  recyclage: 'Déchets',
-  numerique: 'Numérique',
-  loisirs: 'Loisirs',
-  quotidien: 'Quotidien',
+  divers: 'Divers',
 }
 
 // Couleurs fixes par catégorie
