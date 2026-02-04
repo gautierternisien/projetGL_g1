@@ -55,7 +55,7 @@ function handleCardClick(e: Event) {
 
       <div :class="{ 'blurred-content': !isConnected }">
         <RouterLink to="/questionnaires/transport" @click="handleCardClick">
-          <Card title="Transport & Mobilité" :has-arrow="isConnected">
+          <Card title="Transport" :has-arrow="isConnected">
             <div class="image-center">
               <span class="emoji-img">🚗</span>
             </div>
@@ -68,7 +68,7 @@ function handleCardClick(e: Event) {
         </RouterLink>
 
         <RouterLink to="/questionnaires/logement" @click="handleCardClick">
-          <Card title="Logement & Énergie" :has-arrow="isConnected">
+          <Card title="Logement" :has-arrow="isConnected">
             <div class="image-center">
               <span class="emoji-img">🏠</span>
             </div>

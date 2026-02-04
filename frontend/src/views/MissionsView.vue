@@ -18,8 +18,8 @@ const countsByCategory = ref<
 
 // tableau statique des catégories
 const CATEGORY_DATA = [
-  { key: 'transport', title: 'Transport & Mobilité', emoji: '🚗' },
-  { key: 'logement', title: 'Logement & Énergie', emoji: '🏠' },
+  { key: 'transport', title: 'Transport', emoji: '🚗' },
+  { key: 'logement', title: 'Logement', emoji: '🏠' },
   { key: 'alimentation', title: 'Alimentation', emoji: '🍽️' },
   { key: 'divers', title: 'Divers', emoji: '📦️' },
 ]

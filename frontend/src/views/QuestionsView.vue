@@ -139,14 +139,10 @@ onMounted(async () => {
 })
 
 const CATEGORY_DISPLAY_NAMES: Record<string, string> = {
-  transport: 'Transport & Mobilité',
+  transport: 'Transport',
   alimentation: 'Alimentation',
-  logement: 'Logement & Énergie',
-  numerique: 'Numérique',
-  loisirs: 'Loisirs & Voyages',
-  quotidien: 'Habitudes Quotidiennes',
-  recyclage: 'Déchets & Recyclage',
-  consommation: 'Consommation & Achats',
+  logement: 'Logement ',
+  divers: 'Divers',
 }
 
 // --- COMPUTED ---
@@ -305,9 +301,7 @@ const saveAndExit = () => {
         </div>
 
         <div class="message">
-          <p>
-            Toute non réponse vaudra la moyenne nationale.
-          </p>
+          <p>Toute non réponse vaudra la moyenne nationale.</p>
         </div>
       </div>
 
