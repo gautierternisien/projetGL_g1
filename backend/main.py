@@ -791,6 +791,28 @@ async def reset_category_progress(category: str, user_id: int, db: Session = Dep
         "progress": 0
     }
 
+@app.get("/users/{user_id}/profile", response_model=schemas.FriendProfile)
+def read_user_profile(user_id: int, db: Session = Depends(get_db), current_user: schemas.User = Depends(get_current_user)):
+    user = crud.get_user(db, user_id=user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    mission_count = crud.get_completed_missions_count(db, user_id=user_id)
+
+    # Placeholder values for now as requested
+    trophy_count = 0
+    level = 5  # Mock level
+    xp = 60    # Mock XP percentage
+
+    return schemas.FriendProfile(
+        id=user.id,
+        username=user.username,
+        mission_count=mission_count,
+        trophy_count=trophy_count,
+        level=level,
+        xp=xp
+    )
+
 # --- NOUVELLE ROUTE : CALCUL DE L'IDENTITÉ CARBONE ---
 
 @app.get("/carbon-score/{user_id}")

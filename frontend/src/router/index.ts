@@ -3,6 +3,7 @@ import HomeView from '../views/HomeView.vue'
 import SurveyView from '@/views/SurveyView.vue'
 import MissionsView from '@/views/MissionsView.vue'
 import CommunauteView from '@/views/CommunauteView.vue'
+import FriendProfileView from '@/views/FriendProfileView.vue'
 import ConseilsView from '@/views/ConseilsView.vue'
 import ProfileView from '@/views/ProfileView.vue'
 import LoginView from '@/views/LoginView.vue'
@@ -82,6 +83,12 @@ const router = createRouter({
           path: 'amis/ajouter',
           name: 'CommunityFriendsAdd',
           component: () => import('../views/AddFriendView.vue'),
+          meta: { requiresAuth: true },
+        },
+        {
+          path: 'amis/:id',
+          name: 'CommunityFriendProfile',
+          component: () => import('../views/FriendProfileView.vue'),
           meta: { requiresAuth: true },
         },
         {

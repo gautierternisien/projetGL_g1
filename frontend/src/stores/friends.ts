@@ -23,6 +23,15 @@ export interface FriendActivity {
   timestamp?: string
 }
 
+export interface FriendProfile {
+  id: number
+  username: string
+  mission_count: number
+  trophy_count: number
+  level: number
+  xp: number
+}
+
 export const useFriendsStore = defineStore('friends', () => {
   const friends = ref<UserSummary[]>([])
   const activities = ref<FriendActivity[]>([])
@@ -43,6 +52,15 @@ export const useFriendsStore = defineStore('friends', () => {
     })
     if (!res.ok) throw new Error('Erreur lors du chargement des amis')
     friends.value = await res.json()
+  }
+
+  async function fetchFriendProfile(userId: number): Promise<FriendProfile> {
+    if (!auth.token) throw new Error('Utilisateur non connecté')
+    const res = await fetch(`${API_URL}/users/${userId}/profile`, {
+      headers: authHeaders(),
+    })
+    if (!res.ok) throw new Error('Erreur lors du chargement du profil')
+    return await res.json()
   }
 
   async function fetchPendingRequests() {
@@ -139,6 +157,7 @@ export const useFriendsStore = defineStore('friends', () => {
     pendingRequests,
     incomingRequests,
     fetchFriends,
+    fetchFriendProfile,
     fetchActivities,
     fetchPendingRequests,
     fetchIncomingRequests,

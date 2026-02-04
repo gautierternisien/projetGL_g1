@@ -61,6 +61,11 @@ async function rejectRequest(requestId: number) {
 async function cancelRequest(requestId: number) {
   await store.cancelRequest(requestId)
 }
+
+function goToProfile(id: number) {
+  router.push({ name: 'CommunityFriendProfile', params: { id } })
+}
+
 const goBack = () => router.push('/communaute')
 </script>
 
@@ -94,7 +99,12 @@ const goBack = () => router.push('/communaute')
         </div>
 
         <div v-if="store.friends.length" class="friends-list">
-          <div v-for="f in store.friends" :key="f.id" class="friend-item">
+          <div
+            v-for="f in store.friends"
+            :key="f.id"
+            @click="goToProfile(f.id)"
+            class="friend-item"
+          >
             <div class="avatar">{{ f.username.charAt(0).toUpperCase() }}</div>
             <div class="name">{{ f.username }}</div>
             <button class="remove-btn" @click="openRemove(f.id, f.username)">✕</button>

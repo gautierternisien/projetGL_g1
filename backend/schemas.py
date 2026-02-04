@@ -32,6 +32,17 @@ class UserPublic(BaseModel):
     class Config:
         from_attributes = True
 
+class FriendProfile(BaseModel):
+    id: int
+    username: str
+    mission_count: int
+    trophy_count: int
+    level: int
+    xp: int
+
+    class Config:
+        from_attributes = True
+
 class FriendActivity(BaseModel):
     friend_id: int
     friend_username: str

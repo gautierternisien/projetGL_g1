@@ -108,6 +108,11 @@ def get_missions_by_category(db: Session, category_name: str, user_id: int):
 
     return result
 
+def get_completed_missions_count(db: Session, user_id: int):
+    return db.query(models.UserMissionStatus).filter(
+        models.UserMissionStatus.user_id == user_id,
+        models.UserMissionStatus.status == "termine"
+    ).count()
 
 # update_mission_status merged into update_user_mission_status
 
