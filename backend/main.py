@@ -690,7 +690,8 @@ def read_user_profile(user_id: int, db: Session = Depends(get_db), current_user:
         mission_count=mission_count,
         trophy_count=trophy_count,
         level=level,
-        xp=xp
+        xp=xp,
+        profile_image=user.profile_image
     )
 
 # --- NOUVELLE ROUTE : CALCUL DE L'IDENTITÉ CARBONE ---
