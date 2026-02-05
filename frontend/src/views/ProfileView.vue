@@ -139,6 +139,13 @@ function toggleEditMenu() {
 }
 
 function handleEditOption(option: string) {
+  // Cas spécial pour l'image de profil
+  if (option === 'image') {
+    showEditMenu.value = false
+    openProfileImageModal()
+    return
+  }
+
   const fieldMap: Record<string, { label: string; type: 'text' | 'email' | 'password'; old: string }> = {
     email: {
       label: 'adresse mail',
@@ -298,6 +305,7 @@ function submitEditModal() {
               <div @click="handleEditOption('username')" class="dropdown-item">👤 Pseudo</div>
               <div @click="handleEditOption('firstname')" class="dropdown-item">🖊️ Prénom</div>
               <div @click="handleEditOption('lastname')" class="dropdown-item">🖊️ Nom</div>
+              <div @click="handleEditOption('image')" class="dropdown-item">🖼️ Image de profil</div>
               <div @click="handleEditOption('password')" class="dropdown-item">🔒 Mot de passe</div>
             </div>
           </div>
