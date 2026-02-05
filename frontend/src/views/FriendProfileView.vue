@@ -74,7 +74,10 @@ const progressProps = computed(() => ({
       <div v-if="loading" class="loading">Chargement...</div>
       <div v-else-if="error" class="error">{{ error }}</div>
       <div v-else-if="profile" class="profile-container">
-        <div class="avatar-large">{{ profile.username.charAt(0).toUpperCase() }}</div>
+        <div v-if="profile.profile_image" class="avatar-large avatar-image">
+          <img :src="profile.profile_image" :alt="'Image de profil'" />
+        </div>
+        <div v-else class="avatar-large">{{ profile.username.charAt(0).toUpperCase() }}</div>
         <h2 class="username">{{ profile.username }}</h2>
 
         <div class="level-section">
@@ -142,6 +145,18 @@ const progressProps = computed(() => ({
   align-items: center;
   font-size: 3rem;
   font-weight: bold;
+  overflow: hidden;
+}
+
+.avatar-image {
+  background-color: transparent;
+  padding: 0;
+}
+
+.avatar-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .username {

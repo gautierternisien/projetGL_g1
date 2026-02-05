@@ -401,8 +401,8 @@ async def get_pending_requests(current_user: models.User = Depends(get_current_u
     return [
         {
             "id": r.id,
-            "sender": {"id": r.sender.id, "username": r.sender.username},
-            "receiver": {"id": r.receiver.id, "username": r.receiver.username},
+            "sender": {"id": r.sender.id, "username": r.sender.username, "profile_image": r.sender.profile_image},
+            "receiver": {"id": r.receiver.id, "username": r.receiver.username, "profile_image": r.receiver.profile_image},
             "status": r.status
         } for r in requests
     ]
@@ -414,8 +414,8 @@ async def get_incoming_requests(current_user: models.User = Depends(get_current_
     return [
         {
             "id": r.id,
-            "sender": {"id": r.sender.id, "username": r.sender.username},
-            "receiver": {"id": r.receiver.id, "username": r.receiver.username},
+            "sender": {"id": r.sender.id, "username": r.sender.username, "profile_image": r.sender.profile_image},
+            "receiver": {"id": r.receiver.id, "username": r.receiver.username, "profile_image": r.receiver.profile_image},
             "status": r.status
         } for r in requests
     ]
@@ -991,3 +991,16 @@ def leave_league(league_id: int, current_user: schemas.User = Depends(get_curren
         db.delete(member)
         db.commit()
     return {"status": "left"}
+
+# --- PROFILE IMAGE ---
+@app.put("/users/profile-image", response_model=schemas.User)
+def update_profile_image(profile_image: str, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Update the user's profile image"""
+    user = crud.get_user(db, current_user.id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user.profile_image = profile_image
+    db.commit()
+    db.refresh(user)
+    return user

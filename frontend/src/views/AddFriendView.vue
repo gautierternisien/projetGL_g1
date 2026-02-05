@@ -121,7 +121,10 @@ const goBack = () => router.push('/communaute/amis')
       <div v-else-if="error" class="empty">{{ error }}</div>
       <div v-else-if="results.length" class="results">
         <div v-for="u in results" :key="u.id" class="result-item">
-          <div class="avatar">{{ u.username.charAt(0).toUpperCase() }}</div>
+          <div class="avatar">
+            <img v-if="u.profile_image" :src="u.profile_image" :alt="u.username" class="avatar-image" />
+            <span v-else>{{ u.username.charAt(0).toUpperCase() }}</span>
+          </div>
           <div class="name">{{ u.username }}</div>
           <button class="add-btn" @click="openAdd(u.id)">+</button>
         </div>
@@ -132,6 +135,10 @@ const goBack = () => router.push('/communaute/amis')
   </div>
   <div v-if="confirmState.open && confirmState.user" class="blur-overlay">
     <div class="confirm-box" v-if="isIncoming(confirmState.user.id)">
+      <div class="modal-avatar">
+        <img v-if="confirmState.user.profile_image" :src="confirmState.user.profile_image" :alt="confirmState.user.username" class="modal-avatar-image" />
+        <span v-else>{{ confirmState.user.username.charAt(0).toUpperCase() }}</span>
+      </div>
       <h3>{{ confirmState.user.username }} vous demande en ami</h3>
       <p>Cette personne vous a déjà envoyé une demande.</p>
       <div class="confirm-actions">
@@ -140,6 +147,10 @@ const goBack = () => router.push('/communaute/amis')
       </div>
     </div>
     <div class="confirm-box" v-else>
+      <div class="modal-avatar">
+        <img v-if="confirmState.user.profile_image" :src="confirmState.user.profile_image" :alt="confirmState.user.username" class="modal-avatar-image" />
+        <span v-else>{{ confirmState.user.username.charAt(0).toUpperCase() }}</span>
+      </div>
       <h3>Ajouter {{ confirmState.user.username }} ?</h3>
       <p>Une demande d'ami sera envoyée à cette personne.</p>
       <div class="confirm-actions">
@@ -199,6 +210,14 @@ const goBack = () => router.push('/communaute/amis')
   justify-content: center;
   font-weight: 600;
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: transparent;
 }
 
 .name {
@@ -311,5 +330,27 @@ const goBack = () => router.push('/communaute/amis')
   cursor: pointer;
   font-weight: 600;
   flex: 1;
+}
+
+.modal-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #e3eddd;
+  color: #2f3b2f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 1.5rem;
+  margin: 0 auto 1rem;
+  overflow: hidden;
+}
+
+.modal-avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: transparent;
 }
 </style>

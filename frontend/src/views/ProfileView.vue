@@ -20,12 +20,30 @@ const newFieldValue = ref('')
 const newFieldType = ref<'text' | 'email' | 'password'>('text')
 const currentPassword = ref('')
 const modalErrorMessage = ref('')
+const showProfileImageModal = ref(false)
+const allProfileImages = ref<string[]>([])
+const currentImageIndex = ref(0)
+const selectedProfileImage = ref<string | undefined>(undefined)
 
-onMounted(() => {
+onMounted(async () => {
   if (!authStore.isConnected) {
     router.push('/login')
   } else {
     authStore.fetchUser()
+    // Initialiser l'image de profil depuis les données utilisateur
+    if (authStore.user?.profile_image) {
+      selectedProfileImage.value = authStore.user.profile_image
+    }
+  }
+  // Charger toutes les images du dossier image_profil
+  try {
+    const imageNames = ['plante1.png', 'plante2.png', 'plante3.png', 'plante4.png', 'plante5.png', 'plante6.png']
+    allProfileImages.value = imageNames.map(name => 
+      new URL(`../components/image_profil/${name}`, import.meta.url).href
+    )
+    currentImageIndex.value = 0
+  } catch (e) {
+    console.error('Erreur lors du chargement des images:', e)
   }
   // Ajouter un écouteur pour fermer le menu au clic extérieur
   document.addEventListener('click', handleClickOutside)
@@ -57,6 +75,63 @@ function confirmLogout() {
 function cancelLogout() {
   showLogoutConfirm.value = false
   uiStore.setNavigationBlur(false)
+}
+
+function openProfileImageModal() {
+  showProfileImageModal.value = true
+  uiStore.setNavigationBlur(true)
+}
+
+function closeProfileImageModal() {
+  showProfileImageModal.value = false
+  uiStore.setNavigationBlur(false)
+}
+
+function saveProfileImage() {
+  if (allProfileImages.value.length > 0 && currentImageIndex.value < allProfileImages.value.length) {
+    const imageUrl = allProfileImages.value[currentImageIndex.value]
+    if (imageUrl) {
+      selectedProfileImage.value = imageUrl
+      // Sauvegarder l'image dans la base de données
+      authStore.updateProfileImage(imageUrl)
+        .then(() => {
+          closeProfileImageModal()
+        })
+        .catch((e: unknown) => {
+          console.error('Erreur lors de la sauvegarde de l\'image:', e)
+        })
+    }
+  }
+}
+
+function removeProfileImage() {
+  // Si pas d'image, fermer le modal comme si on avait annulé
+  if (!selectedProfileImage.value) {
+    closeProfileImageModal()
+    return
+  }
+  
+  // Sinon, supprimer l'image
+  selectedProfileImage.value = undefined
+  authStore.removeProfileImage()
+    .then(() => {
+      closeProfileImageModal()
+    })
+    .catch((e: unknown) => {
+      console.error('Erreur lors de la suppression de l\'image:', e)
+    })
+}
+
+function nextImage() {
+  if (allProfileImages.value.length > 0) {
+    currentImageIndex.value = (currentImageIndex.value + 1) % allProfileImages.value.length
+  }
+}
+
+function previousImage() {
+  if (allProfileImages.value.length > 0) {
+    currentImageIndex.value = (currentImageIndex.value - 1 + allProfileImages.value.length) % allProfileImages.value.length
+  }
 }
 
 function toggleEditMenu() {
@@ -201,23 +276,35 @@ function submitEditModal() {
         v-if="authStore.user"
         :class="{ 'blurred-content': showLogoutConfirm || showEditModal }"
       >
-        <div class="profile-header">
+        <!-- Message de bienvenue centré -->
+        <div class="welcome-message">
           <h2>Bonjour, {{ authStore.user.username }} !</h2>
-          <div class="header-buttons">
-            <div class="edit-menu-container" ref="editMenuRef">
-              <button @click="toggleEditMenu" class="edit-profile-btn">✏️ Modifier profil</button>
-              <div v-if="showEditMenu" class="edit-dropdown">
-                <div @click="handleEditOption('email')" class="dropdown-item">📧 Adresse mail</div>
-                <div @click="handleEditOption('username')" class="dropdown-item">👤 Pseudo</div>
-                <div @click="handleEditOption('firstname')" class="dropdown-item">🖊️ Prénom</div>
-                <div @click="handleEditOption('lastname')" class="dropdown-item">🖊️ Nom</div>
-                <div @click="handleEditOption('password')" class="dropdown-item">🔒 Mot de passe</div>
-              </div>
-            </div>
-            <button @click="handleLogoutClick" class="logout-btn-small">Se déconnecter</button>
-          </div>
         </div>
 
+        <!-- Icône de profil -->
+        <div class="profile-icon-container">
+          <div v-if="selectedProfileImage" class="profile-icon" @click="openProfileImageModal" style="cursor: pointer;">
+            <img :src="selectedProfileImage" :alt="'Image de profil'" class="profile-icon-image" />
+          </div>
+          <div v-else class="profile-icon" @click="openProfileImageModal" style="cursor: pointer;">{{ authStore.user.username.charAt(0).toUpperCase() }}</div>
+        </div>
+
+        <!-- Boutons sous l'icône -->
+        <div class="action-buttons">
+          <div class="edit-menu-container" ref="editMenuRef">
+            <button @click="toggleEditMenu" class="edit-profile-btn">✏️ Modifier profil</button>
+            <div v-if="showEditMenu" class="edit-dropdown">
+              <div @click="handleEditOption('email')" class="dropdown-item">📧 Adresse mail</div>
+              <div @click="handleEditOption('username')" class="dropdown-item">👤 Pseudo</div>
+              <div @click="handleEditOption('firstname')" class="dropdown-item">🖊️ Prénom</div>
+              <div @click="handleEditOption('lastname')" class="dropdown-item">🖊️ Nom</div>
+              <div @click="handleEditOption('password')" class="dropdown-item">🔒 Mot de passe</div>
+            </div>
+          </div>
+          <button @click="handleLogoutClick" class="logout-btn-small">Se déconnecter</button>
+        </div>
+
+        <!-- Informations du profil -->
         <div class="user-info">
           <p><strong>Email:</strong> {{ authStore.user.email }}</p>
           <p v-if="authStore.user.first_name">
@@ -228,6 +315,7 @@ function submitEditModal() {
           </p>
         </div>
 
+        <!-- Trophées -->
         <div class="menu-section">
           <div class="menu-item" @click="router.push('/trophees')">
             <Card :hasArrow="true">
@@ -293,6 +381,27 @@ function submitEditModal() {
         </div>
       </div>
     </div>
+
+    <!-- Popup de sélection d'image de profil -->
+    <div v-if="showProfileImageModal" class="blur-overlay">
+      <div class="modal-box">
+        <h3>Modifier l'image de profil</h3>
+        <div class="carousel-container">
+          <button v-if="allProfileImages.length > 0" class="carousel-arrow carousel-arrow-left" @click="previousImage">❮</button>
+          <div class="profile-image-placeholder">
+            <img v-if="allProfileImages.length > 0" :src="allProfileImages[currentImageIndex]" :alt="'Image de profil'" class="gallery-image" />
+            <span v-else>Aucune image disponible</span>
+          </div>
+          <button v-if="allProfileImages.length > 0" class="carousel-arrow carousel-arrow-right" @click="nextImage">❯</button>
+        </div>
+        <div v-if="allProfileImages.length > 0" class="image-counter">{{ currentImageIndex + 1 }} / {{ allProfileImages.length }}</div>
+        <div class="remove-link" @click="removeProfileImage">Retirer</div>
+        <div class="modal-actions">
+          <button type="button" class="cancel-btn" @click="closeProfileImageModal">Annuler</button>
+          <button type="button" class="save-btn" @click="saveProfileImage">Enregistrer</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -300,8 +409,9 @@ function submitEditModal() {
 .profile-content {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.5rem;
   transition: filter 0.3s ease;
+  align-items: center;
 }
 
 .blurred-content {
@@ -310,15 +420,49 @@ function submitEditModal() {
   user-select: none;
 }
 
-.profile-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.welcome-message {
+  text-align: center;
+  width: 100%;
 }
 
-.header-buttons {
+.welcome-message h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.profile-icon-container {
   display: flex;
-  gap: 0.5rem;
+  justify-content: center;
+  margin: 1rem 0;
+}
+
+.profile-icon {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #679436 0%, #8ab858 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.profile-icon-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  width: 100%;
+  flex-wrap: wrap;
 }
 
 .edit-menu-container {
@@ -440,10 +584,14 @@ function submitEditModal() {
   flex-direction: column;
   gap: 0.5rem;
   text-align: left;
+  width: 100%;
+  background: #f9f9f9;
+  padding: 1.25rem;
+  border-radius: 12px;
 }
 
 .menu-section {
-  margin-top: 1rem;
+  width: 100%;
 }
 
 .menu-item {
@@ -540,6 +688,75 @@ function submitEditModal() {
   cursor: pointer;
   font-weight: 600;
   flex: 1;
+}
+
+.profile-image-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 200px;
+  background: #ffffff;
+  border-radius: 12px;
+  color: #999;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+  overflow: hidden;
+}
+
+.gallery-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.carousel-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  width: 100%;
+}
+
+.carousel-arrow {
+  background-color: #679436;
+  color: white;
+  border: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+  transition: background-color 0.2s;
+}
+
+.carousel-arrow:hover {
+  background-color: #8ab858;
+}
+
+.image-counter {
+  text-align: center;
+  color: #666;
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+.remove-link {
+  text-align: center;
+  color: #ff9800;
+  cursor: pointer;
+  font-size: 0.9rem;
+  margin: 0.75rem 0;
+  text-decoration: underline;
+  transition: color 0.2s;
+}
+
+.remove-link:hover {
+  color: #f57c00;
 }
 
 .field-group {

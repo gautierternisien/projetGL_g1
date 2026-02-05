@@ -8,6 +8,7 @@ interface User {
   email: string
   first_name?: string
   last_name?: string
+  profile_image?: string
 }
 
 export const useAuthStore = defineStore('auth', () => {
@@ -161,6 +162,42 @@ export const useAuthStore = defineStore('auth', () => {
     await fetchUser()
   }
 
+  async function updateProfileImage(profileImage: string) {
+    if (!token.value) throw new Error('Not authenticated')
+    const response = await fetch(
+      `${API_URL}/users/profile-image?profile_image=${encodeURIComponent(profileImage)}`,
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token.value}`,
+        },
+      }
+    )
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.detail || 'Profile image update failed')
+    }
+    await fetchUser()
+  }
+
+  async function removeProfileImage() {
+    if (!token.value) throw new Error('Not authenticated')
+    const response = await fetch(
+      `${API_URL}/users/profile-image?profile_image=`,
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token.value}`,
+        },
+      }
+    )
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.detail || 'Profile image removal failed')
+    }
+    await fetchUser()
+  }
+
   function logout() {
     token.value = null
     user.value = null
@@ -179,6 +216,8 @@ export const useAuthStore = defineStore('auth', () => {
     updateUserFirstName,
     updateUserLastName,
     updateUserPassword,
+    updateProfileImage,
+    removeProfileImage,
     logout,
   }
 })

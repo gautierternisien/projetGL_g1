@@ -6,6 +6,7 @@ import { useAuthStore } from './auth'
 export interface UserSummary {
   id: number
   username: string
+  profile_image?: string
 }
 
 export interface FriendRequest {
@@ -30,6 +31,7 @@ export interface FriendProfile {
   trophy_count: number
   level: number
   xp: number
+  profile_image?: string
 }
 
 export const useFriendsStore = defineStore('friends', () => {

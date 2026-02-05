@@ -105,7 +105,10 @@ const goBack = () => router.push('/communaute')
             @click="goToProfile(f.id)"
             class="friend-item"
           >
-            <div class="avatar">{{ f.username.charAt(0).toUpperCase() }}</div>
+            <div v-if="f.profile_image" class="avatar avatar-image">
+              <img :src="f.profile_image" :alt="'Image de profil'" />
+            </div>
+            <div v-else class="avatar">{{ f.username.charAt(0).toUpperCase() }}</div>
             <div class="name">{{ f.username }}</div>
             <button class="remove-btn" @click="openRemove(f.id, f.username)">✕</button>
           </div>
@@ -120,7 +123,10 @@ const goBack = () => router.push('/communaute')
       <div v-if="activeTab === 1">
         <div v-if="store.pendingRequests.length" class="requests-list">
           <div v-for="r in store.pendingRequests" :key="r.id" class="request-item pending">
-            <div class="avatar">{{ r.receiver.username.charAt(0).toUpperCase() }}</div>
+            <div v-if="r.receiver.profile_image" class="avatar avatar-image">
+              <img :src="r.receiver.profile_image" :alt="'Image de profil'" />
+            </div>
+            <div v-else class="avatar">{{ r.receiver.username.charAt(0).toUpperCase() }}</div>
             <div class="request-info">
               <div class="name">{{ r.receiver.username }}</div>
               <div class="status">Demande en attente</div>
@@ -138,7 +144,10 @@ const goBack = () => router.push('/communaute')
       <div v-if="activeTab === 2">
         <div v-if="store.incomingRequests.length" class="requests-list">
           <div v-for="r in store.incomingRequests" :key="r.id" class="request-item incoming">
-            <div class="avatar">{{ r.sender.username.charAt(0).toUpperCase() }}</div>
+            <div v-if="r.sender.profile_image" class="avatar avatar-image">
+              <img :src="r.sender.profile_image" :alt="'Image de profil'" />
+            </div>
+            <div v-else class="avatar">{{ r.sender.username.charAt(0).toUpperCase() }}</div>
             <div class="request-info">
               <div class="name">{{ r.sender.username }}</div>
               <div class="status">Demande reçue</div>
@@ -282,6 +291,18 @@ const goBack = () => router.push('/communaute')
   justify-content: center;
   font-weight: 600;
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.avatar-image {
+  background: transparent;
+  padding: 0;
+}
+
+.avatar-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .name {

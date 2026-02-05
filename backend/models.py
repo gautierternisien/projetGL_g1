@@ -12,6 +12,7 @@ class User(Base):
     last_name = Column(String)
     hashed_password = Column(String)
     is_active = Column(Boolean, default=True)
+    profile_image = Column(String, nullable=True)
 
     answers = relationship("UserAnswer", back_populates="user")
     mission_statuses = relationship("UserMissionStatus", back_populates="user")

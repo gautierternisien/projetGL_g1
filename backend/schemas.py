@@ -14,6 +14,7 @@ class UserCreate(UserBase):
 class User(UserBase):
     id: int
     is_active: bool
+    profile_image: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -28,6 +29,7 @@ class TokenData(BaseModel):
 class UserPublic(BaseModel):
     id: int
     username: str
+    profile_image: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -39,6 +41,7 @@ class FriendProfile(BaseModel):
     trophy_count: int
     level: int
     xp: int
+    profile_image: Optional[str] = None
 
     class Config:
         from_attributes = True
