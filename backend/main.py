@@ -2,7 +2,6 @@ from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
 from typing import List, Optional, Dict
 from datetime import timedelta, datetime
 
@@ -11,7 +10,11 @@ from database import SessionLocal, engine
 
 models.Base.metadata.create_all(bind=engine)
 
-app = FastAPI()
+app = FastAPI(
+    title="PGL API",
+    description="API pour l'application ProjetGL : Calcul d'empreinte carbone, missions, et aspects sociaux.",
+    version="1.0.0"
+)
 
 # Dependency
 def get_db():
@@ -262,7 +265,7 @@ user_feed_db: Dict[str, List[Dict]] = {}
 
 # --- ROUTES API ---
 
-@app.post("/register", response_model=schemas.User)
+@app.post("/register", response_model=schemas.User, tags=["Authentication"], summary="Register a new user")
 def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user = crud.get_user_by_email(db, email=user.email)
     if db_user:
@@ -272,7 +275,7 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Pseudo déjà utilisé")
     return crud.create_user(db=db, user=user)
 
-@app.post("/token", response_model=schemas.Token)
+@app.post("/token", response_model=schemas.Token, tags=["Authentication"], summary="Login to get access token")
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     # Try to find user by username
     user = crud.get_user_by_username(db, username=form_data.username)
@@ -293,11 +296,11 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-@app.get("/users/me", response_model=schemas.User)
+@app.get("/users/me", response_model=schemas.User, tags=["Users"], summary="Get current user profile")
 async def read_users_me(current_user: models.User = Depends(get_current_user)):
     return current_user
 
-@app.put("/users/me/email", response_model=schemas.User)
+@app.put("/users/me/email", response_model=schemas.User, tags=["Users"], summary="Update user email")
 async def update_user_email(new_email: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     # Check if email already exists (excluding current user)
     existing_user = crud.get_user_by_email(db, email=new_email)
@@ -305,7 +308,7 @@ async def update_user_email(new_email: str, current_user: models.User = Depends(
         raise HTTPException(status_code=400, detail="Adresse mail déjà utilisée")
     return crud.update_user_email(db, current_user.id, new_email)
 
-@app.put("/users/me/username", response_model=schemas.User)
+@app.put("/users/me/username", response_model=schemas.User, tags=["Users"], summary="Update username")
 async def update_user_username(new_username: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     # Check if username already exists (excluding current user)
     existing_user = crud.get_user_by_username(db, username=new_username)
@@ -326,21 +329,21 @@ async def update_user_username(new_username: str, current_user: models.User = De
     
     return crud.update_user_username(db, current_user.id, new_username)
 
-@app.put("/users/me/first_name", response_model=schemas.User)
+@app.put("/users/me/first_name", response_model=schemas.User, tags=["Users"], summary="Update first name")
 async def update_user_first_name(new_first_name: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     return crud.update_user_first_name(db, current_user.id, new_first_name)
 
-@app.put("/users/me/last_name", response_model=schemas.User)
+@app.put("/users/me/last_name", response_model=schemas.User, tags=["Users"], summary="Update last name")
 async def update_user_last_name(new_last_name: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     return crud.update_user_last_name(db, current_user.id, new_last_name)
 
-@app.put("/users/me/password", response_model=schemas.User)
+@app.put("/users/me/password", response_model=schemas.User, tags=["Users"], summary="Update password")
 async def update_user_password(current_password: str, new_password: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     if not crud.verify_password(current_password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Mot de passe actuel incorrect")
     return crud.update_user_password(db, current_user.id, new_password)
 
-@app.get("/users", response_model=List[schemas.UserPublic])
+@app.get("/users", response_model=List[schemas.UserPublic], tags=["Users"], summary="Search users")
 async def search_users(prefix: str = "", current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     if len(prefix) < 3:
         return []
@@ -354,7 +357,7 @@ async def search_users(prefix: str = "", current_user: models.User = Depends(get
     return filtered
 
 
-@app.get("/friends", response_model=List[schemas.UserPublic])
+@app.get("/friends", response_model=List[schemas.UserPublic], tags=["Friends"], summary="List accepted friends")
 async def list_friends(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     friend_ids = crud.get_accepted_friends(db, current_user.id)
     if not friend_ids:
@@ -362,7 +365,7 @@ async def list_friends(current_user: models.User = Depends(get_current_user), db
     friends = crud.get_users_by_ids(db, friend_ids)
     return friends
 
-@app.get("/friends/activity", response_model=List[schemas.FriendActivity])
+@app.get("/friends/activity", response_model=List[schemas.FriendActivity], tags=["Friends"], summary="Get friends activity feed")
 async def get_friends_activity(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     # Récupérer le feed personnel de l'utilisateur
     my_feed = user_feed_db.get(current_user.username, [])
@@ -383,7 +386,7 @@ async def get_friends_activity(current_user: models.User = Depends(get_current_u
     return response_activities
 
 
-@app.post("/friend-requests/{friend_id}")
+@app.post("/friend-requests/{friend_id}", tags=["Friends"], summary="Send friend request")
 async def send_friend_request(friend_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     target = crud.get_user(db, friend_id)
     if not target:
@@ -395,7 +398,7 @@ async def send_friend_request(friend_id: int, current_user: models.User = Depend
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.get("/friend-requests/pending", response_model=List[schemas.FriendRequestSchema])
+@app.get("/friend-requests/pending", response_model=List[schemas.FriendRequestSchema], tags=["Friends"], summary="Get pending sent requests")
 async def get_pending_requests(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     requests = crud.get_pending_requests_sent(db, current_user.id)
     return [
@@ -408,7 +411,7 @@ async def get_pending_requests(current_user: models.User = Depends(get_current_u
     ]
 
 
-@app.get("/friend-requests/incoming", response_model=List[schemas.FriendRequestSchema])
+@app.get("/friend-requests/incoming", response_model=List[schemas.FriendRequestSchema], tags=["Friends"], summary="Get incoming friend requests")
 async def get_incoming_requests(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     requests = crud.get_incoming_requests(db, current_user.id)
     return [
@@ -421,7 +424,7 @@ async def get_incoming_requests(current_user: models.User = Depends(get_current_
     ]
 
 
-@app.put("/friend-requests/{request_id}/accept")
+@app.put("/friend-requests/{request_id}/accept", tags=["Friends"], summary="Accept friend request")
 async def accept_request(request_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         req = crud.accept_friend_request(db, request_id)
@@ -430,7 +433,7 @@ async def accept_request(request_id: int, current_user: models.User = Depends(ge
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.put("/friend-requests/{request_id}/reject")
+@app.put("/friend-requests/{request_id}/reject", tags=["Friends"], summary="Reject friend request")
 async def reject_request(request_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         crud.reject_friend_request(db, request_id)
@@ -439,7 +442,7 @@ async def reject_request(request_id: int, current_user: models.User = Depends(ge
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.put("/friend-requests/{request_id}/cancel")
+@app.put("/friend-requests/{request_id}/cancel", tags=["Friends"], summary="Cancel sent friend request")
 async def cancel_request(request_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         crud.cancel_friend_request(db, request_id)
@@ -448,7 +451,7 @@ async def cancel_request(request_id: int, current_user: models.User = Depends(ge
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.delete("/friends/{friend_id}")
+@app.delete("/friends/{friend_id}", tags=["Friends"], summary="Remove friend")
 async def delete_friend(friend_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     # Find the accepted request between them
     req = db.query(models.FriendRequest).filter(
@@ -483,14 +486,14 @@ async def delete_friend(friend_id: int, current_user: models.User = Depends(get_
 
     return {"deleted": True}
 
-@app.get("/")
+@app.get("/", tags=["General"], summary="Root endpoint")
 async def root():
     return {
         "message": "API Questionnaire Multi-Catégories",
         "available_categories": list(QUESTIONS_DB.keys())
     }
 
-@app.get("/questions/{category}", response_model=List[schemas.Question])
+@app.get("/questions/{category}", response_model=List[schemas.Question], tags=["Questions"], summary="Get questions by category")
 async def get_questions_by_category(category: str, db: Session = Depends(get_db)):
     """
     Récupère les questions d'une catégorie spécifique (ex: /questions/transport)
@@ -504,7 +507,7 @@ async def get_questions_by_category(category: str, db: Session = Depends(get_db)
          raise HTTPException(status_code=404, detail="Catégorie non trouvée")
     return qs # Pydantic will serialize SQL Alchemy objects
 
-@app.get("/missions/{category}", response_model=List[schemas.Mission])
+@app.get("/missions/{category}", response_model=List[schemas.Mission], tags=["Missions"], summary="Get missions by category")
 async def get_missions_by_category(category: str, user_id: Optional[int] = None, db: Session = Depends(get_db)):
     """
     Récupère les missions d'une catégorie spécifique (ex: /missions/transport).
@@ -544,7 +547,7 @@ async def get_missions_by_category(category: str, user_id: Optional[int] = None,
 
 
 
-@app.put("/missions/{mission_id}")
+@app.put("/missions/{mission_id}", tags=["Missions"], summary="Update mission status")
 async def update_mission(mission_id: int, payload: schemas.MissionUpdate, db: Session = Depends(get_db)):
     """
     Met à jour le statut d'une mission identifiée par son `id`.
@@ -552,6 +555,8 @@ async def update_mission(mission_id: int, payload: schemas.MissionUpdate, db: Se
     """
     # 1. Vérifier si la mission existe (via DB)
     mission_db = db.query(models.Mission).filter(models.Mission.id == mission_id).first()
+
+    mission_title = "Unknown Mission"
 
     # Fallback sur MISSIONS_DB si pas trouvé en base (cas hybride)
     if not mission_db:
@@ -603,7 +608,7 @@ async def update_mission(mission_id: int, payload: schemas.MissionUpdate, db: Se
         raise HTTPException(status_code=400, detail="User ID is required for mission update")
 
 
-@app.post("/answers/{category}/{user_id}")
+@app.post("/answers/{category}/{user_id}", tags=["Answers"], summary="Save user answer")
 async def save_answer(category: str, user_id: int, answer: schemas.UserAnswerBase, db: Session = Depends(get_db)):
     """
     Sauvegarde une réponse pour une catégorie et un utilisateur donnés.
@@ -638,7 +643,7 @@ async def save_answer(category: str, user_id: int, answer: schemas.UserAnswerBas
         "current_answers": current_answers_dict
     }
 
-@app.get("/answers/{category}/{user_id}")
+@app.get("/answers/{category}/{user_id}", tags=["Answers"], summary="Get user progress in category")
 async def get_user_category_progress(category: str, user_id: int, db: Session = Depends(get_db)):
     """
     Récupère les réponses d'un utilisateur pour une catégorie spécifique.
@@ -658,7 +663,7 @@ async def get_user_category_progress(category: str, user_id: int, db: Session = 
         "answers": current_answers_dict
     }
 
-@app.delete("/answers/{category}/{user_id}")
+@app.delete("/answers/{category}/{user_id}", tags=["Answers"], summary="Reset user answers in category")
 async def reset_category_progress(category: str, user_id: int, db: Session = Depends(get_db)):
     """
     Supprime les réponses d'un utilisateur pour une catégorie spécifique.
@@ -671,7 +676,7 @@ async def reset_category_progress(category: str, user_id: int, db: Session = Dep
         "progress": 0
     }
 
-@app.get("/users/{user_id}/profile", response_model=schemas.FriendProfile)
+@app.get("/users/{user_id}/profile", response_model=schemas.FriendProfile, tags=["Users"], summary="Get user public profile")
 def read_user_profile(user_id: int, db: Session = Depends(get_db), current_user: schemas.User = Depends(get_current_user)):
     user = crud.get_user(db, user_id=user_id)
     if not user:
@@ -696,7 +701,7 @@ def read_user_profile(user_id: int, db: Session = Depends(get_db), current_user:
 
 # --- NOUVELLE ROUTE : CALCUL DE L'IDENTITÉ CARBONE ---
 
-@app.get("/carbon-score/{user_id}")
+@app.get("/carbon-score/{user_id}", tags=["Statistics"], summary="Calculate carbon score")
 async def get_carbon_score(user_id: int, db: Session = Depends(get_db)):
     """
     Calcule le score carbone total de l'utilisateur.
@@ -752,7 +757,7 @@ async def get_carbon_score(user_id: int, db: Session = Depends(get_db)):
         "unit": "points_impact"
     }
 
-@app.get("/global-stats")
+@app.get("/global-stats", tags=["Statistics"], summary="Get global statistics")
 async def get_global_stats(db: Session = Depends(get_db)):
     """
     Calcule la moyenne des scores de tous les utilisateurs enregistrés.
@@ -829,7 +834,7 @@ async def get_global_stats(db: Session = Depends(get_db)):
     }
 
 # --- LEAGUE ROUTES ---
-@app.post("/leagues/", response_model=schemas.League)
+@app.post("/leagues/", response_model=schemas.League, tags=["Leagues"], summary="Create a new league")
 async def create_league_route(league: schemas.LeagueCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         return crud.create_league(db=db, league=league, creator_id=current_user.id)
@@ -837,15 +842,15 @@ async def create_league_route(league: schemas.LeagueCreate, current_user: models
         print(f"Error creating league: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.get("/leagues/active", response_model=List[schemas.League])
+@app.get("/leagues/active", response_model=List[schemas.League], tags=["Leagues"], summary="Get active leagues")
 def get_active_leagues(current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
     return crud.get_active_leagues_for_user(db, current_user.id)
 
-@app.get("/leagues/archived", response_model=List[schemas.League])
+@app.get("/leagues/archived", response_model=List[schemas.League], tags=["Leagues"], summary="Get archived leagues")
 def get_archived_leagues(current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
     return crud.get_archived_leagues_for_user(db, current_user.id)
 
-@app.get("/leagues/invites", response_model=List[schemas.LeagueInvite])
+@app.get("/leagues/invites", response_model=List[schemas.LeagueInvite], tags=["Leagues"], summary="Get pending league invites")
 def get_invites(current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
     invites = crud.get_pending_league_invites(db, current_user.id)
     result = []
@@ -863,7 +868,7 @@ def get_invites(current_user: schemas.User = Depends(get_current_user), db: Sess
         ))
     return result
 
-@app.get("/leagues/{league_id}/invites", response_model=List[schemas.LeagueInvite])
+@app.get("/leagues/{league_id}/invites", response_model=List[schemas.LeagueInvite], tags=["Leagues"], summary="Get invites for a league")
 def get_league_invites_route(league_id: int, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
     league = crud.get_league(db, league_id)
     if not league:
@@ -888,7 +893,7 @@ def get_league_invites_route(league_id: int, current_user: schemas.User = Depend
         ))
     return result
 
-@app.get("/leagues/{league_id}", response_model=schemas.LeagueDetail)
+@app.get("/leagues/{league_id}", response_model=schemas.LeagueDetail, tags=["Leagues"], summary="Get league details")
 def get_league_detail(league_id: int, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
     league = crud.get_league(db, league_id)
     if not league:
@@ -918,7 +923,7 @@ def get_league_detail(league_id: int, current_user: schemas.User = Depends(get_c
 
     return league_data
 
-@app.post("/leagues/{league_id}/invite/{user_id}", response_model=schemas.LeagueInvite)
+@app.post("/leagues/{league_id}/invite/{user_id}", response_model=schemas.LeagueInvite, tags=["Leagues"], summary="Invite user to league")
 def invite_user(league_id: int, user_id: int, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
     league = crud.get_league(db, league_id)
     if not league:
@@ -947,7 +952,7 @@ def invite_user(league_id: int, user_id: int, current_user: schemas.User = Depen
         status=invite.status
     )
 
-@app.put("/leagues/invites/{invite_id}/accept", response_model=schemas.LeagueInvite)
+@app.put("/leagues/invites/{invite_id}/accept", response_model=schemas.LeagueInvite, tags=["Leagues"], summary="Accept league invite")
 def accept_invite_route(invite_id: int, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
     invite = crud.respond_league_invite(db, invite_id, accept=True)
     if not invite:
@@ -965,7 +970,7 @@ def accept_invite_route(invite_id: int, current_user: schemas.User = Depends(get
         status=invite.status
     )
 
-@app.put("/leagues/invites/{invite_id}/reject", response_model=schemas.LeagueInvite)
+@app.put("/leagues/invites/{invite_id}/reject", response_model=schemas.LeagueInvite, tags=["Leagues"], summary="Reject league invite")
 def reject_invite_route(invite_id: int, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
     invite = crud.respond_league_invite(db, invite_id, accept=False)
     if not invite:
@@ -982,7 +987,7 @@ def reject_invite_route(invite_id: int, current_user: schemas.User = Depends(get
         status=invite.status
     )
 
-@app.delete("/leagues/{league_id}/leave")
+@app.delete("/leagues/{league_id}/leave", tags=["Leagues"], summary="Leave league")
 def leave_league(league_id: int, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
     member = db.query(models.LeagueMember).filter(
         models.LeagueMember.league_id == league_id,
@@ -994,7 +999,7 @@ def leave_league(league_id: int, current_user: schemas.User = Depends(get_curren
     return {"status": "left"}
 
 # --- PROFILE IMAGE ---
-@app.put("/users/profile-image", response_model=schemas.User)
+@app.put("/users/profile-image", response_model=schemas.User, tags=["Users"], summary="Update profile image")
 def update_profile_image(profile_image: str, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Update the user's profile image"""
     user = crud.get_user(db, current_user.id)
