@@ -16,6 +16,8 @@ class User(Base):
 
     answers = relationship("UserAnswer", back_populates="user")
     mission_statuses = relationship("UserMissionStatus", back_populates="user")
+    ngc_stat = relationship("UserNgcStat", back_populates="user", uselist=False)
+    ngc_progress = relationship("UserNgcProgress", back_populates="user", uselist=False)
 
 class Category(Base):
     __tablename__ = "categories"
@@ -69,6 +71,38 @@ class UserAnswer(Base):
 
     user = relationship("User", back_populates="answers")
     question = relationship("Question", back_populates="user_answers")
+
+
+class UserNgcStat(Base):
+    __tablename__ = "user_ngc_stats"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, index=True, nullable=False)
+
+    global_score = Column(Integer, nullable=False, default=8559)
+    transport = Column(Integer, nullable=False, default=0)
+    logement = Column(Integer, nullable=False, default=0)
+    alimentation = Column(Integer, nullable=False, default=0)
+    divers = Column(Integer, nullable=False, default=0)
+    services_societaux = Column(Integer, nullable=False, default=0)
+    updated_at = Column(String, nullable=True)
+
+    user = relationship("User", back_populates="ngc_stat")
+
+
+class UserNgcProgress(Base):
+    __tablename__ = "user_ngc_progress"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, index=True, nullable=False)
+
+    transport = Column(Integer, nullable=False, default=0)
+    logement = Column(Integer, nullable=False, default=0)
+    alimentation = Column(Integer, nullable=False, default=0)
+    divers = Column(Integer, nullable=False, default=0)
+    updated_at = Column(String, nullable=True)
+
+    user = relationship("User", back_populates="ngc_progress")
 
 class UserMissionStatus(Base):
     __tablename__ = "user_mission_statuses"
@@ -151,4 +185,3 @@ class LeagueInvite(Base):
     league = relationship("League", back_populates="invites")
     inviter = relationship("User", foreign_keys=[inviter_id])
     invitee = relationship("User", foreign_keys=[invitee_id])
-

@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { API_URL } from '@/config' // On importe l'URL de l'API
+import { loadCategoryProgressFromLocalAnswers } from '@/utils/ngcProgress'
 
 export const useProgressStore = defineStore('progress', () => {
   // --- 1. STATE (Les données) ---
@@ -18,6 +19,14 @@ export const useProgressStore = defineStore('progress', () => {
     if (category === 'logement') progressValueLogement.value = value
     if (category === 'alimentation') progressValueAlimentation.value = value
     if (category === 'divers') progressValueDivers.value = value
+  }
+
+  function syncFromLocalAnswers() {
+    const local = loadCategoryProgressFromLocalAnswers()
+    setScore('transport', local.transport)
+    setScore('logement', local.logement)
+    setScore('alimentation', local.alimentation)
+    setScore('divers', local.divers)
   }
 
   // NOUVELLE ACTION : Charge tout depuis le backend
@@ -66,6 +75,7 @@ export const useProgressStore = defineStore('progress', () => {
   return {
     getCategoryScore,
     setScore,
+    syncFromLocalAnswers,
     fetchAllProgress, // On exporte la nouvelle action
     globalAverage,
   }

@@ -2,12 +2,15 @@
 import Card from '@/components/AppCard.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
 import Header from '@/components/AppHeader.vue'
-import { ref, onMounted, computed, onActivated, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, onActivated, watch } from 'vue'
+import Engine from 'publicodes'
 import type { Mission } from '@/types/mission'
 import { useProgressStore } from '@/stores/progress'
 import { useAuthStore } from '@/stores/auth'
 import { useFriendsStore } from '@/stores/friends'
-import { API_URL, USER_ID } from '@/config'
+import { API_URL } from '@/config'
+import { loadAnswers } from '@/lib/ngc/answersStorage'
+import { computeCategoryProgressFromAnswers } from '@/utils/ngcProgress'
 
 const store = useProgressStore()
 const authStore = useAuthStore()
@@ -20,6 +23,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   alimentation: 'Alimentation',
   logement: 'Logement',
   divers: 'Divers',
+  services_societaux: 'Services sociétaux',
 }
 
 // Couleurs fixes par catégorie
@@ -28,9 +32,12 @@ const CATEGORY_COLORS: Record<string, string> = {
   alimentation: '#D84315', // Deep Orange
   logement: '#3951a6', // Yellow
   divers: '#24aa26', // Purple
+  services_societaux: '#616161', // Dark gray
 }
 
 const getCategoryColor = (key: string) => {
+  if (key === 'services_societaux') return CATEGORY_COLORS.services_societaux
+
   const score = store.getCategoryScore(key)
 
   // Si le score est 0 (ou inexistant), on retourne du GRIS
@@ -41,6 +48,49 @@ const getCategoryColor = (key: string) => {
   // Sinon, on retourne la couleur officielle de la catégorie
   return CATEGORY_COLORS[key] // Fallback au cas où
 }
+function normalizeCategoryKey(rawKey: string): string {
+  const normalized = rawKey
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+
+  if (normalized === 'transport') return 'transport'
+  if (normalized === 'alimentation') return 'alimentation'
+  if (normalized === 'logement') return 'logement'
+  if (normalized === 'divers') return 'divers'
+  if (normalized === 'services societaux') return 'services_societaux'
+
+  return rawKey
+}
+
+function normalizeToken(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+}
+
+function findRuleNameByNormalizedName(rules: Record<string, any>, expectedName: string): string | null {
+  const expected = normalizeToken(expectedName)
+  for (const key of Object.keys(rules ?? {})) {
+    if (normalizeToken(key) === expected) return key
+  }
+  return null
+}
+
+function evaluateServicesSocietaux(engine: Engine, rules: Record<string, any>): number {
+  const servicesRuleName = findRuleNameByNormalizedName(rules, 'services societaux')
+  if (!servicesRuleName) return 0
+
+  try {
+    const r: any = engine.evaluate(servicesRuleName)
+    return typeof r?.nodeValue === 'number' ? Math.round(r.nodeValue) : 0
+  } catch {
+    return 0
+  }
+}
 
 // --- ÉTATS ---
 const userScore = ref(0)
@@ -49,14 +99,22 @@ const scoreColor = ref('#333') // Couleur par défaut
 const scoreEmoji = ref('🥀') // Emoji par défaut
 const scoreComment = ref('Chargement...')
 
-const sectors = ref<{ name: string; pct: number; color: string }[]>([])
+const sectors = ref<{ key: string; name: string; pct: number; color: string }[]>([])
+const rulesCache = ref<any | null>(null)
+type NgcStats = {
+  globalScore: number
+  detailsByCategory: Record<string, number>
+  categoryProgress?: Record<string, number>
+}
+const modelDefaultStatsCache = ref<NgcStats | null>(null)
+let disconnectedRefreshTimer: ReturnType<typeof setInterval> | null = null
 
 // Dashboard missions: load actual missions from backend (show title + category)
 const displayMissions = ref<{ mission: Mission; category: string }[]>([])
 
 async function loadDashboardMissions() {
   try {
-    const keys = Object.keys(CATEGORY_LABELS)
+    const keys = ['transport', 'logement', 'alimentation', 'divers']
     const userIdParam = authStore.user ? `?user_id=${authStore.user.id}` : ''
     const results = await Promise.all(
       keys.map((k) =>
@@ -105,6 +163,247 @@ const events = computed(() => {
   return friendsStore.activities.slice(0, 6)
 })
 
+function toPublicodesValue(v: any) {
+  if (v === undefined || v === null || v === '') return undefined
+  if (typeof v === 'boolean') return v ? 'oui' : 'non'
+  if (typeof v === 'number') return v
+  if (typeof v === 'string') {
+    const normalized = v.trim().toLowerCase()
+    if (normalized === 'oui' || normalized === 'non') return normalized
+    return `'${v.replace(/'/g, "\\'")}'`
+  }
+  if (Array.isArray(v))
+    return v.map((x) => {
+      if (typeof x === 'boolean') return x ? 'oui' : 'non'
+      if (typeof x === 'string') {
+        const normalized = x.trim().toLowerCase()
+        if (normalized === 'oui' || normalized === 'non') return normalized
+        return `'${x.replace(/'/g, "\\'")}'`
+      }
+      return x
+    })
+  return v
+}
+
+function flattenAnswers(source: Record<string, any>) {
+  const flat: Record<string, any> = {}
+  for (const [k, v] of Object.entries(source)) {
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      const keys = Object.keys(v)
+      const looksLikeSlugs = keys.some((x) => x.includes(' . '))
+      if (looksLikeSlugs) {
+        for (const [subK, subV] of Object.entries(v)) flat[subK] = subV
+        continue
+      }
+    }
+    flat[k] = v
+  }
+  return flat
+}
+
+function hasFilledAnswer(value: any): boolean {
+  if (value === undefined || value === null || value === '') return false
+  if (Array.isArray(value)) return value.some(hasFilledAnswer)
+  if (typeof value === 'object') {
+    const values = Object.values(value)
+    if (values.length === 0) return false
+    return values.some(hasFilledAnswer)
+  }
+  return true
+}
+
+async function getRules() {
+  if (rulesCache.value) return rulesCache.value
+  const res = await fetch(`${API_URL}/rules`, { cache: 'no-store' })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  rulesCache.value = await res.json()
+  return rulesCache.value
+}
+
+function normalizeDetails(details: Record<string, number> | null | undefined): Record<string, number> {
+  const normalized: Record<string, number> = {}
+  for (const [rawKey, rawValue] of Object.entries(details ?? {})) {
+    const key = normalizeCategoryKey(rawKey)
+    if (!(key in CATEGORY_LABELS)) continue
+
+    const numeric = typeof rawValue === 'number' ? rawValue : Number(rawValue)
+    const safeValue = Number.isFinite(numeric) ? numeric : 0
+    normalized[key] = (normalized[key] ?? 0) + safeValue
+  }
+  return normalized
+}
+
+function enrichDetailsWithServices(
+  details: Record<string, number> | null | undefined,
+  total: number,
+  defaults: NgcStats | null,
+): Record<string, number> {
+  const enriched = normalizeDetails(details)
+  if ((enriched.services_societaux ?? 0) > 0 || total <= 0) return enriched
+
+  const knownTotal =
+    (enriched.transport ?? 0) +
+    (enriched.logement ?? 0) +
+    (enriched.alimentation ?? 0) +
+    (enriched.divers ?? 0)
+
+  const remainder = total - knownTotal
+  if (remainder > 0.0001) {
+    enriched.services_societaux = remainder
+    return enriched
+  }
+
+  if (!defaults || defaults.globalScore <= 0) return enriched
+
+  const defaultServices = Number(defaults.detailsByCategory.services_societaux ?? 0)
+  if (!Number.isFinite(defaultServices) || defaultServices <= 0) return enriched
+
+  const servicesRatio = defaultServices / defaults.globalScore
+  const inferredServices = Math.max(0, total * servicesRatio)
+  const targetKnownTotal = Math.max(0, total - inferredServices)
+  const scale = knownTotal > 0 ? targetKnownTotal / knownTotal : 0
+
+  for (const key of ['transport', 'logement', 'alimentation', 'divers']) {
+    if (enriched[key] !== undefined) enriched[key] *= scale
+  }
+
+  enriched.services_societaux = inferredServices
+  return enriched
+}
+
+async function computeLocalNgcStats() {
+  try {
+    const rules = await getRules()
+    const engine = new Engine(rules)
+    const answers = loadAnswers() ?? {}
+    const flat = flattenAnswers(answers)
+    const hasAnswers = Object.values(flat).some(hasFilledAnswer)
+
+    const situation = Object.fromEntries(
+      Object.entries(flat)
+        .map(([k, v]) => [k, toPublicodesValue(v)] as const)
+        .filter(([, v]) => v !== undefined),
+    )
+
+    engine.setSituation(situation)
+
+    const bilanRes: any = engine.evaluate('bilan')
+    let globalScore = typeof bilanRes?.nodeValue === 'number' ? Math.round(bilanRes.nodeValue) : 8559
+    if (!hasAnswers) globalScore = 8559
+
+    const detailsByCategory: Record<string, number> = {}
+    for (const key of ['transport', 'logement', 'alimentation', 'divers']) {
+      const r: any = engine.evaluate(key)
+      detailsByCategory[key] = typeof r?.nodeValue === 'number' ? Math.round(r.nodeValue) : 0
+    }
+
+    detailsByCategory.services_societaux = evaluateServicesSocietaux(engine, rules)
+    const categoryProgress = computeCategoryProgressFromAnswers(answers)
+
+    return { globalScore, detailsByCategory, categoryProgress }
+  } catch (error) {
+    console.error('Erreur calcul local NGC:', error)
+    return null
+  }
+}
+
+async function getModelDefaultStatsCached(): Promise<NgcStats | null> {
+  if (modelDefaultStatsCache.value) return modelDefaultStatsCache.value
+  const computedDefaults = await computeModelDefaultStats()
+  if (computedDefaults) modelDefaultStatsCache.value = computedDefaults
+  return computedDefaults
+}
+
+async function pushNgcStatsToBackend(stats: NgcStats) {
+  if (!authStore.isConnected || !authStore.token) return
+
+  try {
+    await fetch(`${API_URL}/ngc/stats/me`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authStore.token}`,
+      },
+      body: JSON.stringify({
+        global_score: stats.globalScore,
+        details_by_category: stats.detailsByCategory,
+        category_progress: stats.categoryProgress ?? {},
+      }),
+    })
+  } catch {
+    // Best-effort sync only.
+  }
+}
+
+async function refreshProgressAndScore() {
+  if (isConnected.value && authStore.user) {
+    await store.fetchAllProgress(authStore.user.id)
+  }
+  store.syncFromLocalAnswers()
+
+  try {
+    const response = await fetch(`${API_URL}/global-stats`, { cache: 'no-store' })
+    if (response.ok) {
+      const data = await response.json()
+      averageScore.value = data.average_national_score || data.global_score || 8559
+
+      if (!isConnected.value) {
+        const hasUsers = Number(data.user_count ?? 0) > 0
+        const defaults = await getModelDefaultStatsCached()
+        if (hasUsers) {
+          const score = Number(data.global_score)
+          const safeScore = Number.isFinite(score) ? score : 8559
+          userScore.value = safeScore
+          const enrichedDetails = enrichDetailsWithServices(data.details_by_category, safeScore, defaults)
+          processSectors(enrichedDetails, safeScore)
+        } else {
+          if (defaults) {
+            userScore.value = defaults.globalScore
+            processSectors(defaults.detailsByCategory, defaults.globalScore)
+          } else {
+            userScore.value = data.global_score
+            const fallbackScore = Number(data.global_score)
+            const safeFallbackScore = Number.isFinite(fallbackScore) ? fallbackScore : 8559
+            const enrichedDetails = enrichDetailsWithServices(data.details_by_category, safeFallbackScore, null)
+            processSectors(enrichedDetails, safeFallbackScore)
+          }
+        }
+        calculateStatus(userScore.value, averageScore.value)
+      }
+    } else if (!isConnected.value) {
+      const defaults = await getModelDefaultStatsCached()
+      if (defaults) {
+        userScore.value = defaults.globalScore
+        processSectors(defaults.detailsByCategory, defaults.globalScore)
+        calculateStatus(userScore.value, averageScore.value || 8559)
+      }
+    }
+  } catch (error) {
+    console.error('Erreur chargement stats globales:', error)
+    if (!isConnected.value) {
+      const defaults = await getModelDefaultStatsCached()
+      if (defaults) {
+        userScore.value = defaults.globalScore
+        processSectors(defaults.detailsByCategory, defaults.globalScore)
+        calculateStatus(userScore.value, averageScore.value || 8559)
+      }
+    }
+  }
+
+  if (isConnected.value) {
+    const localStats = await computeLocalNgcStats()
+    if (localStats) {
+      userScore.value = localStats.globalScore
+      processSectors(localStats.detailsByCategory, localStats.globalScore)
+      await pushNgcStatsToBackend(localStats)
+      calculateStatus(userScore.value, averageScore.value || 8559)
+      return
+    }
+    userScore.value = 8559
+    calculateStatus(userScore.value, averageScore.value || 8559)
+  }
+}
+
 // --- COMPUTED POUR LE GRAPHIQUE ---
 const donutStyle = computed(() => {
   if (sectors.value.length === 0) {
@@ -112,17 +411,31 @@ const donutStyle = computed(() => {
   }
 
   let current = 0
-  const segments = sectors.value.map((s) => {
-    const start = current
-    const end = current + s.pct
-    current = end
-    return `${s.color} ${start}% ${end}%`
-  })
+  const segments = sectors.value
+    .map((s) => {
+      if (s.pct <= 0) return null
+
+      const start = current
+      const end = Math.min(100, current + s.pct)
+      current = end
+      return `${s.color} ${start}% ${end}%`
+    })
+    .filter((segment): segment is string => !!segment)
+
+  if (current < 100) {
+    segments.push(`#E0E0E0 ${current}% 100%`)
+  }
+
+  if (segments.length === 0) {
+    return { background: '#e0e0e0' }
+  }
 
   return {
     background: `conic-gradient(${segments.join(', ')})`,
   }
 })
+
+const legendSectors = computed(() => sectors.value.filter((s) => s.key in CATEGORY_LABELS))
 
 // --- LOGIQUE DE CALCUL ---
 const calculateStatus = (score: number, avg: number) => {
@@ -156,27 +469,51 @@ const calculateStatus = (score: number, avg: number) => {
 
 // 2. Traitement des secteurs pour le graphique
 const processSectors = (details: Record<string, number>, total: number) => {
-  // A. On transforme l'objet { transport: 2000, ... } en tableau
-  const rawSectors = Object.entries(details).map(([key, value]) => {
-    return {
-      key: key, // On garde la clé pour la couleur
-      name: CATEGORY_LABELS[key] || key, // On met le joli nom ou la clé par défaut
-      rawScore: value,
-      pct: total > 0 ? Math.round((value / total) * 100) : 0,
-    }
-  })
+  const aggregated: Record<string, number> = {}
 
-  // B. On filtre les catégories à 0% pour ne pas polluer l'affichage (optionnel)
+  for (const [rawKey, rawValue] of Object.entries(details)) {
+    const key = normalizeCategoryKey(rawKey)
+    if (!(key in CATEGORY_LABELS)) continue
+
+    const numeric = typeof rawValue === 'number' ? rawValue : Number(rawValue)
+    const safeValue = Number.isFinite(numeric) ? numeric : 0
+    aggregated[key] = (aggregated[key] ?? 0) + safeValue
+  }
+
+  const hasServicesFromDetails = (aggregated.services_societaux ?? 0) > 0
+  if (!hasServicesFromDetails && total > 0) {
+    const knownTotal =
+      (aggregated.transport ?? 0) +
+      (aggregated.logement ?? 0) +
+      (aggregated.alimentation ?? 0) +
+      (aggregated.divers ?? 0)
+
+    const remainder = total - knownTotal
+    if (remainder > 0.0001) aggregated.services_societaux = remainder
+  }
+
+  const aggregatedTotal = Object.values(aggregated).reduce((sum, value) => {
+    if (!Number.isFinite(value) || value <= 0) return sum
+    return sum + value
+  }, 0)
+  const denominator = aggregatedTotal > 0 ? aggregatedTotal : total
+
+  const rawSectors = Object.entries(aggregated).map(([key, value]) => ({
+    key,
+    name: CATEGORY_LABELS[key] || key,
+    rawScore: value,
+    pct: denominator > 0 ? (value / denominator) * 100 : 0,
+  }))
+
   const activeSectors = rawSectors.filter((s) => s.pct > 0)
-
-  // C. On TRIE du plus grand au plus petit pourcentage
   activeSectors.sort((a, b) => b.pct - a.pct)
 
-  // D. On applique la couleur selon la catégorie
   sectors.value = activeSectors.map((sector) => {
     let color
 
-    if (!isConnected.value) {
+    if (sector.key === 'services_societaux') {
+      color = CATEGORY_COLORS.services_societaux
+    } else if (!isConnected.value) {
       color = CATEGORY_COLORS[sector.key] || '#333'
     } else {
       color = getCategoryColor(sector.key)
@@ -191,87 +528,100 @@ const processSectors = (details: Record<string, number>, total: number) => {
   })
 }
 
-// --- CHARGEMENT DES DONNÉES ---
+async function computeModelDefaultStats() {
+  try {
+    const rules = await getRules()
+    const engine = new Engine(rules)
+    engine.setSituation({})
+
+    const bilanRes: any = engine.evaluate('bilan')
+    const globalScore = typeof bilanRes?.nodeValue === 'number' ? Math.round(bilanRes.nodeValue) : 8559
+
+    const detailsByCategory: Record<string, number> = {}
+    for (const key of ['transport', 'logement', 'alimentation', 'divers']) {
+      const r: any = engine.evaluate(key)
+      detailsByCategory[key] = typeof r?.nodeValue === 'number' ? Math.round(r.nodeValue) : 0
+    }
+
+    detailsByCategory.services_societaux = evaluateServicesSocietaux(engine, rules)
+
+    return { globalScore, detailsByCategory }
+  } catch (error) {
+    console.error('Erreur calcul moyenne par dÃ©faut NGC:', error)
+    return null
+  }
+}
+
+async function onWindowFocus() {
+  await refreshProgressAndScore()
+  if (isConnected.value) {
+    await loadDashboardMissions()
+    await friendsStore.fetchActivities()
+  }
+}
+
+function stopDisconnectedRefreshTimer() {
+  if (disconnectedRefreshTimer) {
+    clearInterval(disconnectedRefreshTimer)
+    disconnectedRefreshTimer = null
+  }
+}
+
+function startDisconnectedRefreshTimer() {
+  stopDisconnectedRefreshTimer()
+  if (isConnected.value) return
+
+  disconnectedRefreshTimer = setInterval(() => {
+    void refreshProgressAndScore()
+  }, 5000)
+}
+
+// --- CHARGEMENT DES DONNEES ---
 onMounted(async () => {
-  // Ensure user is loaded if connected
   if (isConnected.value && !authStore.user) {
     await authStore.fetchUser()
   }
 
-  // 1. On lance le chargement des progressions en arrière-plan
-  if (isConnected.value && authStore.user) {
-    store.fetchAllProgress(authStore.user.id)
-  }
+  await refreshProgressAndScore()
 
-  try {
-    let url = `${API_URL}/global-stats`
-    if (isConnected.value) {
-      const userId = authStore.user ? authStore.user.id : USER_ID
-      url = `${API_URL}/carbon-score/${userId}`
-    }
-
-    const response = await fetch(url)
-
-    if (response.ok) {
-      const data = await response.json()
-
-      // Mise à jour des scores globaux
-      userScore.value = data.global_score
-      // Si connecté, on compare à la moyenne nationale (déjà dans data)
-      // Si pas connecté, on affiche la moyenne globale comme score principal
-      averageScore.value = data.average_national_score || 0
-      calculateStatus(userScore.value, averageScore.value)
-
-      // Mise à jour dynamique du graphique
-      processSectors(data.details_by_category, data.global_score)
-    }
-  } catch (error) {
-    console.error('Erreur chargement:', error)
-    scoreComment.value = 'Erreur'
-  }
-
-  // load dashboard missions (real ones) only if connected
   if (isConnected.value) {
     await loadDashboardMissions()
     await friendsStore.fetchActivities()
   }
+
+  window.addEventListener('focus', onWindowFocus)
+  startDisconnectedRefreshTimer()
 })
 
-// Refresh missions when navigating back to this view (if cached)
+onUnmounted(() => {
+  window.removeEventListener('focus', onWindowFocus)
+  stopDisconnectedRefreshTimer()
+})
+
+// Refresh when navigating back to this view (if cached)
 onActivated(async () => {
+  await refreshProgressAndScore()
   if (isConnected.value) {
     await loadDashboardMissions()
     await friendsStore.fetchActivities()
-    if (authStore.user) {
-      store.fetchAllProgress(authStore.user.id)
-    }
   }
 })
 
-// Also refresh when the window regains focus
-window.addEventListener('focus', async () => {
-  if (isConnected.value) {
-    await loadDashboardMissions()
-    await friendsStore.fetchActivities()
-    if (authStore.user) {
-      store.fetchAllProgress(authStore.user.id)
-    }
-  }
-})
-
-// Watch for user changes to reload data (e.g. after login or page refresh)
 watch(
   () => authStore.user,
-  async (newUser) => {
-    if (newUser) {
-      store.fetchAllProgress(newUser.id)
+  async () => {
+    await refreshProgressAndScore()
+    if (isConnected.value) {
       await loadDashboardMissions()
       await friendsStore.fetchActivities()
-      store.fetchAllProgress(newUser.id)
-      await loadDashboardMissions()
     }
+    startDisconnectedRefreshTimer()
   },
 )
+
+watch(isConnected, () => {
+  startDisconnectedRefreshTimer()
+})
 </script>
 
 <template>
@@ -320,10 +670,10 @@ watch(
         <div class="split-content">
           <div class="info-side">
             <ul class="legend-list">
-              <li v-for="sector in sectors" :key="sector.name">
+              <li v-for="sector in legendSectors" :key="sector.name">
                 <span class="dot" :style="{ backgroundColor: sector.color }"></span>
                 <span :style="{ color: sector.color }">
-                  {{ sector.name }} ({{ sector.pct }}%)
+                  {{ sector.name }} ({{ Math.round(sector.pct) }}%)
                 </span>
               </li>
             </ul>
@@ -600,3 +950,5 @@ watch(
   opacity: 0.8;
 }
 </style>
+
+

@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 # --- USER ---
 class UserBase(BaseModel):
@@ -108,6 +108,12 @@ class UserAnswer(UserAnswerBase):
     user_id: int
     class Config:
         from_attributes = True
+
+
+class NgcStatsPayload(BaseModel):
+    global_score: int
+    details_by_category: Dict[str, float] = {}
+    category_progress: Dict[str, float] = {}
 
 # --- LEAGUE ---
 class LeagueBase(BaseModel):

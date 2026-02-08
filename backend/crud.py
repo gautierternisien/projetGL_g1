@@ -2,8 +2,17 @@ from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 import models, schemas
 from datetime import datetime
+import unicodedata
 
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+
+NGC_DEFAULT_BREAKDOWN = {
+    'transport': 2200,
+    'logement': 1700,
+    'alimentation': 2000,
+    'divers': 1200,
+    'services_societaux': 1459,
+}
 
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
@@ -132,6 +141,179 @@ def save_user_answer(db: Session, user_id: int, answer: schemas.UserAnswerBase):
     db.commit()
     db.refresh(db_answer)
     return db_answer
+
+
+def _normalize_ngc_category_key(raw_key: str) -> str:
+    normalized = ''.join(
+        c for c in unicodedata.normalize('NFD', str(raw_key).strip().lower())
+        if unicodedata.category(c) != 'Mn'
+    )
+    normalized = normalized.strip()
+    if normalized == 'services societaux':
+        return 'services_societaux'
+    return normalized
+
+
+def _safe_int(value, fallback: int = 0) -> int:
+    try:
+        return int(round(float(value)))
+    except Exception:
+        return fallback
+
+
+def _normalize_ngc_progress_map(raw_progress):
+    normalized_progress = {}
+    for k, v in (raw_progress or {}).items():
+        key = _normalize_ngc_category_key(k)
+        if key not in ('transport', 'logement', 'alimentation', 'divers'):
+            continue
+        normalized_progress[key] = max(0, min(100, _safe_int(v, 0)))
+    return normalized_progress
+
+
+def _get_default_ngc_breakdown(rows_by_user, progress_by_user):
+    candidates = []
+
+    for user_id, row in rows_by_user.items():
+        progress_row = progress_by_user.get(user_id)
+        if not progress_row:
+            continue
+
+        if (
+            _safe_int(getattr(progress_row, 'transport', 0), 0) != 0
+            or _safe_int(getattr(progress_row, 'logement', 0), 0) != 0
+            or _safe_int(getattr(progress_row, 'alimentation', 0), 0) != 0
+            or _safe_int(getattr(progress_row, 'divers', 0), 0) != 0
+        ):
+            continue
+
+        candidate = {
+            'transport': _safe_int(getattr(row, 'transport', 0), NGC_DEFAULT_BREAKDOWN['transport']),
+            'logement': _safe_int(getattr(row, 'logement', 0), NGC_DEFAULT_BREAKDOWN['logement']),
+            'alimentation': _safe_int(getattr(row, 'alimentation', 0), NGC_DEFAULT_BREAKDOWN['alimentation']),
+            'divers': _safe_int(getattr(row, 'divers', 0), NGC_DEFAULT_BREAKDOWN['divers']),
+            'services_societaux': _safe_int(
+                getattr(row, 'services_societaux', 0),
+                NGC_DEFAULT_BREAKDOWN['services_societaux'],
+            ),
+        }
+
+        if sum(candidate.values()) <= 0:
+            continue
+
+        candidates.append(candidate)
+
+    if not candidates:
+        return dict(NGC_DEFAULT_BREAKDOWN)
+
+    averaged = {}
+    for key in NGC_DEFAULT_BREAKDOWN:
+        averaged[key] = round(sum(c[key] for c in candidates) / len(candidates))
+
+    if sum(averaged.values()) <= 0:
+        return dict(NGC_DEFAULT_BREAKDOWN)
+
+    return averaged
+
+
+def upsert_user_ngc_stats(db: Session, user_id: int, payload: schemas.NgcStatsPayload):
+    details = payload.details_by_category or {}
+    progress = _normalize_ngc_progress_map(payload.category_progress or {})
+
+    normalized_details = {}
+    for k, v in details.items():
+        normalized_details[_normalize_ngc_category_key(k)] = _safe_int(v, 0)
+
+    row = db.query(models.UserNgcStat).filter(models.UserNgcStat.user_id == user_id).first()
+    if not row:
+        row = models.UserNgcStat(user_id=user_id)
+        db.add(row)
+
+    row.global_score = _safe_int(payload.global_score, 8559)
+    row.transport = normalized_details.get('transport', 0)
+    row.logement = normalized_details.get('logement', 0)
+    row.alimentation = normalized_details.get('alimentation', 0)
+    row.divers = normalized_details.get('divers', 0)
+    row.services_societaux = normalized_details.get('services_societaux', 0)
+    row.updated_at = datetime.now().isoformat()
+
+    progress_row = db.query(models.UserNgcProgress).filter(models.UserNgcProgress.user_id == user_id).first()
+    if not progress_row:
+        progress_row = models.UserNgcProgress(user_id=user_id)
+        db.add(progress_row)
+
+    progress_row.transport = progress.get('transport', 0)
+    progress_row.logement = progress.get('logement', 0)
+    progress_row.alimentation = progress.get('alimentation', 0)
+    progress_row.divers = progress.get('divers', 0)
+    progress_row.updated_at = datetime.now().isoformat()
+
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def get_ngc_stats_aggregate(db: Session):
+    all_users = db.query(models.User.id).all()
+    if not all_users:
+        return None
+
+    rows = db.query(models.UserNgcStat).all()
+    rows_by_user = {row.user_id: row for row in rows}
+    progress_rows = db.query(models.UserNgcProgress).all()
+    progress_by_user = {row.user_id: row for row in progress_rows}
+    default_breakdown = _get_default_ngc_breakdown(rows_by_user, progress_by_user)
+
+    total = len(all_users)
+
+    sums = {
+        'transport': 0,
+        'logement': 0,
+        'alimentation': 0,
+        'divers': 0,
+        'services_societaux': 0,
+    }
+
+    global_sum = 0
+    for user in all_users:
+        user_id = user.id
+        row = rows_by_user.get(user_id)
+
+        if row:
+            global_score = _safe_int(row.global_score, 8559)
+            global_sum += global_score
+
+            progress_row = progress_by_user.get(user_id)
+            for key in ('transport', 'logement', 'alimentation', 'divers'):
+                category_progress = _safe_int(getattr(progress_row, key, 0), 0) if progress_row else 0
+                if category_progress >= 100:
+                    sums[key] += _safe_int(getattr(row, key, 0), default_breakdown[key])
+                else:
+                    sums[key] += default_breakdown[key]
+
+            # Services sociétaux reste une composante "de base" du modèle.
+            sums['services_societaux'] += default_breakdown['services_societaux']
+            continue
+
+        # User has no pushed NGC stats yet: fallback to neutral model baseline.
+        global_sum += 8559
+        sums['transport'] += default_breakdown['transport']
+        sums['logement'] += default_breakdown['logement']
+        sums['alimentation'] += default_breakdown['alimentation']
+        sums['divers'] += default_breakdown['divers']
+        sums['services_societaux'] += default_breakdown['services_societaux']
+
+    return {
+        'global_score': round(global_sum / total),
+        'details_by_category': {
+            'transport': round(sums['transport'] / total),
+            'logement': round(sums['logement'] / total),
+            'alimentation': round(sums['alimentation'] / total),
+            'divers': round(sums['divers'] / total),
+            'services societaux': round(sums['services_societaux'] / total),
+        },
+        'user_count': total,
+    }
 
 def get_user_answers_by_category(db: Session, user_id: int, category_name: str):
     return db.query(models.UserAnswer).join(models.Question).filter(

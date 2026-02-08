@@ -4,6 +4,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict
 from datetime import timedelta, datetime
+from routes import router
 
 import crud, models, schemas, utils
 from database import SessionLocal, engine
@@ -15,6 +16,8 @@ app = FastAPI(
     description="API pour l'application ProjetGL : Calcul d'empreinte carbone, missions, et aspects sociaux.",
     version="1.0.0"
 )
+
+app.include_router(router)
 
 # Dependency
 def get_db():
@@ -213,6 +216,8 @@ QUESTIONS_DB = {
         },
     ],
 }
+
+NGC_DEFAULT_SCORE = 8559
 
 # --- SIMULATION FAUSSE DES MISSIONS ---
 MISSIONS_DB = {
@@ -701,6 +706,27 @@ def read_user_profile(user_id: int, db: Session = Depends(get_db), current_user:
 
 # --- NOUVELLE ROUTE : CALCUL DE L'IDENTITÉ CARBONE ---
 
+@app.post("/ngc/stats/me", tags=["Statistics"], summary="Upsert current user NGC stats")
+async def upsert_my_ngc_stats(
+    payload: schemas.NgcStatsPayload,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    row = crud.upsert_user_ngc_stats(db, current_user.id, payload)
+    return {
+        "status": "saved",
+        "user_id": current_user.id,
+        "global_score": row.global_score,
+        "details_by_category": {
+            "transport": row.transport,
+            "logement": row.logement,
+            "alimentation": row.alimentation,
+            "divers": row.divers,
+            "services societaux": row.services_societaux,
+        },
+        "updated_at": row.updated_at,
+    }
+
 @app.get("/carbon-score/{user_id}", tags=["Statistics"], summary="Calculate carbon score")
 async def get_carbon_score(user_id: int, db: Session = Depends(get_db)):
     """
@@ -762,6 +788,15 @@ async def get_global_stats(db: Session = Depends(get_db)):
     """
     Calcule la moyenne des scores de tous les utilisateurs enregistrés.
     """
+    # Priorite: moyenne des scores NGC reels pousses par les utilisateurs
+    ngc_aggregate = crud.get_ngc_stats_aggregate(db)
+    if ngc_aggregate:
+        return {
+            "global_score": ngc_aggregate["global_score"],
+            "average_national_score": NGC_DEFAULT_SCORE,
+            "details_by_category": ngc_aggregate["details_by_category"],
+            "user_count": ngc_aggregate["user_count"],
+        }
     # 1. Calcul du score national de référence (somme des defaults)
     sum_of_defaults = 0
     national_category_scores = {}
