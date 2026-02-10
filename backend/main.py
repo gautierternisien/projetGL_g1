@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, UniqueConstraint, func, or_
+from sqlalchemy import func, or_
 from typing import List, Optional, Dict
 from datetime import timedelta, datetime
 from routes import router
@@ -18,6 +18,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# On inclut le router qui sert le fichier rules.json
 app.include_router(router)
 
 # Dependency
@@ -30,15 +31,13 @@ def get_db():
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-# Configuration CORS pour autoriser le frontend (Vue.js) à parler au backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"], # Port par défaut de Vite/Vue
+    allow_origins=["http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 # Validated user getter
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
@@ -52,175 +51,26 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         user_id_str: str = payload.get("sub")
         if user_id_str is None:
             raise credentials_exception
-        token_data = schemas.TokenData(email=user_id_str) # reuse email field for user_id/sub
+        token_data = schemas.TokenData(email=user_id_str)
     except utils.JWTError:
         raise credentials_exception
 
-    # Try to get user by numeric ID first (new token format)
     try:
         user_id = int(token_data.email)
         user = crud.get_user(db, user_id)
     except (ValueError, TypeError):
-        # Fall back to username lookup (old token format for backward compatibility)
         user = crud.get_user_by_username(db, username=token_data.email)
 
     if user is None:
         raise credentials_exception
     return user
 
-# --- SIMULATION DE BASE DE DONNÉES ---
-# Dans un vrai projet, utilisez SQLite ou PostgreSQL
-QUESTIONS_DB = {
-    "transport": [
-        {
-            "id": 1,
-            "text": 'Quel est votre moyen de transport principal ?',
-            "options": [
-                { "label": 'Voiture personnelle (diesel)', "value": 'car', "score": 2000, "is_default": True },
-                { "label": 'Voiture personnelle (électrique)', "value": 'electric car', "score": 950,},
-                { "label": 'Transports en commun (Bus)', "value": 'bus', "score": 850 },
-                { "label": 'Transports en commun (Rail)', "value": 'rail', "score": 40 },
-                { "label": 'Vélo / Marche', "value": 'soft', "score": 0 },
-            ],
-        },
-        {
-            "id": 2,
-            "text": 'Combien de km parcourez-vous par jour ?',
-            "options": [
-                { "label": 'Moins de 5 km', "value": 'low', "score": 100 },
-                { "label": 'Entre 5 et 20 km', "value": 'medium', "score": 500, "is_default": True },
-                { "label": 'Plus de 20 km', "value": 'high', "score": 1000 },
-            ],
-        },
-        {
-            "id": 3,
-            "text": 'À quelle fréquence faites-vous du covoiturage ?',
-            "options": [
-                { "label": 'Régulièrement', "value": 'regular', "score": -200 }, # Bonus
-                { "label": 'Rarement', "value": 'rare', "score": -50 },
-                { "label": 'Jamais', "value": 'never', "score": 0, "is_default": True },
-            ],
-        },
-        {
-            "id": 4,
-            "text": "Prenez-vous l'avion pour vos vacances ?",
-            "options": [
-                { "label": 'Plusieurs fois par an', "value": 'often', "score": 3000 },
-                { "label": 'Une fois par an', "value": 'once', "score": 1000 },
-                { "label": 'Rarement ou jamais', "value": 'never', "score": 0, "is_default": True },
-            ],
-        },
-    ],
-    "alimentation": [
-        {
-            "id": 101,
-            "text": 'Combien de repas avec viande mangez-vous par semaine ?',
-            "options": [
-                { "label": 'Tous les jours', "value": 'high', "score": 2000 },
-                { "label": '1 à 3 fois', "value": 'medium', "score": 1000, "is_default": True },
-                { "label": 'Jamais (Végétarien)', "value": 'none', "score": 300 },
-            ],
-        },
-        {
-            "id": 102,
-            "text": "Vous consommez de l'eau en ?",
-            "options": [
-                { "label": 'Bouteille', "value": 'plastic', "score": 200 },
-                { "label": 'Robinet', "value": 'tap', "score": 10, "is_default": True },
-            ],
-        },
-        {
-            "id": 103,
-            "text": 'Consommation de produits laitiers ?',
-            "options": [
-                { "label": 'Importante', "value": 'high', "score": 800 },
-                { "label": 'Modérée', "value": 'medium', "score": 400, "is_default": True },
-                { "label": 'Faible', "value": 'low', "score": 100 },
-            ],
-        },
-        {
-            "id": 104,
-            "text": 'Jetez-vous de la nourriture ?',
-            "options": [
-                { "label": 'Souvent', "value": 'often', "score": 300 },
-                { "label": 'Parfois', "value": 'sometimes', "score": 100, "is_default": True },
-                { "label": 'Jamais', "value": 'never', "score": 0 },
-            ],
-        },
-    ],
-    "logement": [
-        {
-            "id": 201,
-            "text": 'Système de chauffage principal ?',
-            "options": [
-                { "label": 'Fioul ou Gaz', "value": 'fossil', "score": 2500, "is_default": True },
-                { "label": 'Électrique', "value": 'electric', "score": 800 },
-                { "label": 'Pompe à chaleur / Bois', "value": 'renewable', "score": 200 },
-            ],
-        },
-        {
-            "id": 202,
-            "text": 'Température l\'hiver ?',
-            "options": [
-                { "label": 'Plus de 21°C', "value": 'hot', "score": 500 },
-                { "label": 'Entre 19°C et 21°C', "value": 'standard', "score": 200, "is_default": True },
-                { "label": '19°C ou moins', "value": 'eco', "score": 0 },
-            ],
-        },
-        {
-            "id": 203,
-            "text": 'Qualité de l\'isolation ?',
-            "options": [
-                { "label": 'Mauvaise', "value": 'bad', "score": 1000 },
-                { "label": 'Moyenne', "value": 'average', "score": 500, "is_default": True },
-                { "label": 'Bonne', "value": 'good', "score": 100 },
-            ],
-        },
-        {
-            "id": 204,
-            "text": 'Surface par personne ?',
-            "options": [
-                { "label": 'Grande (+60m²)', "value": 'large', "score": 800 },
-                { "label": 'Moyenne (30-60m²)', "value": 'medium', "score": 400, "is_default": True },
-                { "label": 'Petite (-30m²)', "value": 'small', "score": 200 },
-            ],
-        },
-        {
-            "id": 205,
-            "text": 'Quel type de jardin ?',
-            "options": [
-                { "label": "Pas d'éxtérieur ", "value": 'no', "score": 0, "is_default": True },
-                { "label": "Grande pelouse avec beaucoup d'entretien et de dalles/béton", "value": "high", "score": 500},
-                { "label": 'Jardin classique', "value": 'classic', "score": 50 },
-                { "label": "Jardin positif pour le climat (Compostage, potager,récupération d'eau", "value": 'eco', "score": -200}
-            ],
-        }
-    ],
-    "divers": [
-        {
-            "id": 301,
-            "text": 'Achat vêtements neufs ?',
-            "options": [
-                { "label": 'Chaque mois', "value": 'monthly', "score": 600 },
-                { "label": 'Quelques fois par an', "value": 'yearly', "score": 200, "is_default": True },
-                { "label": 'Seconde main', "value": 'rarely', "score": 50 },
-            ],
-        },
-        {
-            "id": 302,
-            "text": 'Quand un appareil est en panne ?',
-            "options": [
-                { "label": 'Achat neuf', "value": 'replace', "score": 500 },
-                { "label": 'Réparation', "value": 'repair', "score": 100, "is_default": True },
-                { "label": 'Occasion', "value": 'secondhand', "score": 50 },
-            ],
-        },
-    ],
-}
+# --- CONSTANTES ---
 
+# Score par défaut (moyenne française approx) utilisé comme fallback
 NGC_DEFAULT_SCORE = 8559
 
-# --- SIMULATION FAUSSE DES MISSIONS ---
+# --- SIMULATION DES MISSIONS (On garde ça pour l'instant) ---
 MISSIONS_DB = {
     "transport": [
         { "id": 1, "title": 'Prendre le vélo', "description": 'Remplacez un trajet voiture par vélo', "status": 'en_cours' },
@@ -240,23 +90,21 @@ MISSIONS_DB = {
     ],
 }
 
-
 # --- DATA INITIALIZATION ---
 def init_db_from_static_data(db: Session):
-    for category_name, questions in QUESTIONS_DB.items():
-        # Get or create category
+    """
+    Initialise uniquement les missions et catégories si nécessaire.
+    Les questions sont maintenant gérées par Publicodes (rules.json).
+    """
+    # On initialise les missions
+    for category_name, missions in MISSIONS_DB.items():
+        # On s'assure que la catégorie existe
         cat = crud.get_category_by_name(db, category_name)
         if not cat:
             cat = crud.create_category(db, category_name)
 
-        # Questions
-        for q_data in questions:
-            crud.create_question(db, q_data, category_name)
-
-    # Also init missions
-    for category_name, missions in MISSIONS_DB.items():
-         for m_data in missions:
-             crud.create_mission(db, m_data, category_name)
+        for m_data in missions:
+            crud.create_mission(db, m_data, category_name)
 
 @app.on_event("startup")
 def startup_event():
@@ -267,7 +115,7 @@ def startup_event():
         db.close()
 
 # Feed des activités : { "username_receiver": [ { "sender_username": "...", "mission_id": 1, ... } ] }
-user_feed_db: Dict[str, List[Dict]] = {} 
+user_feed_db: Dict[str, List[Dict]] = {}
 
 # --- ROUTES API ---
 
@@ -283,9 +131,7 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
 
 @app.post("/token", response_model=schemas.Token, tags=["Authentication"], summary="Login to get access token")
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    # Try to find user by username
     user = crud.get_user_by_username(db, username=form_data.username)
-    # If not found, try by email
     if not user:
         user = crud.get_user_by_email(db, email=form_data.username)
 
@@ -306,78 +152,66 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
 async def read_users_me(current_user: models.User = Depends(get_current_user)):
     return current_user
 
-@app.put("/users/me/email", response_model=schemas.User, tags=["Users"], summary="Update user email")
+# ... (Gardez les routes PUT /users/me/... ici, inchangées) ...
+@app.put("/users/me/email", response_model=schemas.User, tags=["Users"])
 async def update_user_email(new_email: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # Check if email already exists (excluding current user)
     existing_user = crud.get_user_by_email(db, email=new_email)
     if existing_user and existing_user.id != current_user.id:
         raise HTTPException(status_code=400, detail="Adresse mail déjà utilisée")
     return crud.update_user_email(db, current_user.id, new_email)
 
-@app.put("/users/me/username", response_model=schemas.User, tags=["Users"], summary="Update username")
+@app.put("/users/me/username", response_model=schemas.User, tags=["Users"])
 async def update_user_username(new_username: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # Check if username already exists (excluding current user)
     existing_user = crud.get_user_by_username(db, username=new_username)
     if existing_user and existing_user.id != current_user.id:
         raise HTTPException(status_code=400, detail="Pseudo déjà utilisé")
-    
-    # Before updating, migrate data from old username to numeric user_id in in-memory stores
+
+    # Migration des feeds (logique existante)
     old_username = current_user.username
     user_id = current_user.id
-    
-    # Migrate personal feed key and refresh sender_username in existing activities
     if old_username in user_feed_db:
         user_feed_db[new_username] = user_feed_db.pop(old_username)
     for feed in user_feed_db.values():
         for act in feed:
             if act.get("sender_id") == user_id:
                 act["sender_username"] = new_username
-    
+
     return crud.update_user_username(db, current_user.id, new_username)
 
-@app.put("/users/me/first_name", response_model=schemas.User, tags=["Users"], summary="Update first name")
+@app.put("/users/me/first_name", response_model=schemas.User, tags=["Users"])
 async def update_user_first_name(new_first_name: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     return crud.update_user_first_name(db, current_user.id, new_first_name)
 
-@app.put("/users/me/last_name", response_model=schemas.User, tags=["Users"], summary="Update last name")
+@app.put("/users/me/last_name", response_model=schemas.User, tags=["Users"])
 async def update_user_last_name(new_last_name: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     return crud.update_user_last_name(db, current_user.id, new_last_name)
 
-@app.put("/users/me/password", response_model=schemas.User, tags=["Users"], summary="Update password")
+@app.put("/users/me/password", response_model=schemas.User, tags=["Users"])
 async def update_user_password(current_password: str, new_password: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     if not crud.verify_password(current_password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Mot de passe actuel incorrect")
     return crud.update_user_password(db, current_user.id, new_password)
 
-@app.get("/users", response_model=List[schemas.UserPublic], tags=["Users"], summary="Search users")
+# ... (Gardez les routes Friends inchangées ici) ...
+@app.get("/users", response_model=List[schemas.UserPublic], tags=["Users"])
 async def search_users(prefix: str = "", current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if len(prefix) < 3:
-        return []
+    if len(prefix) < 3: return []
     users = crud.search_users_by_prefix(db, prefix)
-    # Get accepted friends and pending requests sent
     friend_ids = set(crud.get_accepted_friends(db, current_user.id))
     pending_requests = crud.get_pending_requests_sent(db, current_user.id)
     pending_receiver_ids = set(r.receiver_id for r in pending_requests)
-    # Exclure soi-même, amis acceptés, et demandes en attente
     filtered = [u for u in users if u.id != current_user.id and u.id not in friend_ids and u.id not in pending_receiver_ids]
     return filtered
 
-
-@app.get("/friends", response_model=List[schemas.UserPublic], tags=["Friends"], summary="List accepted friends")
+@app.get("/friends", response_model=List[schemas.UserPublic], tags=["Friends"])
 async def list_friends(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     friend_ids = crud.get_accepted_friends(db, current_user.id)
-    if not friend_ids:
-        return []
-    friends = crud.get_users_by_ids(db, friend_ids)
-    return friends
+    if not friend_ids: return []
+    return crud.get_users_by_ids(db, friend_ids)
 
-@app.get("/friends/activity", response_model=List[schemas.FriendActivity], tags=["Friends"], summary="Get friends activity feed")
+@app.get("/friends/activity", response_model=List[schemas.FriendActivity], tags=["Friends"])
 async def get_friends_activity(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # Récupérer le feed personnel de l'utilisateur
     my_feed = user_feed_db.get(current_user.username, [])
-    
-    # Transformer pour le schema de réponse
-    # On renvoie la liste inversée pour avoir le plus récent en premier
     response_activities = []
     for activity in reversed(my_feed):
         response_activities.append(schemas.FriendActivity(
@@ -388,49 +222,29 @@ async def get_friends_activity(current_user: models.User = Depends(get_current_u
             status=activity["status"],
             timestamp=activity["timestamp"].isoformat() if activity.get("timestamp") else None
         ))
-            
     return response_activities
 
-
-@app.post("/friend-requests/{friend_id}", tags=["Friends"], summary="Send friend request")
+@app.post("/friend-requests/{friend_id}", tags=["Friends"])
 async def send_friend_request(friend_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     target = crud.get_user(db, friend_id)
-    if not target:
-        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+    if not target: raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
     try:
         req = crud.send_friend_request(db, current_user.id, friend_id)
         return {"id": req.id, "status": "pending", "receiver": {"id": target.id, "username": target.username}}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-
-@app.get("/friend-requests/pending", response_model=List[schemas.FriendRequestSchema], tags=["Friends"], summary="Get pending sent requests")
+@app.get("/friend-requests/pending", response_model=List[schemas.FriendRequestSchema], tags=["Friends"])
 async def get_pending_requests(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     requests = crud.get_pending_requests_sent(db, current_user.id)
-    return [
-        {
-            "id": r.id,
-            "sender": {"id": r.sender.id, "username": r.sender.username, "profile_image": r.sender.profile_image},
-            "receiver": {"id": r.receiver.id, "username": r.receiver.username, "profile_image": r.receiver.profile_image},
-            "status": r.status
-        } for r in requests
-    ]
+    return [{"id": r.id, "sender": {"id": r.sender.id, "username": r.sender.username, "profile_image": r.sender.profile_image}, "receiver": {"id": r.receiver.id, "username": r.receiver.username, "profile_image": r.receiver.profile_image}, "status": r.status} for r in requests]
 
-
-@app.get("/friend-requests/incoming", response_model=List[schemas.FriendRequestSchema], tags=["Friends"], summary="Get incoming friend requests")
+@app.get("/friend-requests/incoming", response_model=List[schemas.FriendRequestSchema], tags=["Friends"])
 async def get_incoming_requests(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     requests = crud.get_incoming_requests(db, current_user.id)
-    return [
-        {
-            "id": r.id,
-            "sender": {"id": r.sender.id, "username": r.sender.username, "profile_image": r.sender.profile_image},
-            "receiver": {"id": r.receiver.id, "username": r.receiver.username, "profile_image": r.receiver.profile_image},
-            "status": r.status
-        } for r in requests
-    ]
+    return [{"id": r.id, "sender": {"id": r.sender.id, "username": r.sender.username, "profile_image": r.sender.profile_image}, "receiver": {"id": r.receiver.id, "username": r.receiver.username, "profile_image": r.receiver.profile_image}, "status": r.status} for r in requests]
 
-
-@app.put("/friend-requests/{request_id}/accept", tags=["Friends"], summary="Accept friend request")
+@app.put("/friend-requests/{request_id}/accept", tags=["Friends"])
 async def accept_request(request_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         req = crud.accept_friend_request(db, request_id)
@@ -438,8 +252,7 @@ async def accept_request(request_id: int, current_user: models.User = Depends(ge
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-
-@app.put("/friend-requests/{request_id}/reject", tags=["Friends"], summary="Reject friend request")
+@app.put("/friend-requests/{request_id}/reject", tags=["Friends"])
 async def reject_request(request_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         crud.reject_friend_request(db, request_id)
@@ -447,8 +260,7 @@ async def reject_request(request_id: int, current_user: models.User = Depends(ge
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-
-@app.put("/friend-requests/{request_id}/cancel", tags=["Friends"], summary="Cancel sent friend request")
+@app.put("/friend-requests/{request_id}/cancel", tags=["Friends"])
 async def cancel_request(request_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         crud.cancel_friend_request(db, request_id)
@@ -456,76 +268,43 @@ async def cancel_request(request_id: int, current_user: models.User = Depends(ge
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-
-@app.delete("/friends/{friend_id}", tags=["Friends"], summary="Remove friend")
+@app.delete("/friends/{friend_id}", tags=["Friends"])
 async def delete_friend(friend_id: int, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # Find the accepted request between them
     req = db.query(models.FriendRequest).filter(
         ((models.FriendRequest.sender_id == current_user.id) & (models.FriendRequest.receiver_id == friend_id)) |
         ((models.FriendRequest.sender_id == friend_id) & (models.FriendRequest.receiver_id == current_user.id)),
         models.FriendRequest.status == "accepted"
     ).first()
     if req:
-        # Supprimer aussi le lien dans friend_links via crud.remove_friend
         crud.remove_friend(db, current_user.id, friend_id)
-        
         db.delete(req)
         db.commit()
-
-        # Nettoyage des feeds d'activités
-        # 1. Retirer les activités de l'ami supprimé dans MON feed
+        # Nettoyage feed (code simplifié)
         friend_user = crud.get_user(db, friend_id)
         if friend_user:
             friend_username = friend_user.username
             if current_user.username in user_feed_db:
-                user_feed_db[current_user.username] = [
-                    act for act in user_feed_db[current_user.username] 
-                    if act["sender_username"] != friend_username
-                ]
-            
-            # 2. Retirer MES activités dans le feed de l'ami supprimé
+                user_feed_db[current_user.username] = [act for act in user_feed_db[current_user.username] if act["sender_username"] != friend_username]
             if friend_username in user_feed_db:
-                user_feed_db[friend_username] = [
-                    act for act in user_feed_db[friend_username] 
-                    if act["sender_username"] != current_user.username
-                ]
-
+                user_feed_db[friend_username] = [act for act in user_feed_db[friend_username] if act["sender_username"] != current_user.username]
     return {"deleted": True}
 
 @app.get("/", tags=["General"], summary="Root endpoint")
 async def root():
+    # On renvoie les clés de la DB Missions pour compatibilité, ou les catégories statiques
     return {
-        "message": "API Questionnaire Multi-Catégories",
-        "available_categories": list(QUESTIONS_DB.keys())
+        "message": "API Questionnaire Multi-Catégories (Mode Publicodes)",
+        "available_categories": list(MISSIONS_DB.keys())
     }
 
-@app.get("/questions/{category}", response_model=List[schemas.Question], tags=["Questions"], summary="Get questions by category")
-async def get_questions_by_category(category: str, db: Session = Depends(get_db)):
-    """
-    Récupère les questions d'une catégorie spécifique (ex: /questions/transport)
-    """
-    # Use DB
-    qs = crud.get_questions_by_category(db, category)
-    if not qs:
-         # Fallback to dictionary if not in DB yet (or empty)
-         if category in QUESTIONS_DB:
-             return QUESTIONS_DB[category]
-         raise HTTPException(status_code=404, detail="Catégorie non trouvée")
-    return qs # Pydantic will serialize SQL Alchemy objects
+# NOTE : Les routes /questions/{category} et /answers/... ont été supprimées
+# car le frontend utilise maintenant Publicodes et /ngc/stats/me.
 
 @app.get("/missions/{category}", response_model=List[schemas.Mission], tags=["Missions"], summary="Get missions by category")
 async def get_missions_by_category(category: str, user_id: Optional[int] = None, db: Session = Depends(get_db)):
     """
-    Récupère les missions d'une catégorie spécifique (ex: /missions/transport).
-    Si user_id est fourni, retourne les statuts personnalisés.
-    Sinon, retourne les missions avec statut 'new' par défaut.
+    Récupère les missions d'une catégorie spécifique.
     """
-    # Check category existence
-    if category not in QUESTIONS_DB and category not in MISSIONS_DB:
-        # Note: MISSIONS_DB used as reference for category existence,
-        # but better to check DB if possible.
-        pass
-
     if user_id:
         return crud.get_missions_by_category(db, category, user_id)
     else:
@@ -537,64 +316,49 @@ async def get_missions_by_category(category: str, user_id: Optional[int] = None,
             m_data.status = "new"
             result.append(m_data)
 
-        # Fallback if DB empty but static has it (should not happen due to init)
+        # Fallback si la DB est vide mais que la variable statique existe
         if not result and category in MISSIONS_DB:
-             for m in MISSIONS_DB[category]:
-                  # Convert dict to schema
-                  m_obj = schemas.Mission(**m)
-                  m_obj.status = "new"
-                  result.append(m_obj)
+            for m in MISSIONS_DB[category]:
+                m_obj = schemas.Mission(**m)
+                m_obj.status = "new"
+                result.append(m_obj)
 
         if not result:
-             raise HTTPException(status_code=404, detail="Catégorie de missions non trouvée")
+            raise HTTPException(status_code=404, detail="Catégorie de missions non trouvée")
 
         return result
-
-
-
 
 @app.put("/missions/{mission_id}", tags=["Missions"], summary="Update mission status")
 async def update_mission(mission_id: int, payload: schemas.MissionUpdate, db: Session = Depends(get_db)):
     """
-    Met à jour le statut d'une mission identifiée par son `id`.
-    Si user_id est fourni, met à jour le statut pour cet utilisateur uniquement.
+    Met à jour le statut d'une mission.
     """
-    # 1. Vérifier si la mission existe (via DB)
     mission_db = db.query(models.Mission).filter(models.Mission.id == mission_id).first()
-
     mission_title = "Unknown Mission"
 
-    # Fallback sur MISSIONS_DB si pas trouvé en base (cas hybride)
     if not mission_db:
-         # Try finding in static DB
-         found = False
-         for cat, missions in MISSIONS_DB.items():
+        found = False
+        for cat, missions in MISSIONS_DB.items():
             for m in missions:
                 if int(m.get('id')) == mission_id:
                     mission_title = m.get('title', 'Mission')
                     found = True
                     break
             if found: break
-         if not found:
+        if not found:
             raise HTTPException(status_code=404, detail="Mission non trouvée")
     else:
         mission_title = mission_db.title
 
     if payload.user_id:
-        # Utiliser CRUD pour persister le statut
-        # Note: update_user_mission_status handles created_at/completed_at logic
         crud.update_user_mission_status(db, payload.user_id, mission_id, payload.status)
 
-        # Enregistrement dans le feed des amis si terminé
+        # Feed activity
         if payload.status == 'termine':
-            # 1. Recuperer l'ID de l'utilisateur qui a terminé la mission
             user = crud.get_user(db, payload.user_id)
             if user:
-                # 2. Recuperer ses amis
                 friend_ids = crud.get_accepted_friends(db, user.id)
                 friends = crud.get_users_by_ids(db, friend_ids)
-                
-                # 3. Ajouter l'activité dans le feed de chaque ami
                 new_activity = {
                     "sender_id": payload.user_id,
                     "sender_username": user.username,
@@ -603,97 +367,24 @@ async def update_mission(mission_id: int, payload: schemas.MissionUpdate, db: Se
                     "status": payload.status,
                     "timestamp": datetime.now()
                 }
-                
                 for friend in friends:
-                    if friend.username not in user_feed_db:
-                        user_feed_db[friend.username] = []
+                    if friend.username not in user_feed_db: user_feed_db[friend.username] = []
                     user_feed_db[friend.username].append(new_activity)
-            
+
         return {"id": mission_id, "status": payload.status}
     else:
         raise HTTPException(status_code=400, detail="User ID is required for mission update")
 
-
-@app.post("/answers/{category}/{user_id}", tags=["Answers"], summary="Save user answer")
-async def save_answer(category: str, user_id: int, answer: schemas.UserAnswerBase, db: Session = Depends(get_db)):
-    """
-    Sauvegarde une réponse pour une catégorie et un utilisateur donnés.
-    Calcule la progression de CETTE catégorie.
-    """
-    # 1. Vérifier si la catégorie existe
-    if category not in QUESTIONS_DB:
-        raise HTTPException(status_code=404, detail="Catégorie inconnue")
-
-    # 2. Sauvegarder en DB
-    crud.save_user_answer(db, user_id, schemas.UserAnswerBase(
-        question_id=answer.question_id,
-        answer_value=answer.answer_value
-    ))
-
-    # 3. Calcul de progression pour CETTE catégorie
-    answers_list = crud.get_user_answers_by_category(db, user_id, category)
-
-    total_questions = len(QUESTIONS_DB[category])
-    answered_count = len(answers_list)
-
-    progress = 0
-    if total_questions > 0:
-        progress = round((answered_count / total_questions) * 100)
-
-    current_answers_dict = {a.question_id: a.answer_value for a in answers_list}
-
-    return {
-        "status": "saved",
-        "category": category,
-        "progress": progress,
-        "current_answers": current_answers_dict
-    }
-
-@app.get("/answers/{category}/{user_id}", tags=["Answers"], summary="Get user progress in category")
-async def get_user_category_progress(category: str, user_id: int, db: Session = Depends(get_db)):
-    """
-    Récupère les réponses d'un utilisateur pour une catégorie spécifique.
-    """
-    answers_list = crud.get_user_answers_by_category(db, user_id, category)
-
-    current_answers_dict = {a.question_id: a.answer_value for a in answers_list}
-    answered_count = len(answers_list)
-    total_questions = len(QUESTIONS_DB.get(category, []))
-
-    progress = 0
-    if total_questions > 0:
-        progress = round((answered_count / total_questions) * 100)
-
-    return {
-        "progress": progress,
-        "answers": current_answers_dict
-    }
-
-@app.delete("/answers/{category}/{user_id}", tags=["Answers"], summary="Reset user answers in category")
-async def reset_category_progress(category: str, user_id: int, db: Session = Depends(get_db)):
-    """
-    Supprime les réponses d'un utilisateur pour une catégorie spécifique.
-    """
-    crud.reset_user_answers_by_category(db, user_id, category)
-
-    return {
-        "status": "reset",
-        "category": category,
-        "progress": 0
-    }
-
 @app.get("/users/{user_id}/profile", response_model=schemas.FriendProfile, tags=["Users"], summary="Get user public profile")
 def read_user_profile(user_id: int, db: Session = Depends(get_db), current_user: schemas.User = Depends(get_current_user)):
     user = crud.get_user(db, user_id=user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    if not user: raise HTTPException(status_code=404, detail="User not found")
 
     mission_count = crud.get_completed_missions_count(db, user_id=user_id)
-
-    # Placeholder values for now as requested
+    # Placeholder stats
     trophy_count = 0
-    level = 5  # Mock level
-    xp = 60    # Mock XP percentage
+    level = 5
+    xp = 60
 
     return schemas.FriendProfile(
         id=user.id,
@@ -705,14 +396,15 @@ def read_user_profile(user_id: int, db: Session = Depends(get_db), current_user:
         profile_image=user.profile_image
     )
 
-# --- NOUVELLE ROUTE : CALCUL DE L'IDENTITÉ CARBONE ---
+# --- ROUTES STATISTIQUES NGC (Publicodes) ---
 
 @app.post("/ngc/stats/me", tags=["Statistics"], summary="Upsert current user NGC stats")
 async def upsert_my_ngc_stats(
-    payload: schemas.NgcStatsPayload,
-    current_user: models.User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+        payload: schemas.NgcStatsPayload,
+        current_user: models.User = Depends(get_current_user),
+        db: Session = Depends(get_db),
 ):
+    # C'est ici que le frontend envoie les calculs du moteur Publicodes
     row = crud.upsert_user_ngc_stats(db, current_user.id, payload)
     return {
         "status": "saved",
@@ -728,72 +420,48 @@ async def upsert_my_ngc_stats(
         "updated_at": row.updated_at,
     }
 
-@app.get("/carbon-score/{user_id}", tags=["Statistics"], summary="Calculate carbon score")
+@app.get("/carbon-score/{user_id}", tags=["Statistics"], summary="Get user stored carbon score")
 async def get_carbon_score(user_id: int, db: Session = Depends(get_db)):
     """
-    Calcule le score carbone total de l'utilisateur.
+    Récupère le score carbone STOCKÉ en base (calculé par le front via Publicodes).
+    Ne recalcule plus via l'ancienne QUESTIONS_DB.
     """
+    ngc_stat = db.query(models.UserNgcStat).filter(models.UserNgcStat.user_id == user_id).first()
 
-    global_score = 0
-    category_scores = {}
-
-    # Récupérer TOUTES les réponses de l'utilisateur
-    # Pour faire simple, on itère par catégorie
-
-    for category, questions in QUESTIONS_DB.items():
-        cat_score = 0
-
-        # Récupérer réponses en DB
-        answers_list = crud.get_user_answers_by_category(db, user_id, category)
-        user_cat_answers = {a.question_id: a.answer_value for a in answers_list}
-
-        for question in questions:
-            user_val = user_cat_answers.get(question['id'])
-            score_added = False
-
-            # On cherche l'option correspondante
-            for option in question['options']:
-                if user_val == option['value']:
-                    cat_score += option['score']
-                    score_added = True
-                    break
-
-            # Cas 2 : L'utilisateur n'a pas répondu, valeur par défaut
-            if not score_added:
-                for option in question['options']:
-                    if option.get('is_default'):
-                        cat_score += option['score']
-                        break
-
-        category_scores[category] = cat_score
-        global_score += cat_score
-
-    # Calcul de la moyenne française
-    average_score = 0
-    for cat, questions in QUESTIONS_DB.items():
-        for q in questions:
-            for opt in q['options']:
-                if opt.get('is_default'):
-                    average_score += opt['score']
-
-    return {
-        "user_id": user_id,
-        "global_score": global_score,
-        "average_national_score": average_score,
-        "details_by_category": category_scores,
-        "unit": "points_impact"
-    }
+    if ngc_stat:
+        return {
+            "user_id": user_id,
+            "global_score": ngc_stat.global_score,
+            "average_national_score": NGC_DEFAULT_SCORE,
+            "details_by_category": {
+                "transport": ngc_stat.transport,
+                "logement": ngc_stat.logement,
+                "alimentation": ngc_stat.alimentation,
+                "divers": ngc_stat.divers,
+                "services_societaux": ngc_stat.services_societaux
+            },
+            "unit": "points_impact"
+        }
+    else:
+        # Pas de données encore, on renvoie la moyenne par défaut
+        return {
+            "user_id": user_id,
+            "global_score": NGC_DEFAULT_SCORE,
+            "average_national_score": NGC_DEFAULT_SCORE,
+            "details_by_category": {}, # Ou des valeurs par défaut
+            "unit": "points_impact"
+        }
 
 @app.get("/global-stats", tags=["Statistics"], summary="Get global statistics")
 async def get_global_stats(db: Session = Depends(get_db)):
     """
-    Calcule les statistiques globales de l'application.
+    Calcule les statistiques globales en utilisant les agrégats de UserNgcStat.
     """
     stats = {
         "global_score": NGC_DEFAULT_SCORE,
         "average_national_score": NGC_DEFAULT_SCORE,
         "details_by_category": {},
-        "user_count": 0, # C'est cette valeur qu'on va utiliser
+        "user_count": 0,
         "total_leagues": 0,
         "total_missions_completed": 0,
         "total_trophies": 0
@@ -841,179 +509,76 @@ async def get_global_stats(db: Session = Depends(get_db)):
 
     return stats
 
-# --- LEAGUE ROUTES ---
-@app.post("/leagues/", response_model=schemas.League, tags=["Leagues"], summary="Create a new league")
+# ... (Routes LEAGUES et PROFILE IMAGE inchangées) ...
+@app.post("/leagues/", response_model=schemas.League, tags=["Leagues"])
 async def create_league_route(league: schemas.LeagueCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    try:
-        return crud.create_league(db=db, league=league, creator_id=current_user.id)
-    except Exception as e:
-        print(f"Error creating league: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
+    try: return crud.create_league(db=db, league=league, creator_id=current_user.id)
+    except Exception as e: raise HTTPException(status_code=400, detail=str(e))
 
-@app.get("/leagues/active", response_model=List[schemas.League], tags=["Leagues"], summary="Get active leagues")
+@app.get("/leagues/active", response_model=List[schemas.League], tags=["Leagues"])
 def get_active_leagues(current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
     return crud.get_active_leagues_for_user(db, current_user.id)
 
-@app.get("/leagues/archived", response_model=List[schemas.League], tags=["Leagues"], summary="Get archived leagues")
+@app.get("/leagues/archived", response_model=List[schemas.League], tags=["Leagues"])
 def get_archived_leagues(current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
     return crud.get_archived_leagues_for_user(db, current_user.id)
 
-@app.get("/leagues/invites", response_model=List[schemas.LeagueInvite], tags=["Leagues"], summary="Get pending league invites")
+@app.get("/leagues/invites", response_model=List[schemas.LeagueInvite], tags=["Leagues"])
 def get_invites(current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
     invites = crud.get_pending_league_invites(db, current_user.id)
-    result = []
-    for inc in invites:
-        league = crud.get_league(db, inc.league_id)
-        inviter = crud.get_user(db, inc.inviter_id)
-        result.append(schemas.LeagueInvite(
-            id=inc.id,
-            league_id=inc.league_id,
-            league_name=league.name if league else "Unknown",
-            inviter_id=inc.inviter_id,
-            inviter_name=inviter.username if inviter else "Unknown",
-            invitee_id=inc.invitee_id,
-            status=inc.status
-        ))
-    return result
+    return [{"id": i.id, "league_id": i.league_id, "league_name": crud.get_league(db, i.league_id).name if crud.get_league(db, i.league_id) else "Unknown", "inviter_id": i.inviter_id, "inviter_name": crud.get_user(db, i.inviter_id).username, "invitee_id": i.invitee_id, "status": i.status} for i in invites]
 
-@app.get("/leagues/{league_id}/invites", response_model=List[schemas.LeagueInvite], tags=["Leagues"], summary="Get invites for a league")
+@app.get("/leagues/{league_id}/invites", response_model=List[schemas.LeagueInvite], tags=["Leagues"])
 def get_league_invites_route(league_id: int, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
     league = crud.get_league(db, league_id)
-    if not league:
-        raise HTTPException(status_code=404, detail="League not found")
-
-    is_member = any(m.user_id == current_user.id for m in league.members)
-    if not is_member:
-        raise HTTPException(status_code=403, detail="Not a member of this league")
-
+    if not league: raise HTTPException(status_code=404, detail="League not found")
+    if not any(m.user_id == current_user.id for m in league.members): raise HTTPException(status_code=403, detail="Not a member")
     invites = crud.get_league_invites(db, league_id)
-    result = []
-    for inc in invites:
-        inviter = crud.get_user(db, inc.inviter_id)
-        result.append(schemas.LeagueInvite(
-            id=inc.id,
-            league_id=inc.league_id,
-            league_name=league.name,
-            inviter_id=inc.inviter_id,
-            inviter_name=inviter.username if inviter else "Unknown",
-            invitee_id=inc.invitee_id,
-            status=inc.status
-        ))
-    return result
+    return [{"id": i.id, "league_id": i.league_id, "league_name": league.name, "inviter_id": i.inviter_id, "inviter_name": crud.get_user(db, i.inviter_id).username, "invitee_id": i.invitee_id, "status": i.status} for i in invites]
 
-@app.get("/leagues/{league_id}", response_model=schemas.LeagueDetail, tags=["Leagues"], summary="Get league details")
+@app.get("/leagues/{league_id}", response_model=schemas.LeagueDetail, tags=["Leagues"])
 def get_league_detail(league_id: int, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
     league = crud.get_league(db, league_id)
-    if not league:
-        raise HTTPException(status_code=404, detail="League not found")
-
-    # Check if user is member (security)
-    is_member = any(m.user_id == current_user.id for m in league.members)
-    if not is_member:
-        raise HTTPException(status_code=403, detail="Not a member of this league")
-
+    if not league: raise HTTPException(status_code=404, detail="League not found")
+    if not any(m.user_id == current_user.id for m in league.members): raise HTTPException(status_code=403, detail="Not a member")
     members_stats = crud.get_league_members_with_stats(db, league_id)
-
-    # Construct response
-    # Step 1: Validate against base League schema to ignore members relationship issue
     league_base = schemas.League.model_validate(league)
+    return schemas.LeagueDetail(**league_base.model_dump(), members=[schemas.LeagueMember(**m) for m in members_stats], members_count=len(members_stats))
 
-    # Step 2: Create LeagueDetail with computed members
-    members_schema = [schemas.LeagueMember(**m) for m in members_stats]
-
-    league_data = schemas.LeagueDetail(
-        **league_base.model_dump(),
-        members=members_schema
-    )
-
-    # Re-calculate members count
-    league_data.members_count = len(members_stats)
-
-    return league_data
-
-@app.post("/leagues/{league_id}/invite/{user_id}", response_model=schemas.LeagueInvite, tags=["Leagues"], summary="Invite user to league")
+@app.post("/leagues/{league_id}/invite/{user_id}", response_model=schemas.LeagueInvite, tags=["Leagues"])
 def invite_user(league_id: int, user_id: int, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
     league = crud.get_league(db, league_id)
-    if not league:
-        raise HTTPException(status_code=404, detail="League not found")
-
-    is_member = any(m.user_id == current_user.id for m in league.members)
-    if not is_member:
-        raise HTTPException(status_code=403, detail="You must be a member to invite others")
-
-    if user_id == current_user.id:
-        raise HTTPException(status_code=400, detail="Cannot invite yourself")
-
+    if not league: raise HTTPException(status_code=404, detail="League not found")
+    if not any(m.user_id == current_user.id for m in league.members): raise HTTPException(status_code=403, detail="Not allowed")
+    if user_id == current_user.id: raise HTTPException(status_code=400, detail="Cannot invite self")
     invite = crud.invite_user_to_league(db, league_id, current_user.id, user_id)
-    if not invite:
-        raise HTTPException(status_code=400, detail="User already member or invited")
+    if not invite: raise HTTPException(status_code=400, detail="Error inviting")
+    return schemas.LeagueInvite(id=invite.id, league_id=invite.league_id, league_name=league.name, inviter_id=invite.inviter_id, inviter_name=current_user.username, invitee_id=invite.invitee_id, status=invite.status)
 
-    inviter = crud.get_user(db, current_user.id)
-
-    return schemas.LeagueInvite(
-        id=invite.id,
-        league_id=invite.league_id,
-        league_name=league.name,
-        inviter_id=invite.inviter_id,
-        inviter_name=inviter.username,
-        invitee_id=invite.invitee_id,
-        status=invite.status
-    )
-
-@app.put("/leagues/invites/{invite_id}/accept", response_model=schemas.LeagueInvite, tags=["Leagues"], summary="Accept league invite")
+@app.put("/leagues/invites/{invite_id}/accept", response_model=schemas.LeagueInvite, tags=["Leagues"])
 def accept_invite_route(invite_id: int, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
     invite = crud.respond_league_invite(db, invite_id, accept=True)
-    if not invite:
-        raise HTTPException(status_code=404, detail="Invite not found")
+    if not invite: raise HTTPException(status_code=404, detail="Invite not found")
+    return schemas.LeagueInvite(id=invite.id, league_id=invite.league_id, league_name=crud.get_league(db, invite.league_id).name, inviter_id=invite.inviter_id, inviter_name=crud.get_user(db, invite.inviter_id).username, invitee_id=invite.invitee_id, status=invite.status)
 
-    league = crud.get_league(db, invite.league_id)
-    inviter = crud.get_user(db, invite.inviter_id)
-    return schemas.LeagueInvite(
-        id=invite.id,
-        league_id=invite.league_id,
-        league_name=league.name,
-        inviter_id=invite.inviter_id,
-        inviter_name=inviter.username,
-        invitee_id=invite.invitee_id,
-        status=invite.status
-    )
-
-@app.put("/leagues/invites/{invite_id}/reject", response_model=schemas.LeagueInvite, tags=["Leagues"], summary="Reject league invite")
+@app.put("/leagues/invites/{invite_id}/reject", response_model=schemas.LeagueInvite, tags=["Leagues"])
 def reject_invite_route(invite_id: int, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
     invite = crud.respond_league_invite(db, invite_id, accept=False)
-    if not invite:
-        raise HTTPException(status_code=404, detail="Invite not found")
-    league = crud.get_league(db, invite.league_id)
-    inviter = crud.get_user(db, invite.inviter_id)
-    return schemas.LeagueInvite(
-        id=invite.id,
-        league_id=invite.league_id,
-        league_name=league.name,
-        inviter_id=invite.inviter_id,
-        inviter_name=inviter.username,
-        invitee_id=invite.invitee_id,
-        status=invite.status
-    )
+    if not invite: raise HTTPException(status_code=404, detail="Invite not found")
+    return schemas.LeagueInvite(id=invite.id, league_id=invite.league_id, league_name=crud.get_league(db, invite.league_id).name, inviter_id=invite.inviter_id, inviter_name=crud.get_user(db, invite.inviter_id).username, invitee_id=invite.invitee_id, status=invite.status)
 
-@app.delete("/leagues/{league_id}/leave", tags=["Leagues"], summary="Leave league")
+@app.delete("/leagues/{league_id}/leave", tags=["Leagues"])
 def leave_league(league_id: int, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    member = db.query(models.LeagueMember).filter(
-        models.LeagueMember.league_id == league_id,
-        models.LeagueMember.user_id == current_user.id
-    ).first()
+    member = db.query(models.LeagueMember).filter(models.LeagueMember.league_id == league_id, models.LeagueMember.user_id == current_user.id).first()
     if member:
         db.delete(member)
         db.commit()
     return {"status": "left"}
 
-# --- PROFILE IMAGE ---
-@app.put("/users/profile-image", response_model=schemas.User, tags=["Users"], summary="Update profile image")
+@app.put("/users/profile-image", response_model=schemas.User, tags=["Users"])
 def update_profile_image(profile_image: str, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Update the user's profile image"""
     user = crud.get_user(db, current_user.id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
+    if not user: raise HTTPException(status_code=404, detail="User not found")
     user.profile_image = profile_image
     db.commit()
     db.refresh(user)
