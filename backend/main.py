@@ -543,7 +543,9 @@ def get_league_detail(league_id: int, current_user: schemas.User = Depends(get_c
     if not any(m.user_id == current_user.id for m in league.members): raise HTTPException(status_code=403, detail="Not a member")
     members_stats = crud.get_league_members_with_stats(db, league_id)
     league_base = schemas.League.model_validate(league)
-    return schemas.LeagueDetail(**league_base.model_dump(), members=[schemas.LeagueMember(**m) for m in members_stats], members_count=len(members_stats))
+    league_data = league_base.model_dump()
+    league_data['members_count'] = len(members_stats)
+    return schemas.LeagueDetail(**league_data, members=[schemas.LeagueMember(**m) for m in members_stats])
 
 @app.post("/leagues/{league_id}/invite/{user_id}", response_model=schemas.LeagueInvite, tags=["Leagues"])
 def invite_user(league_id: int, user_id: int, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
