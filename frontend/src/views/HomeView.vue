@@ -783,56 +783,65 @@ watch(isConnected, () => {
       <Card title="Statistiques Globales">
         <div class="stats-grid">
           <div class="stat-item wide-item">
-            <div class="stat-content-left">
+            <div class="stat-content-side">
               <span class="stat-icon">👣</span>
               <div class="stat-info">
-                <span class="stat-value">
-                  {{ (globalStats.global_score / 1000).toFixed(1) }} t
-                </span>
-                <span class="stat-label">Empreinte moyenne <br>des utilisateurs</span>
+                <div class="stat-value-row">
+                  <span class="stat-number">
+                    {{ (globalStats.global_score / 1000).toFixed(1) }}
+                  </span>
+                  <span class="stat-unit">Tonnes CO₂</span>
+                </div>
+                <span class="stat-label"
+                  >Moyenne des<br />
+                  utilisateurs</span
+                >
               </div>
             </div>
 
             <div class="stat-separator"></div>
 
-            <div class="stat-content-right">
+            <div class="stat-content-side">
               <span class="stat-icon">🎯</span>
               <div class="stat-info">
-                <span class="stat-value goal-value">2.0 t</span>
+                <div class="stat-value-row">
+                  <span class="stat-number goal-value">2.0</span>
+                  <span class="stat-unit goal-value">Tonnes CO₂</span>
+                </div>
                 <span class="stat-label">Objectif 2050</span>
               </div>
             </div>
           </div>
 
-          <div class="stat-item">
+          <div class="stat-item small-item">
             <span class="stat-icon">🏆</span>
             <div class="stat-info">
-              <span class="stat-value">{{ globalStats.total_leagues }}</span>
-              <span class="stat-label">Ligues actives</span>
+              <span class="stat-number">{{ globalStats.total_leagues }}</span>
+              <span class="stat-label">Ligues<br />actives</span>
             </div>
           </div>
 
-          <div class="stat-item">
+          <div class="stat-item small-item">
             <span class="stat-icon">✅</span>
             <div class="stat-info">
-              <span class="stat-value">{{ globalStats.total_missions_completed }}</span>
-              <span class="stat-label">Missions finies</span>
+              <span class="stat-number">{{ globalStats.total_missions_completed }}</span>
+              <span class="stat-label">Missions<br />finies</span>
             </div>
           </div>
 
-          <div class="stat-item">
+          <div class="stat-item small-item">
             <span class="stat-icon">🥇</span>
             <div class="stat-info">
-              <span class="stat-value">{{ globalStats.total_trophies }}</span>
-              <span class="stat-label">Trophées gagnés</span>
+              <span class="stat-number">{{ globalStats.total_trophies }}</span>
+              <span class="stat-label">Trophées<br />gagnés</span>
             </div>
           </div>
 
-          <div class="stat-item">
+          <div class="stat-item small-item">
             <span class="stat-icon">👥</span>
             <div class="stat-info">
-              <span class="stat-value">{{ globalStats.user_count }}</span>
-              <span class="stat-label">Utilisateurs</span>
+              <span class="stat-number">{{ globalStats.user_count }}</span>
+              <span class="stat-label">Utilisateurs<br />inscrits</span>
             </div>
           </div>
         </div>
@@ -1052,57 +1061,128 @@ watch(isConnected, () => {
   opacity: 0.8;
 }
 
+/* --- GRILLE --- */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr); /* 2 colonnes */
-  gap: 15px;
+  gap: 12px;
 }
 
-.wide-item {
-  grid-column: span 2; /* Prend toute la largeur */
-  display: flex;
-  justify-content: space-around; /* Espacement équitable */
-  background: white;
-  border: 1px solid #f0f0f0;
-}
-
+/* --- STYLE GÉNÉRAL DES BOITES --- */
 .stat-item {
   display: flex;
-  align-items: center;
+  align-items: center; /* Centre verticalement l'icône par rapport au texte */
   background-color: white;
-  border: 1px solid #f0f0f0;
   padding: 12px;
   border-radius: 12px;
   transition: transform 0.2s;
+  gap: 16px;
 }
 
+/* --- BOITES 1x1 (PETITES) --- */
+.small-item {
+  justify-content: center; /* Centre le bloc (Icone+Texte) horizontalement dans la case */
+  text-align: left; /* Le texte reste aligné à gauche par rapport à lui-même */
+}
+
+/* --- BOITE 2x1 (LARGE / EMPREINTE) --- */
+.wide-item {
+  grid-column: span 2;
+  display: flex;
+  justify-content: space-around; /* Espacement équitable entre gauche et droite */
+  padding: 16px 12px;
+  background: white;
+  border: 1px solid #f0f0f0;
+  align-items: flex-start;
+  gap: 0;
+}
+
+.stat-content-side {
+  display: flex;
+  align-items: flex-start; /* Centre l'icône verticalement par rapport au bloc texte */
+  gap: 16px;
+  flex: 1;
+  justify-content: center; /* Centre le contenu dans sa moitié */
+}
+
+.stat-separator {
+  width: 1px;
+  height: 45px; /* Hauteur fixe pour le trait de séparation */
+  background-color: #ddd;
+  margin: 0 5px;
+  align-self: center;
+}
+
+/* --- TYPOGRAPHIE ET ICONES --- */
 .stat-icon {
-  font-size: 1.8rem;
-  margin-right: 12px;
+  font-size: 2rem; /* Taille unifiée des émojis */
+  line-height: 1;
+  flex-shrink: 0;
+  margin-right: 0;
+  margin-top: 4px;
+}
+
+.wide-item .stat-icon {
+  margin-top: 4px;
 }
 
 .stat-info {
   display: flex;
   flex-direction: column;
+  justify-content: center;
 }
 
-.stat-value {
+/* Ligne contenant "5.1" et "Tonnes" */
+.stat-value-row {
+  display: flex;
+  align-items: baseline; /* ALIGNEMENT MAGIQUE : Aligne le bas du chiffre avec le bas du texte */
+  gap: 4px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.stat-number {
   font-weight: 800;
-  font-size: 1.1rem;
-  color: #679436; /* Ta couleur verte principale */
+  font-size: 1.4rem; /* Le gros chiffre */
+  color: #679436;
+}
+
+.stat-unit {
+  font-weight: 600;
+  font-size: 0.75rem; /* Le petit texte */
+  color: #666;
 }
 
 .stat-label {
   font-size: 0.75rem;
   color: #666;
   line-height: 1.2;
-
 }
 
-/* Sur très petits écrans, on garde 2 colonnes mais on réduit la police si besoin */
-@media (max-width: 350px) {
+/* --- RESPONSIVE MOBILE --- */
+@media (max-width: 380px) {
   .stats-grid {
-    grid-template-columns: 1fr; /* 1 colonne sur très petits écrans */
+    grid-template-columns: 1fr; /* Une seule colonne */
+  }
+
+  .wide-item {
+    grid-column: span 1;
+    flex-direction: column; /* Empile les deux parties de l'empreinte */
+    gap: 15px;
+    align-items: flex-start;
+  }
+
+  .stat-content-side {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .stat-separator {
+    display: none; /* Cache le trait vertical sur mobile */
+  }
+
+  .small-item {
+    justify-content: flex-start; /* Aligne à gauche sur mobile */
   }
 }
 </style>
