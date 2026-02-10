@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, UniqueConstraint, func, or_
 from typing import List, Optional, Dict
 from datetime import timedelta, datetime
 from routes import router
@@ -786,87 +787,59 @@ async def get_carbon_score(user_id: int, db: Session = Depends(get_db)):
 @app.get("/global-stats", tags=["Statistics"], summary="Get global statistics")
 async def get_global_stats(db: Session = Depends(get_db)):
     """
-    Calcule la moyenne des scores de tous les utilisateurs enregistrés.
+    Calcule les statistiques globales de l'application.
     """
-    # Priorite: moyenne des scores NGC reels pousses par les utilisateurs
-    ngc_aggregate = crud.get_ngc_stats_aggregate(db)
-    if ngc_aggregate:
-        return {
-            "global_score": ngc_aggregate["global_score"],
-            "average_national_score": NGC_DEFAULT_SCORE,
-            "details_by_category": ngc_aggregate["details_by_category"],
-            "user_count": ngc_aggregate["user_count"],
-        }
-    # 1. Calcul du score national de référence (somme des defaults)
-    sum_of_defaults = 0
-    national_category_scores = {}
-
-    for cat, questions in QUESTIONS_DB.items():
-        cat_score = 0
-        for q in questions:
-            for opt in q['options']:
-                if opt.get('is_default'):
-                    cat_score += opt['score']
-        national_category_scores[cat] = cat_score
-        sum_of_defaults += cat_score
-
-    average_national_score = sum_of_defaults
-
-    # 2. Récupération de tous les utilisateurs
-    all_users = crud.get_all_users(db)
-    total_users = len(all_users)
-
-    if total_users == 0:
-        return {
-            "global_score": sum_of_defaults,
-            "average_national_score": average_national_score,
-            "details_by_category": national_category_scores,
-            "user_count": 0
-        }
-
-    # 3. Calcul de la moyenne réelle
-    global_sum = 0
-    category_sums = {cat: 0 for cat in QUESTIONS_DB}
-
-    for user in all_users:
-        # Pour chaque utilisateur, calculer son score
-        for category, questions in QUESTIONS_DB.items():
-            cat_score = 0
-
-            # Optimisation: charger toutes les réponses utilisateur d'un coup serait mieux,
-            # mais on va garder simple via crud par catégorie
-            answers_list = crud.get_user_answers_by_category(db, user.id, category)
-            user_cat_answers = {a.question_id: a.answer_value for a in answers_list}
-
-            for question in questions:
-                user_val = user_cat_answers.get(question['id'])
-                score_added = False
-
-                if user_val:
-                    for option in question['options']:
-                        if user_val == option['value']:
-                            cat_score += option['score']
-                            score_added = True
-                            break
-
-                if not score_added:
-                    for option in question['options']:
-                        if option.get('is_default'):
-                            cat_score += option['score']
-                            break
-
-            category_sums[category] += cat_score
-            global_sum += cat_score
-
-    avg_global = round(global_sum / total_users)
-    avg_categories = {cat: round(s / total_users) for cat, s in category_sums.items()}
-
-    return {
-        "global_score": avg_global,
-        "average_national_score": average_national_score,
-        "details_by_category": avg_categories,
-        "user_count": total_users
+    stats = {
+        "global_score": NGC_DEFAULT_SCORE,
+        "average_national_score": NGC_DEFAULT_SCORE,
+        "details_by_category": {},
+        "user_count": 0, # C'est cette valeur qu'on va utiliser
+        "total_leagues": 0,
+        "total_missions_completed": 0,
+        "total_trophies": 0
     }
+
+    try:
+        # --- 1. EMPREINTE CARBONE & USER COUNT ---
+        ngc_aggregate = crud.get_ngc_stats_aggregate(db)
+        if ngc_aggregate and ngc_aggregate["user_count"] > 0:
+            stats["global_score"] = ngc_aggregate["global_score"]
+            stats["details_by_category"] = ngc_aggregate["details_by_category"]
+            stats["user_count"] = ngc_aggregate["user_count"]
+
+            if stats["global_score"] == 0:
+                stats["global_score"] = NGC_DEFAULT_SCORE
+        else:
+            # Fallback si pas de stats NGC : on compte juste les inscrits
+            count_users = db.query(models.User).count()
+            stats["user_count"] = count_users
+
+        # --- 2. LIGUES ---
+        try:
+            stats["total_leagues"] = db.query(models.League).count()
+        except: pass
+
+        # --- 3. MISSIONS ---
+        try:
+            stats["total_missions_completed"] = db.query(models.UserMissionStatus).filter(
+                or_(
+                    models.UserMissionStatus.status == 'termine',
+                    models.UserMissionStatus.status == 'terminee',
+                    models.UserMissionStatus.status == 'completed',
+                    models.UserMissionStatus.status == 'done'
+                )
+            ).count()
+        except Exception as e:
+            print(f"Erreur stats missions: {e}")
+
+        # --- 4. TROPHÉES ---
+        if stats["total_missions_completed"] > 0:
+            stats["total_trophies"] = int(stats["total_missions_completed"] // 3)
+
+    except Exception as global_e:
+        print(f"ERREUR CRITIQUE DANS GET_GLOBAL_STATS: {global_e}")
+
+    return stats
 
 # --- LEAGUE ROUTES ---
 @app.post("/leagues/", response_model=schemas.League, tags=["Leagues"], summary="Create a new league")

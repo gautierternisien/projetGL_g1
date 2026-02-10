@@ -35,6 +35,14 @@ const CATEGORY_COLORS: Record<string, string> = {
   services_societaux: '#616161', // Dark gray
 }
 
+const globalStats = ref({
+  global_score: 0,
+  total_leagues: 0,
+  total_missions_completed: 0,
+  total_trophies: 0,
+  user_count: 0,
+})
+
 const getCategoryColor = (key: string) => {
   if (key === 'services_societaux') return CATEGORY_COLORS.services_societaux
 
@@ -72,7 +80,10 @@ function normalizeToken(value: string): string {
     .trim()
 }
 
-function findRuleNameByNormalizedName(rules: Record<string, any>, expectedName: string): string | null {
+function findRuleNameByNormalizedName(
+  rules: Record<string, any>,
+  expectedName: string,
+): string | null {
   const expected = normalizeToken(expectedName)
   for (const key of Object.keys(rules ?? {})) {
     if (normalizeToken(key) === expected) return key
@@ -220,7 +231,9 @@ async function getRules() {
   return rulesCache.value
 }
 
-function normalizeDetails(details: Record<string, number> | null | undefined): Record<string, number> {
+function normalizeDetails(
+  details: Record<string, number> | null | undefined,
+): Record<string, number> {
   const normalized: Record<string, number> = {}
   for (const [rawKey, rawValue] of Object.entries(details ?? {})) {
     const key = normalizeCategoryKey(rawKey)
@@ -288,7 +301,8 @@ async function computeLocalNgcStats() {
     engine.setSituation(situation)
 
     const bilanRes: any = engine.evaluate('bilan')
-    let globalScore = typeof bilanRes?.nodeValue === 'number' ? Math.round(bilanRes.nodeValue) : 8559
+    let globalScore =
+      typeof bilanRes?.nodeValue === 'number' ? Math.round(bilanRes.nodeValue) : 8559
     if (!hasAnswers) globalScore = 8559
 
     const detailsByCategory: Record<string, number> = {}
@@ -335,73 +349,100 @@ async function pushNgcStatsToBackend(stats: NgcStats) {
   }
 }
 
+async function loadGlobalStats() {
+  try {
+    const response = await fetch(`${API_URL}/global-stats`)
+    if (response.ok) {
+      const data = await response.json()
+      globalStats.value = data
+    }
+  } catch (e) {
+    console.error('Erreur chargement stats globales', e)
+  }
+}
+
 async function refreshProgressAndScore() {
+  // 1. Synchronisation initiale si connecté
   if (isConnected.value && authStore.user) {
     await store.fetchAllProgress(authStore.user.id)
   }
+
+  // Récupération des réponses locales (utile pour le mode connecté et invité)
   store.syncFromLocalAnswers()
 
+  // --- ÉTAPE A : Récupérer les données globales (Reference) ---
+  let globalApiData = null
   try {
     const response = await fetch(`${API_URL}/global-stats`, { cache: 'no-store' })
     if (response.ok) {
-      const data = await response.json()
-      averageScore.value = data.average_national_score || data.global_score || 8559
+      globalApiData = await response.json()
 
-      if (!isConnected.value) {
-        const hasUsers = Number(data.user_count ?? 0) > 0
-        const defaults = await getModelDefaultStatsCached()
-        if (hasUsers) {
-          const score = Number(data.global_score)
-          const safeScore = Number.isFinite(score) ? score : 8559
-          userScore.value = safeScore
-          const enrichedDetails = enrichDetailsWithServices(data.details_by_category, safeScore, defaults)
-          processSectors(enrichedDetails, safeScore)
-        } else {
-          if (defaults) {
-            userScore.value = defaults.globalScore
-            processSectors(defaults.detailsByCategory, defaults.globalScore)
-          } else {
-            userScore.value = data.global_score
-            const fallbackScore = Number(data.global_score)
-            const safeFallbackScore = Number.isFinite(fallbackScore) ? fallbackScore : 8559
-            const enrichedDetails = enrichDetailsWithServices(data.details_by_category, safeFallbackScore, null)
-            processSectors(enrichedDetails, safeFallbackScore)
-          }
-        }
-        calculateStatus(userScore.value, averageScore.value)
-      }
-    } else if (!isConnected.value) {
-      const defaults = await getModelDefaultStatsCached()
-      if (defaults) {
-        userScore.value = defaults.globalScore
-        processSectors(defaults.detailsByCategory, defaults.globalScore)
-        calculateStatus(userScore.value, averageScore.value || 8559)
-      }
+      // On met à jour la moyenne nationale affichée (benchmark)
+      // Si l'API renvoie une moyenne nationale, on la prend, sinon défaut 8559
+      averageScore.value = globalApiData.average_national_score || 8559
     }
   } catch (error) {
     console.error('Erreur chargement stats globales:', error)
-    if (!isConnected.value) {
-      const defaults = await getModelDefaultStatsCached()
-      if (defaults) {
-        userScore.value = defaults.globalScore
-        processSectors(defaults.detailsByCategory, defaults.globalScore)
-        calculateStatus(userScore.value, averageScore.value || 8559)
-      }
+  }
+
+  // On prépare les données par défaut (NGC) au cas où on en a besoin (fallback)
+  const defaults = await getModelDefaultStatsCached()
+  const defaultScore = defaults ? defaults.globalScore : 8559
+  const defaultDetails = defaults ? defaults.detailsByCategory : {}
+
+  // --- ÉTAPE B : Gestion du Score Utilisateur (Gros Chiffre) ---
+
+  if (isConnected.value) {
+    // === CAS 1 : CONNECTÉ ===
+    // On calcule le score précis basé sur les réponses de l'utilisateur
+    const localStats = await computeLocalNgcStats()
+
+    if (localStats) {
+      userScore.value = localStats.globalScore
+
+      // On enrichit avec les services sociétaux (impôts, services publics...)
+      // Assure-toi que cette fonction existe et gère les nulls
+      const enrichedDetails = enrichDetailsWithServices(
+        localStats.detailsByCategory,
+        userScore.value,
+        defaults,
+      )
+
+      processSectors(enrichedDetails, userScore.value)
+
+      // On sauvegarde ce nouveau score dans le backend
+      await pushNgcStatsToBackend(localStats)
+    } else {
+      // Fallback si le calcul local échoue
+      userScore.value = defaultScore
+      processSectors(defaultDetails, defaultScore)
+    }
+  } else {
+    // === CAS 2 : NON CONNECTÉ (INVITÉ) ===
+    // On veut afficher la moyenne de la communauté ("Empreinte moyenne des utilisateurs")
+
+    if (globalApiData && globalApiData.user_count > 0) {
+      // S'il y a des données globales réelles
+      userScore.value = Number(globalApiData.global_score) || defaultScore
+
+      // On utilise les détails globaux venant de l'API
+      // Note: On passe 'defaults' en 3ème argument si enrichDetailsWithServices en a besoin pour combler les trous
+      const enrichedDetails = enrichDetailsWithServices(
+        globalApiData.details_by_category,
+        userScore.value,
+        defaults,
+      )
+
+      processSectors(enrichedDetails, userScore.value)
+    } else {
+      // S'il n'y a pas encore d'utilisateurs ou erreur API -> On affiche la moyenne française par défaut
+      userScore.value = defaultScore
+      processSectors(defaultDetails, defaultScore)
     }
   }
 
-  if (isConnected.value) {
-    const localStats = await computeLocalNgcStats()
-    if (localStats) {
-      userScore.value = localStats.globalScore
-      processSectors(localStats.detailsByCategory, localStats.globalScore)
-      await pushNgcStatsToBackend(localStats)
-      calculateStatus(userScore.value, averageScore.value || 8559)
-      return
-    }
-    userScore.value = 8559
-    calculateStatus(userScore.value, averageScore.value || 8559)
-  }
+  // --- ÉTAPE C : Mise à jour des couleurs/emojis ---
+  calculateStatus(userScore.value, averageScore.value || 8559)
 }
 
 // --- COMPUTED POUR LE GRAPHIQUE ---
@@ -535,7 +576,8 @@ async function computeModelDefaultStats() {
     engine.setSituation({})
 
     const bilanRes: any = engine.evaluate('bilan')
-    const globalScore = typeof bilanRes?.nodeValue === 'number' ? Math.round(bilanRes.nodeValue) : 8559
+    const globalScore =
+      typeof bilanRes?.nodeValue === 'number' ? Math.round(bilanRes.nodeValue) : 8559
 
     const detailsByCategory: Record<string, number> = {}
     for (const key of ['transport', 'logement', 'alimentation', 'divers']) {
@@ -583,6 +625,8 @@ onMounted(async () => {
   }
 
   await refreshProgressAndScore()
+
+  await loadGlobalStats()
 
   if (isConnected.value) {
     await loadDashboardMissions()
@@ -735,6 +779,64 @@ watch(isConnected, () => {
           <div v-else class="lock-placeholder">🔒</div>
         </Card>
       </RouterLink>
+
+      <Card title="Statistiques Globales">
+        <div class="stats-grid">
+          <div class="stat-item wide-item">
+            <div class="stat-content-left">
+              <span class="stat-icon">👣</span>
+              <div class="stat-info">
+                <span class="stat-value">
+                  {{ (globalStats.global_score / 1000).toFixed(1) }} t
+                </span>
+                <span class="stat-label">Empreinte moyenne <br>des utilisateurs</span>
+              </div>
+            </div>
+
+            <div class="stat-separator"></div>
+
+            <div class="stat-content-right">
+              <span class="stat-icon">🎯</span>
+              <div class="stat-info">
+                <span class="stat-value goal-value">2.0 t</span>
+                <span class="stat-label">Objectif 2050</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="stat-item">
+            <span class="stat-icon">🏆</span>
+            <div class="stat-info">
+              <span class="stat-value">{{ globalStats.total_leagues }}</span>
+              <span class="stat-label">Ligues actives</span>
+            </div>
+          </div>
+
+          <div class="stat-item">
+            <span class="stat-icon">✅</span>
+            <div class="stat-info">
+              <span class="stat-value">{{ globalStats.total_missions_completed }}</span>
+              <span class="stat-label">Missions finies</span>
+            </div>
+          </div>
+
+          <div class="stat-item">
+            <span class="stat-icon">🥇</span>
+            <div class="stat-info">
+              <span class="stat-value">{{ globalStats.total_trophies }}</span>
+              <span class="stat-label">Trophées gagnés</span>
+            </div>
+          </div>
+
+          <div class="stat-item">
+            <span class="stat-icon">👥</span>
+            <div class="stat-info">
+              <span class="stat-value">{{ globalStats.user_count }}</span>
+              <span class="stat-label">Utilisateurs</span>
+            </div>
+          </div>
+        </div>
+      </Card>
     </div>
   </div>
 </template>
@@ -949,6 +1051,58 @@ watch(isConnected, () => {
 .cta-link:hover {
   opacity: 0.8;
 }
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); /* 2 colonnes */
+  gap: 15px;
+}
+
+.wide-item {
+  grid-column: span 2; /* Prend toute la largeur */
+  display: flex;
+  justify-content: space-around; /* Espacement équitable */
+  background: white;
+  border: 1px solid #f0f0f0;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  background-color: white;
+  border: 1px solid #f0f0f0;
+  padding: 12px;
+  border-radius: 12px;
+  transition: transform 0.2s;
+}
+
+.stat-icon {
+  font-size: 1.8rem;
+  margin-right: 12px;
+}
+
+.stat-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-value {
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: #679436; /* Ta couleur verte principale */
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: #666;
+  line-height: 1.2;
+
+}
+
+/* Sur très petits écrans, on garde 2 colonnes mais on réduit la police si besoin */
+@media (max-width: 350px) {
+  .stats-grid {
+    grid-template-columns: 1fr; /* 1 colonne sur très petits écrans */
+  }
+}
 </style>
-
-

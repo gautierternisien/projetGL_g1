@@ -28,11 +28,7 @@ const CATEGORY_DISPLAY_NAMES: Record<string, string> = {
   transport: 'Transport & Mobilité',
   alimentation: 'Alimentation',
   logement: 'Logement & Énergie',
-  numerique: 'Numérique',
-  loisirs: 'Loisirs & Voyages',
-  quotidien: 'Habitudes Quotidiennes',
-  recyclage: 'Déchets & Recyclage',
-  consommation: 'Consommation & Achats',
+  divers: 'Divers',
 }
 
 const title = computed(() => CATEGORY_DISPLAY_NAMES[category] || category)
