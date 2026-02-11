@@ -43,6 +43,7 @@ const categoryTitle = computed(
 )
 
 const isLoading = ref(true)
+const isCompletedMode = ref(false)
 const engine = ref<Engine | null>(null)
 const engineError = ref<string | null>(null)
 const situationError = ref<unknown>(null)
@@ -664,6 +665,91 @@ function getMosaicCount(slug: string, subSlug: string): string | number {
   return value === undefined || value === null ? '' : value
 }
 
+function finishQuestionnaire() {
+  try {
+    isCompletedMode.value = true
+    flushLocalPersistence()
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  } catch (e) {
+    console.error('Error in finishQuestionnaire', e)
+  }
+}
+
+function modifyAnswers() {
+  isCompletedMode.value = false
+  if (visibleQuestions.value.length > 0) {
+    currentSlug.value = visibleQuestions.value[0].slug
+  }
+}
+
+function getAnswerLabel(q: QuestionRecord): string {
+  try {
+    const raw = answers.value[q.slug]
+    if (raw === undefined || raw === null || raw === '') return 'Non répondu'
+
+    if (q.type_widget === 'BOOLEEN') {
+      const val = normalizeBooleanValue(raw)
+      if (val === true) return 'Oui'
+      if (val === false) return 'Non'
+      return 'Non répondu'
+    }
+
+    if (q.type_widget === 'CHOIX_UNIQUE') {
+      const options = q.config_json.options ?? []
+      const valStr = String(raw)
+      for (const opt of options) {
+        const optVal =
+          typeof opt === 'object' ? (opt.value ?? opt.slug ?? String(opt)) : String(opt)
+        if (String(optVal) === valStr) {
+          return typeof opt === 'object' && opt.label ? opt.label : valStr
+        }
+      }
+      return valStr
+    }
+
+    if (q.type_widget === 'CHOIX_MULTIPLE') {
+      const selected: string[] = []
+      const options = q.config_json.options ?? []
+      for (const opt of options) {
+        const slug = typeof opt === 'object' ? (opt.slug ?? opt.value) : String(opt)
+        const label = typeof opt === 'object' && opt.label ? opt.label : String(opt)
+        if (isMultiSelected(q, String(slug))) {
+          selected.push(label)
+        }
+      }
+      if (q.config_json.noneOptionLabel && isMultiNoneSelected(q)) {
+        selected.push(q.config_json.noneOptionLabel)
+      }
+      return selected.length > 0 ? selected.join(', ') : 'Aucun'
+    }
+
+    if (q.type_widget === 'NOMBRE') {
+      return `${raw} ${q.config_json.unit || ''}`
+    }
+
+    if (q.type_widget === 'COMPTEUR') {
+      const parts: string[] = []
+      const mosaicOpts = q.config_json.mosaique?.options ?? []
+      const vals = (answers.value[q.slug] as Record<string, unknown>) ?? {}
+
+      for (const opt of mosaicOpts) {
+        const subSlug = getMosaicSubSlug(q.slug, opt)
+        const val = vals[subSlug]
+        if (val && Number(val) > 0) {
+          const label = getMosaicDisplayLabel(opt)
+          parts.push(`${val} ${label}`)
+        }
+      }
+      return parts.length > 0 ? parts.join(', ') : 'Rien'
+    }
+
+    return String(raw)
+  } catch (e) {
+    console.error('Error in getAnswerLabel', e)
+    return 'Erreur'
+  }
+}
+
 function setMosaicCountFromInput(slug: string, subSlug: string, raw: any) {
   const counters: Record<string, number> =
     answers.value[slug] &&
@@ -709,6 +795,15 @@ onMounted(async () => {
 
     const normalized = normalizeStoredAnswersByQuestionType(answers.value, allQuestions.value)
     if (normalized !== answers.value) answers.value = normalized
+
+    await nextTick()
+    if (visibleQuestions.value.length > 0) {
+      const allAnswered = visibleQuestions.value.every((q) => isAnswerFilled(answers.value[q.slug]))
+      if (allAnswered) {
+        isCompletedMode.value = true
+      }
+    }
+
     void pushNgcStatsToBackend()
   } catch (e: any) {
     console.error(e)
@@ -742,7 +837,7 @@ onUnmounted(() => {
     <Header
       title="Questionnaire"
       :subtitle="categoryTitle"
-      :showResumeBtn="true"
+      :showResumeBtn="!isCompletedMode"
       @resumeLater="saveAndExit"
     />
 
@@ -756,6 +851,24 @@ onUnmounted(() => {
         <pre v-if="engineError" style="white-space: pre-wrap; margin-top: 12px">{{
           engineError
         }}</pre>
+      </div>
+
+      <div v-else-if="isCompletedMode" class="recap-container">
+        <div class="success-icon">🎉</div>
+        <h2 class="recap-title">Questionnaire terminé !</h2>
+        <p class="recap-subtitle">Voici le récapitulatif de vos réponses :</p>
+
+        <div class="recap-list">
+          <div v-for="q in visibleQuestions" :key="q.slug" class="recap-item">
+            <div class="recap-question">{{ q.question }}</div>
+            <div class="recap-answer">{{ getAnswerLabel(q) }}</div>
+          </div>
+        </div>
+
+        <div class="recap-actions">
+          <button class="nav-btn reset-btn" @click="modifyAnswers">Modifier mes réponses</button>
+          <button class="nav-btn quest-btn" @click="saveAndExit">Retour aux questionnaires</button>
+        </div>
       </div>
 
       <div v-else class="question-container">
@@ -942,7 +1055,10 @@ onUnmounted(() => {
               <button class="nav-btn reset-btn" @click="clearAnswer(currentQuestion.slug)">
                 Effacer
               </button>
-              <button class="nav-btn next-btn" @click="isLastQuestion ? saveAndExit() : goNext()">
+              <button
+                class="nav-btn next-btn"
+                @click="isLastQuestion ? finishQuestionnaire() : goNext()"
+              >
                 {{ isLastQuestion ? 'Terminer' : 'Question suivante >' }}
               </button>
             </div>
@@ -1091,5 +1207,61 @@ onUnmounted(() => {
   padding: 6px 12px;
   font-size: 0.8rem;
   cursor: pointer;
+}
+
+/* Styles spécifiques au récapitulatif */
+.recap-container {
+  align-items: center;
+}
+.success-icon {
+  font-size: 3rem;
+  margin-bottom: 10px;
+}
+.recap-title {
+  font-size: 1.8rem;
+  color: #2c3e50;
+  margin-bottom: 10px;
+}
+.recap-subtitle {
+  color: #666;
+  margin-bottom: 30px;
+}
+.recap-list {
+  width: 100%;
+  background: #f9f9f9;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 30px;
+}
+.recap-item {
+  margin-bottom: 15px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 15px;
+}
+.recap-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+.recap-question {
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 5px;
+  font-size: 0.95rem;
+}
+.recap-answer {
+  color: #679436;
+  font-weight: 500;
+}
+.recap-actions {
+  display: flex;
+  gap: 15px;
+  width: 100%;
+  justify-content: center;
+}
+
+.quest-btn {
+  background-color: #679436;
+  color: white;
 }
 </style>
