@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import Engine, { type Rule } from 'publicodes'
+import Engine from 'publicodes'
 import { VCheckbox, VRadio, VRadioGroup, VTextField } from 'vuetify/components'
 
 import Header from '@/components/AppHeader.vue'
@@ -14,7 +14,6 @@ import {
   isQuestionVisible,
   type Category,
   type QuestionRecord,
-  type MosaicOption,
 } from '@/lib/ngc/questionnaire'
 import { computeCategoryProgressFromAnswers } from '@/utils/ngcProgress'
 import { loadAnswers, loadProgress, saveAnswers, saveProgress } from '@/lib/ngc/answersStorage'
@@ -178,28 +177,12 @@ function prettifyCounterLabel(raw: string): string {
   return cleaned.split(' . ').slice(-1)[0]!.trim()
 }
 
-function getMosaicDisplayLabel(opt: unknown): string {
-  const typedOpt = opt as { titre?: string; title?: string; label?: string } | string
-  const rawLabel = String(
-    typeof typedOpt === 'string'
-      ? typedOpt
-      : (typedOpt?.titre ?? typedOpt?.title ?? typedOpt?.label ?? typedOpt),
-  )
+function getMosaicDisplayLabel(opt: any): string {
+  const rawLabel = String(opt?.titre ?? opt?.title ?? opt?.label ?? opt)
   return prettifyCounterLabel(rawLabel)
 }
 
-function getMosaicSubSlug(parentSlug: string, opt: MosaicOption | string): string {
-  if (typeof opt === 'string') {
-    if (opt.includes(' . ')) {
-      if (opt.endsWith(' . nombre')) return opt
-      if (opt.endsWith(' . nombre . nombre'))
-        return opt.replace(/ \. nombre \. nombre$/, ' . nombre')
-      return `${opt} . nombre`
-    }
-    const label = prettifyCounterLabel(opt)
-    return `${parentSlug} . ${label} . nombre`
-  }
-
+function getMosaicSubSlug(parentSlug: string, opt: any): string {
   const candidate = opt?.dottedName ?? opt?.valeur ?? opt?.name
 
   if (typeof candidate === 'string' && candidate.includes(' . ')) {
@@ -209,7 +192,7 @@ function getMosaicSubSlug(parentSlug: string, opt: MosaicOption | string): strin
     return `${candidate} . nombre`
   }
 
-  const rawLabel = String(opt?.titre ?? opt?.title ?? opt?.label ?? '')
+  const rawLabel = String(opt?.titre ?? opt?.title ?? opt?.label ?? opt)
   const label = prettifyCounterLabel(rawLabel)
   return `${parentSlug} . ${label} . nombre`
 }
@@ -240,7 +223,7 @@ function normalizeToken(value: string): string {
 }
 
 function findRuleNameByNormalizedName(
-  rules: Record<string, Rule>,
+  rules: Record<string, any>,
   expectedName: string,
 ): string | null {
   const expected = normalizeToken(expectedName)
@@ -270,10 +253,10 @@ async function pushNgcStatsToBackend() {
     }
 
     let servicesScore = 0
-    const parsedRules = engine.value.getParsedRules()
+    const parsedRules = engine.value.getParsedRules() as any
     const servicesRuleName = findRuleNameByNormalizedName(parsedRules, 'services societaux')
     if (servicesRuleName) {
-      const r = engine.value.evaluate(servicesRuleName)
+      const r: any = engine.value.evaluate(servicesRuleName)
       servicesScore = typeof r?.nodeValue === 'number' ? Math.round(r.nodeValue) : 0
     }
     detailsByCategory['services societaux'] = servicesScore
@@ -309,17 +292,17 @@ function getResumeSlug(cat: Category, list: QuestionRecord[]): string | null {
   return list[list.length - 1]!.slug
 }
 
-function getCounterSuggestions(q: QuestionRecord): Record<string, number> {
+function getCounterSuggestions(q: QuestionRecord): Record<string, any> {
   const suggestions = q.config_json.mosaique?.suggestions ?? q.config_json.suggestions
   if (!suggestions || typeof suggestions !== 'object') return {}
-  return suggestions as Record<string, number>
+  return suggestions as Record<string, any>
 }
 
-function applyCounterSuggestion(q: QuestionRecord, preset: unknown) {
+function applyCounterSuggestion(q: QuestionRecord, preset: any) {
   if (!preset || typeof preset !== 'object') return
 
   const next: Record<string, number> = {}
-  for (const [k, v] of Object.entries(preset as Record<string, unknown>)) {
+  for (const [k, v] of Object.entries(preset as Record<string, any>)) {
     const fullSlug = k.startsWith(q.slug) ? k : `${q.slug} . ${k}`
     const n = Number(v)
     next[fullSlug] = Number.isFinite(n) ? n : 0
@@ -327,13 +310,13 @@ function applyCounterSuggestion(q: QuestionRecord, preset: unknown) {
   setAnswer(q.slug, next)
 }
 
-function getNumberSuggestions(q: QuestionRecord): Record<string, number> {
+function getNumberSuggestions(q: QuestionRecord): Record<string, any> {
   const suggestions = q.config_json.suggestions
   if (!suggestions || typeof suggestions !== 'object') return {}
-  return suggestions as Record<string, number>
+  return suggestions as Record<string, any>
 }
 
-function applyNumberSuggestion(slug: string, value: unknown) {
+function applyNumberSuggestion(slug: string, value: any) {
   const n = Number(value)
   if (Number.isFinite(n)) setAnswer(slug, n)
 }
@@ -555,7 +538,7 @@ function goNext() {
   if (nextQ) currentSlug.value = nextQ.slug
 }
 
-function setAnswer(slug: string, v: unknown) {
+function setAnswer(slug: string, v: any) {
   answers.value = { ...answers.value, [slug]: v }
 }
 
@@ -831,7 +814,7 @@ onUnmounted(() => {
                 "
                 :model-value="answers[currentQuestion!.slug] ?? ''"
                 @update:model-value="
-                  (v: unknown) => setAnswer(currentQuestion!.slug, v === '' ? '' : Number(v))
+                  (v: any) => setAnswer(currentQuestion!.slug, v === '' ? '' : Number(v))
                 "
               />
               <div style="opacity: 0.7; font-size: 0.9rem">
