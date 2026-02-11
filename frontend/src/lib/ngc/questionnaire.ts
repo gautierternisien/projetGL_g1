@@ -142,7 +142,8 @@ export function determineWidgetType(rule: any): WidgetType {
     return 'CHOIX_UNIQUE'
   }
 
-  if (raw.plancher !== undefined || raw.plafond !== undefined || raw.unité !== undefined) return 'NOMBRE'
+  if (raw.plancher !== undefined || raw.plafond !== undefined || raw['unité'] !== undefined)
+    return 'NOMBRE'
   return 'BOOLEEN'
 }
 
@@ -181,7 +182,8 @@ export function buildConfigJson(slug: string, rule: any, widgetType: WidgetType)
 
     if (widgetType === 'CHOIX_MULTIPLE') {
       const noneLabel = raw.mosaique['option aucun']
-      if (typeof noneLabel === 'string' && noneLabel.trim().length > 0) config.noneOptionLabel = noneLabel.trim()
+      if (typeof noneLabel === 'string' && noneLabel.trim().length > 0)
+        config.noneOptionLabel = noneLabel.trim()
       else config.noneOptionLabel = 'Aucun'
     }
 
@@ -202,12 +204,15 @@ export function buildConfigJson(slug: string, rule: any, widgetType: WidgetType)
     }
   }
 
-  if (!config.options && Array.isArray(raw['une possibilité'])) config.options = raw['une possibilité']
+  if (!config.options && Array.isArray(raw['une possibilité']))
+    config.options = raw['une possibilité']
   if (widgetType === 'BOOLEEN' && !config.options) config.options = ['oui', 'non']
   if (widgetType === 'BOOLEEN') config.booleanNative = !hasExplicitPossibilities
 
   if (widgetType === 'CHOIX_MULTIPLE' && Array.isArray(config.options)) {
-    const slugs = config.options.map((opt: any) => String(opt?.slug ?? opt?.value ?? '')).filter(Boolean)
+    const slugs = config.options
+      .map((opt: any) => String(opt?.slug ?? opt?.value ?? ''))
+      .filter(Boolean)
     config.multiValuesAsBoolean =
       slugs.length > 0 &&
       slugs.every((s: string) =>
@@ -222,7 +227,7 @@ export function buildConfigJson(slug: string, rule: any, widgetType: WidgetType)
   if (raw.plancher !== undefined) config.min = raw.plancher
   if (raw.plafond !== undefined) config.max = raw.plafond
   if (raw['par défaut'] !== undefined) config.defaultValue = raw['par défaut']
-  if (raw.unité) config.unit = raw.unité
+  if (raw['unité']) config.unit = raw['unité']
 
   if (limites[slug]) {
     config.min = limites[slug].min
@@ -267,7 +272,12 @@ export function buildQuestionnaire(engine: Engine): QuestionRecord[] {
 }
 
 /** Détermine si une question doit être visible (dépendances sur les réponses utilisateur). */
-export function isQuestionVisible(q: QuestionRecord, answers: Record<string, any>, _engine?: Engine | null): boolean {
+export function isQuestionVisible(
+  q: QuestionRecord,
+  answers: Record<string, any>,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _engine?: Engine | null,
+): boolean {
   const deps = q.config_json.dependances
   if (!deps || deps.length === 0) return true
 
@@ -288,7 +298,9 @@ function normalizeDependencyValue(value: any) {
   if (typeof value === 'string') {
     const trimmed = value.trim()
     const unquoted =
-      trimmed.length >= 2 && trimmed.startsWith("'") && trimmed.endsWith("'") ? trimmed.slice(1, -1) : trimmed
+      trimmed.length >= 2 && trimmed.startsWith("'") && trimmed.endsWith("'")
+        ? trimmed.slice(1, -1)
+        : trimmed
     return unquoted
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
@@ -301,7 +313,7 @@ function normalizeDependencyValue(value: any) {
 function prettifyPresentLabel(s: string): string {
   const withoutPresent = s.replace(/\s*\.\s*présent\s*$/i, '').trim()
   if (withoutPresent.includes('photovoltaique')) return 'électricité photovoltaïque'
-  return withoutPresent.split(' . ').slice(-1)[0]
+  return withoutPresent.split(' . ').slice(-1)[0]!
 }
 
 /** Construit le slug Publicodes complet pour une option de mosaïque, relative ou absolue. */
@@ -319,4 +331,3 @@ function resolveMosaicOptionSlug(parentSlug: string, opt: string): string {
   if (clean.startsWith(parentSlug + ' .') || clean === parentSlug) return clean
   return `${parentSlug} . ${clean}`
 }
-
