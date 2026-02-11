@@ -667,6 +667,9 @@ function getMosaicCount(slug: string, subSlug: string): string | number {
 
 function finishQuestionnaire() {
   try {
+    const flag = `__completed_${currentCategory.value}`
+    answers.value = { ...answers.value, [flag]: true }
+
     isCompletedMode.value = true
     flushLocalPersistence()
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -677,6 +680,15 @@ function finishQuestionnaire() {
 
 function modifyAnswers() {
   isCompletedMode.value = false
+
+  const flag = `__completed_${currentCategory.value}`
+  if (answers.value[flag]) {
+    const next = { ...answers.value }
+    delete next[flag]
+    answers.value = next
+    flushLocalPersistence()
+  }
+
   if (visibleQuestions.value.length > 0) {
     currentSlug.value = visibleQuestions.value[0].slug
   }
@@ -798,8 +810,10 @@ onMounted(async () => {
 
     await nextTick()
     if (visibleQuestions.value.length > 0) {
+      const flag = `__completed_${currentCategory.value}`
       const allAnswered = visibleQuestions.value.every((q) => isAnswerFilled(answers.value[q.slug]))
-      if (allAnswered) {
+
+      if (answers.value[flag] === true || allAnswered) {
         isCompletedMode.value = true
       }
     }
