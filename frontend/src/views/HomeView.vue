@@ -9,7 +9,7 @@ import { useProgressStore } from '@/stores/progress'
 import { useAuthStore } from '@/stores/auth'
 import { useFriendsStore } from '@/stores/friends'
 import { API_URL } from '@/config'
-import { loadAnswers } from '@/lib/ngc/answersStorage'
+import { loadAnswers, fetchRemoteAnswers } from '@/lib/ngc/answersStorage'
 import { computeCategoryProgressFromAnswers } from '@/utils/ngcProgress'
 
 const store = useProgressStore()
@@ -288,7 +288,15 @@ async function computeLocalNgcStats() {
   try {
     const rules = await getRules()
     const engine = new Engine(rules)
-    const answers = loadAnswers() ?? {}
+    let answers = loadAnswers() ?? {}
+
+    if (authStore.isConnected && authStore.token) {
+      const remote = await fetchRemoteAnswers(authStore.token)
+      if (remote) {
+        answers = { ...answers, ...remote }
+      }
+    }
+
     const flat = flattenAnswers(answers)
     const hasAnswers = Object.values(flat).some(hasFilledAnswer)
 
@@ -362,13 +370,9 @@ async function loadGlobalStats() {
 }
 
 async function refreshProgressAndScore() {
-  // 1. Synchronisation initiale si connecté
-  if (isConnected.value && authStore.user) {
-    await store.fetchAllProgress(authStore.user.id)
-  }
-
-  // Récupération des réponses locales (utile pour le mode connecté et invité)
-  store.syncFromLocalAnswers()
+  // 1. Synchronisation initiale si connecté : plus besoin de fetchAllProgress (endpoints morts)
+  // ni de syncFromLocalAnswers (localStorage désactivé).
+  // Tout est géré par computeLocalNgcStats plus bas.
 
   // --- ÉTAPE A : Récupérer les données globales (Reference) ---
   let globalApiData = null
@@ -399,6 +403,14 @@ async function refreshProgressAndScore() {
 
     if (localStats) {
       userScore.value = localStats.globalScore
+
+      // Fix: mettre à jour le store avec les progressions récupérées
+      if (localStats.categoryProgress) {
+        store.setScore('transport', localStats.categoryProgress.transport || 0)
+        store.setScore('logement', localStats.categoryProgress.logement || 0)
+        store.setScore('alimentation', localStats.categoryProgress.alimentation || 0)
+        store.setScore('divers', localStats.categoryProgress.divers || 0)
+      }
 
       // On enrichit avec les services sociétaux (impôts, services publics...)
       // Assure-toi que cette fonction existe et gère les nulls

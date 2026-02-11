@@ -336,28 +336,38 @@ function getResumeSlug(cat: Category, list: QuestionRecord[]): string | null {
   return list[list.length - 1]!.slug
 }
 
-function getCounterSuggestions(q: QuestionRecord): Record<string, unknown> {
+function getCounterSuggestions(q: QuestionRecord): Record<string, any> {
   const suggestions = q.config_json.mosaique?.suggestions ?? q.config_json.suggestions
   if (!suggestions || typeof suggestions !== 'object') return {}
-  return suggestions as Record<string, unknown>
+  return suggestions as Record<string, any>
 }
 
-function applyCounterSuggestion(q: QuestionRecord, preset: unknown) {
+function applyCounterSuggestion(q: QuestionRecord, preset: any) {
   if (!preset || typeof preset !== 'object') return
 
-  const next: Record<string, number> = {}
-  for (const [k, v] of Object.entries(preset as Record<string, unknown>)) {
-    const fullSlug = k.startsWith(q.slug) ? k : `${q.slug} . ${k}`
+  // On fusionne avec les réponses existantes pour ne pas écraser les autres compteurs
+  const current = (answers.value[q.slug] as Record<string, any>) || {}
+  const next: Record<string, number> = { ...current }
+
+  for (const [k, v] of Object.entries(preset as Record<string, any>)) {
+    let fullSlug = k.startsWith(q.slug) ? k : `${q.slug} . ${k}`
+
+    // PGL Fix: les suggestions pointent souvent vers le sous-élément sans " . nombre"
+    // Si c'est un compteur, on rajoute " . nombre" si absent
+    if (q.type_widget === 'COMPTEUR' && !fullSlug.endsWith(' . nombre')) {
+      fullSlug += ' . nombre'
+    }
+
     const n = Number(v)
     next[fullSlug] = Number.isFinite(n) ? n : 0
   }
   setAnswer(q.slug, next)
 }
 
-function getNumberSuggestions(q: QuestionRecord): Record<string, unknown> {
+function getNumberSuggestions(q: QuestionRecord): Record<string, any> {
   const suggestions = q.config_json.suggestions
   if (!suggestions || typeof suggestions !== 'object') return {}
-  return suggestions as Record<string, unknown>
+  return suggestions as Record<string, any>
 }
 
 function applyNumberSuggestion(slug: string, value: unknown) {
@@ -522,10 +532,11 @@ watch(
 
     saveAnswersTimer = setTimeout(() => {
       saveAnswers(nextAnswers)
+      syncCategoryProgress(nextAnswers)
+      // PGL Fix: sauvegarde en base de données si connecté
       if (authStore.isConnected && authStore.token) {
         void pushRemoteAnswers(authStore.token, nextAnswers)
       }
-      syncCategoryProgress(nextAnswers)
     }, ANSWERS_PERSIST_DEBOUNCE_MS)
 
     backendStatsSyncTimer = setTimeout(() => {
@@ -562,8 +573,8 @@ watch(
   ([cat, slug]) => {
     if (!slug) return
     const progress = loadProgress() ?? {}
-    if (progress[cat] === slug) return
-    saveProgress({ ...progress, [cat]: slug })
+    if ((progress as any)[cat] === slug) return
+    saveProgress({ ...(progress as any), [cat]: slug })
   },
   { immediate: true },
 )
@@ -575,17 +586,15 @@ function saveAndExit() {
 
 function goPrev() {
   if (isFirstQuestion.value) return
-  const prevQ = visibleQuestions.value[currentIndex.value - 1]
-  if (prevQ) currentSlug.value = prevQ.slug
+  currentSlug.value = visibleQuestions.value[currentIndex.value - 1].slug
 }
 
 function goNext() {
   if (isLastQuestion.value) return
-  const nextQ = visibleQuestions.value[currentIndex.value + 1]
-  if (nextQ) currentSlug.value = nextQ.slug
+  currentSlug.value = visibleQuestions.value[currentIndex.value + 1].slug
 }
 
-function setAnswer(slug: string, v: unknown) {
+function setAnswer(slug: string, v: any) {
   answers.value = { ...answers.value, [slug]: v }
 }
 
@@ -598,10 +607,10 @@ function clearAnswer(slug: string) {
 function getBooleanAnswerValue(q: QuestionRecord): boolean | string | null {
   const raw = answers.value[q.slug]
   if (q.config_json.booleanNative) return normalizeBooleanValue(raw)
-  return (raw as string | null) ?? null
+  return raw ?? null
 }
 
-function setBooleanAnswer(q: QuestionRecord, value: unknown) {
+function setBooleanAnswer(q: QuestionRecord, value: any) {
   if (q.config_json.booleanNative) {
     const normalized = normalizeBooleanValue(value)
     if (normalized === null) {
@@ -616,23 +625,19 @@ function setBooleanAnswer(q: QuestionRecord, value: unknown) {
 }
 
 function isMultiSelected(q: QuestionRecord, subSlug: string): boolean {
-  const value = (answers.value[q.slug] as Record<string, unknown>)?.[subSlug]
+  const value = answers.value[q.slug]?.[subSlug]
   if (q.config_json.multiValuesAsBoolean) {
     const normalized = normalizeBooleanValue(value)
     return normalized === true
   }
   const normalized = normalizeBooleanValue(value)
-  if (normalized !== null) return normalized
+  if (normalized !== null) return normalized === true
   return !!value
 }
 
 function getMultiOptionSlugs(q: QuestionRecord): string[] {
   if (!Array.isArray(q.config_json.options)) return []
-  return q.config_json.options.map((opt: unknown) => {
-    if (typeof opt === 'string') return opt
-    const typedOpt = opt as { slug?: string; value?: string }
-    return String(typedOpt?.slug ?? typedOpt?.value ?? String(typedOpt))
-  })
+  return q.config_json.options.map((opt: any) => String(opt?.slug ?? opt?.value ?? String(opt)))
 }
 
 function isMultiNoneSelected(q: QuestionRecord): boolean {
@@ -640,7 +645,7 @@ function isMultiNoneSelected(q: QuestionRecord): boolean {
     answers.value[q.slug] &&
     typeof answers.value[q.slug] === 'object' &&
     !Array.isArray(answers.value[q.slug])
-      ? (answers.value[q.slug] as Record<string, unknown>)
+      ? (answers.value[q.slug] as Record<string, any>)
       : null
   if (!selected) return false
 
@@ -662,7 +667,7 @@ function setMultiNone(q: QuestionRecord, enabled: boolean) {
   const optionSlugs = getMultiOptionSlugs(q)
   if (optionSlugs.length === 0) return
 
-  const next: Record<string, unknown> = {}
+  const next: Record<string, any> = {}
   for (const optionSlug of optionSlugs) {
     next[optionSlug] = q.config_json.multiValuesAsBoolean ? false : 'non'
   }
@@ -670,11 +675,11 @@ function setMultiNone(q: QuestionRecord, enabled: boolean) {
 }
 
 function toggleMulti(q: QuestionRecord, subSlug: string) {
-  const selected: Record<string, unknown> =
+  const selected: Record<string, any> =
     answers.value[q.slug] &&
     typeof answers.value[q.slug] === 'object' &&
     !Array.isArray(answers.value[q.slug])
-      ? (answers.value[q.slug] as Record<string, unknown>)
+      ? answers.value[q.slug]
       : {}
 
   const next = { ...selected }
@@ -685,16 +690,16 @@ function toggleMulti(q: QuestionRecord, subSlug: string) {
 }
 
 function getMosaicCount(slug: string, subSlug: string): string | number {
-  const value = (answers.value[slug] as Record<string, unknown>)?.[subSlug]
-  return value === undefined || value === null ? '' : (value as number)
+  const value = answers.value[slug]?.[subSlug]
+  return value === undefined || value === null ? '' : value
 }
 
-function setMosaicCountFromInput(slug: string, subSlug: string, raw: unknown) {
+function setMosaicCountFromInput(slug: string, subSlug: string, raw: any) {
   const counters: Record<string, number> =
     answers.value[slug] &&
     typeof answers.value[slug] === 'object' &&
     !Array.isArray(answers.value[slug])
-      ? (answers.value[slug] as Record<string, number>)
+      ? answers.value[slug]
       : {}
 
   if (raw === '' || raw === null || raw === undefined) {
@@ -718,21 +723,22 @@ onMounted(async () => {
 
   try {
     const rules = await fetchRules()
+    engine.value = new Engine(rules)
+    allQuestions.value = buildQuestionnaire(engine.value)
 
-    // Attempt to sync with backend before initializing engine fully
-    await syncAnswersWithBackend()
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    engine.value = new Engine(rules as any)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    allQuestions.value = buildQuestionnaire(engine.value as any)
+    if (authStore.isConnected && authStore.token) {
+      const remote = await fetchRemoteAnswers(authStore.token)
+      if (remote && Object.keys(remote).length > 0) {
+        answers.value = { ...answers.value, ...remote }
+      }
+    }
 
     const normalized = normalizeStoredAnswersByQuestionType(answers.value, allQuestions.value)
     if (normalized !== answers.value) answers.value = normalized
     void pushNgcStatsToBackend()
-  } catch (e: unknown) {
+  } catch (e: any) {
     console.error(e)
-    engineError.value = (e as Error)?.message ?? String(e)
+    engineError.value = e?.message ?? String(e)
   } finally {
     isLoading.value = false
   }
@@ -794,35 +800,35 @@ onUnmounted(() => {
         </div>
 
         <div v-else>
-          <h1 class="question-text">{{ currentQuestion!.question }}</h1>
+          <h1 class="question-text">{{ currentQuestion.question }}</h1>
 
           <div class="answers-area">
-            <div v-if="currentQuestion!.type_widget === 'BOOLEEN'">
+            <div v-if="currentQuestion.type_widget === 'BOOLEEN'">
               <v-radio-group
-                :model-value="getBooleanAnswerValue(currentQuestion!)"
-                @update:model-value="(v: unknown) => setBooleanAnswer(currentQuestion!, v)"
+                :model-value="getBooleanAnswerValue(currentQuestion)"
+                @update:model-value="(v: any) => setBooleanAnswer(currentQuestion, v)"
               >
                 <v-radio
                   label="Oui"
-                  :value="currentQuestion!.config_json.booleanNative ? true : 'oui'"
+                  :value="currentQuestion.config_json.booleanNative ? true : 'oui'"
                   color="#679436"
                 />
                 <v-radio
                   label="Non"
-                  :value="currentQuestion!.config_json.booleanNative ? false : 'non'"
+                  :value="currentQuestion.config_json.booleanNative ? false : 'non'"
                   color="#679436"
                 />
               </v-radio-group>
             </div>
 
-            <div v-else-if="currentQuestion!.type_widget === 'CHOIX_UNIQUE'">
+            <div v-else-if="currentQuestion.type_widget === 'CHOIX_UNIQUE'">
               <v-radio-group
-                :model-value="answers[currentQuestion!.slug] ?? null"
-                @update:model-value="(v: unknown) => setAnswer(currentQuestion!.slug, v)"
+                :model-value="answers[currentQuestion.slug] ?? null"
+                @update:model-value="(v: any) => setAnswer(currentQuestion.slug, v)"
               >
                 <v-radio
-                  v-for="opt in (currentQuestion!.config_json.options as Option[]) ?? []"
-                  :key="opt.value ?? String(opt)"
+                  v-for="opt in currentQuestion.config_json.options ?? []"
+                  :key="opt.value ?? opt"
                   :label="opt.label ?? String(opt)"
                   :value="opt.value ?? String(opt)"
                   color="#679436"
@@ -830,58 +836,58 @@ onUnmounted(() => {
               </v-radio-group>
             </div>
 
-            <div v-else-if="currentQuestion!.type_widget === 'CHOIX_MULTIPLE'">
+            <div v-else-if="currentQuestion.type_widget === 'CHOIX_MULTIPLE'">
               <div
-                v-for="opt in (currentQuestion!.config_json.options as Option[]) ?? []"
-                :key="opt.slug ?? opt.value ?? String(opt)"
+                v-for="opt in currentQuestion.config_json.options ?? []"
+                :key="opt.slug ?? opt.value ?? opt"
               >
                 <v-checkbox
                   :label="opt.label ?? String(opt)"
                   :model-value="
-                    isMultiSelected(currentQuestion!, opt.slug ?? opt.value ?? String(opt))
+                    isMultiSelected(currentQuestion, opt.slug ?? opt.value ?? String(opt))
                   "
                   color="#679436"
                   @update:model-value="
-                    () => toggleMulti(currentQuestion!, opt.slug ?? opt.value ?? String(opt))
+                    () => toggleMulti(currentQuestion, opt.slug ?? opt.value ?? String(opt))
                   "
                 />
               </div>
-              <div v-if="currentQuestion!.config_json.noneOptionLabel">
+              <div v-if="currentQuestion.config_json.noneOptionLabel">
                 <v-checkbox
-                  :label="currentQuestion!.config_json.noneOptionLabel"
-                  :model-value="isMultiNoneSelected(currentQuestion!)"
+                  :label="currentQuestion.config_json.noneOptionLabel"
+                  :model-value="isMultiNoneSelected(currentQuestion)"
                   color="#679436"
-                  @update:model-value="(v: any) => setMultiNone(currentQuestion!, !!v)"
+                  @update:model-value="(v: any) => setMultiNone(currentQuestion, !!v)"
                 />
               </div>
             </div>
 
-            <div v-else-if="currentQuestion!.type_widget === 'NOMBRE'">
+            <div v-else-if="currentQuestion.type_widget === 'NOMBRE'">
               <v-text-field
                 type="number"
                 placeholder="ex : 0"
                 :label="
-                  currentQuestion!.config_json.unit ? `(${currentQuestion!.config_json.unit})` : ''
+                  currentQuestion.config_json.unit ? `(${currentQuestion.config_json.unit})` : ''
                 "
-                :model-value="answers[currentQuestion!.slug] ?? ''"
+                :model-value="answers[currentQuestion.slug] ?? ''"
                 @update:model-value="
-                  (v: any) => setAnswer(currentQuestion!.slug, v === '' ? '' : Number(v))
+                  (v: any) => setAnswer(currentQuestion.slug, v === '' ? '' : Number(v))
                 "
               />
               <div style="opacity: 0.7; font-size: 0.9rem">
-                <span v-if="currentQuestion!.config_json.min !== undefined"
-                  >min {{ currentQuestion!.config_json.min }}</span
+                <span v-if="currentQuestion.config_json.min !== undefined"
+                  >min {{ currentQuestion.config_json.min }}</span
                 >
                 <span
                   v-if="
-                    currentQuestion!.config_json.min !== undefined &&
-                    currentQuestion!.config_json.max !== undefined
+                    currentQuestion.config_json.min !== undefined &&
+                    currentQuestion.config_json.max !== undefined
                   "
                 >
                   ·
                 </span>
-                <span v-if="currentQuestion!.config_json.max !== undefined"
-                  >max {{ currentQuestion!.config_json.max }}</span
+                <span v-if="currentQuestion.config_json.max !== undefined"
+                  >max {{ currentQuestion.config_json.max }}</span
                 >
               </div>
 
@@ -892,7 +898,7 @@ onUnmounted(() => {
                     v-for="[label, preset] in numberSuggestionEntries"
                     :key="String(label)"
                     class="suggestion-btn"
-                    @click="applyNumberSuggestion(currentQuestion!.slug, preset)"
+                    @click="applyNumberSuggestion(currentQuestion.slug, preset)"
                   >
                     {{ label }}
                   </button>
@@ -900,9 +906,9 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <div v-else-if="currentQuestion!.type_widget === 'COMPTEUR'">
+            <div v-else-if="currentQuestion.type_widget === 'COMPTEUR'">
               <div
-                v-for="(opt, idx) in currentQuestion!.config_json.mosaique?.options ?? []"
+                v-for="(opt, idx) in currentQuestion.config_json.mosaique?.options ?? []"
                 :key="idx"
                 style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px"
               >
@@ -917,15 +923,15 @@ onUnmounted(() => {
                   style="max-width: 140px"
                   :model-value="
                     getMosaicCount(
-                      currentQuestion!.slug,
-                      getMosaicSubSlug(currentQuestion!.slug, opt),
+                      currentQuestion.slug,
+                      getMosaicSubSlug(currentQuestion.slug, opt),
                     )
                   "
                   @update:model-value="
-                    (v: unknown) =>
+                    (v: any) =>
                       setMosaicCountFromInput(
-                        currentQuestion!.slug,
-                        getMosaicSubSlug(currentQuestion!.slug, opt),
+                        currentQuestion.slug,
+                        getMosaicSubSlug(currentQuestion.slug, opt),
                         v,
                       )
                   "
@@ -939,7 +945,7 @@ onUnmounted(() => {
                     v-for="[label, preset] in counterSuggestionEntries"
                     :key="String(label)"
                     class="suggestion-btn"
-                    @click="applyCounterSuggestion(currentQuestion!, preset)"
+                    @click="applyCounterSuggestion(currentQuestion, preset)"
                   >
                     {{ label }}
                   </button>
@@ -948,7 +954,7 @@ onUnmounted(() => {
             </div>
 
             <div v-else class="error-state">
-              Type de question non gere : {{ currentQuestion!.type_widget }}
+              Type de question non gere : {{ currentQuestion.type_widget }}
             </div>
           </div>
 
@@ -959,7 +965,7 @@ onUnmounted(() => {
             <div v-else></div>
 
             <div style="display: flex; gap: 10px; align-items: center">
-              <button class="nav-btn reset-btn" @click="clearAnswer(currentQuestion!.slug)">
+              <button class="nav-btn reset-btn" @click="clearAnswer(currentQuestion.slug)">
                 Effacer
               </button>
               <button class="nav-btn next-btn" @click="isLastQuestion ? saveAndExit() : goNext()">
@@ -978,7 +984,7 @@ onUnmounted(() => {
           >
             <strong>Erreur Publicodes</strong>
             <pre style="white-space: pre-wrap; margin: 8px 0 0">{{
-              String((bilan.err as Error)?.message ?? bilan.err)
+              String(bilan.err?.message ?? bilan.err)
             }}</pre>
           </div>
 
@@ -988,7 +994,7 @@ onUnmounted(() => {
           >
             <strong>Erreur situation</strong>
             <pre style="white-space: pre-wrap; margin: 8px 0 0"
-              >{{ String((situationError as Error)?.message ?? situationError) }}
+              >{{ String(situationError?.message ?? situationError) }}
             </pre>
           </div>
         </div>
