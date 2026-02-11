@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Engine from 'publicodes'
 import { VCheckbox, VRadio, VRadioGroup, VTextField } from 'vuetify/components'
@@ -62,26 +62,6 @@ let backendStatsSyncTimer: ReturnType<typeof setTimeout> | null = null
 const isError = computed(() => !isLoading.value && !!engineError.value)
 
 let restoreWarn: (() => void) | null = null
-
-async function syncAnswersWithBackend() {
-  if (!authStore.isConnected || !authStore.token) return
-
-  try {
-    const remote = await fetchRemoteAnswers(authStore.token)
-    if (remote && Object.keys(remote).length > 0) {
-      // Merge strategy: remote wins? or current wins?
-      // Since we just mounted, local might be stale or empty if clearing cookies but keeping account.
-      // Let's say remote is source of truth if connected.
-      // However, we initialised with loadAnswers() (local storage).
-      // If local storage has keys that remote doesn't, we might want to keep then?
-      // For simplicity: Remote overrides local if remote is not empty.
-      answers.value = { ...answers.value, ...remote }
-      saveAnswers(answers.value)
-    }
-  } catch (e) {
-    console.error('Failed to sync answers', e)
-  }
-}
 
 async function fetchRules(): Promise<unknown> {
   const controller = new AbortController()
@@ -500,16 +480,6 @@ const currentIndex = computed(() => {
 const currentQuestion = computed(() => visibleQuestions.value[currentIndex.value] ?? null)
 const isFirstQuestion = computed(() => currentIndex.value === 0)
 
-type Option = {
-  label?: string
-  value?: string
-  slug?: string
-  icone?: string
-  titre?: string
-  title?: string
-  dottedName?: string
-}
-
 const isLastQuestion = computed(() => currentIndex.value >= visibleQuestions.value.length - 1)
 
 const progressPct = computed(() => {
@@ -730,6 +700,10 @@ onMounted(async () => {
       const remote = await fetchRemoteAnswers(authStore.token)
       if (remote && Object.keys(remote).length > 0) {
         answers.value = { ...answers.value, ...remote }
+        // Force recalculation of current question to resume where we left off
+        await nextTick()
+        const resume = getResumeSlug(currentCategory.value, visibleQuestions.value)
+        if (resume) currentSlug.value = resume
       }
     }
 
