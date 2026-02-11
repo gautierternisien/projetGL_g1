@@ -177,13 +177,25 @@ function prettifyCounterLabel(raw: string): string {
   return cleaned.split(' . ').slice(-1)[0]!.trim()
 }
 
-function getMosaicDisplayLabel(opt: any): string {
-  const rawLabel = String(opt?.titre ?? opt?.title ?? opt?.label ?? opt)
+type MosaicOption = {
+  titre?: string
+  title?: string
+  label?: string
+  name?: string
+  dottedName?: string
+  valeur?: string
+  icone?: string
+}
+
+function getMosaicDisplayLabel(opt: unknown): string {
+  const o = opt as MosaicOption
+  const rawLabel = String(o?.titre ?? o?.title ?? o?.label ?? opt)
   return prettifyCounterLabel(rawLabel)
 }
 
-function getMosaicSubSlug(parentSlug: string, opt: any): string {
-  const candidate = opt?.dottedName ?? opt?.valeur ?? opt?.name
+function getMosaicSubSlug(parentSlug: string, opt: unknown): string {
+  const o = opt as MosaicOption
+  const candidate = o?.dottedName ?? o?.valeur ?? o?.name
 
   if (typeof candidate === 'string' && candidate.includes(' . ')) {
     if (candidate.endsWith(' . nombre')) return candidate
@@ -192,7 +204,7 @@ function getMosaicSubSlug(parentSlug: string, opt: any): string {
     return `${candidate} . nombre`
   }
 
-  const rawLabel = String(opt?.titre ?? opt?.title ?? opt?.label ?? opt)
+  const rawLabel = String(o?.titre ?? o?.title ?? o?.label ?? opt)
   const label = prettifyCounterLabel(rawLabel)
   return `${parentSlug} . ${label} . nombre`
 }
@@ -223,7 +235,7 @@ function normalizeToken(value: string): string {
 }
 
 function findRuleNameByNormalizedName(
-  rules: Record<string, any>,
+  rules: Record<string, unknown>,
   expectedName: string,
 ): string | null {
   const expected = normalizeToken(expectedName)
@@ -253,9 +265,11 @@ async function pushNgcStatsToBackend() {
     }
 
     let servicesScore = 0
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const parsedRules = engine.value.getParsedRules() as any
     const servicesRuleName = findRuleNameByNormalizedName(parsedRules, 'services societaux')
     if (servicesRuleName) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const r: any = engine.value.evaluate(servicesRuleName)
       servicesScore = typeof r?.nodeValue === 'number' ? Math.round(r.nodeValue) : 0
     }
@@ -292,17 +306,17 @@ function getResumeSlug(cat: Category, list: QuestionRecord[]): string | null {
   return list[list.length - 1]!.slug
 }
 
-function getCounterSuggestions(q: QuestionRecord): Record<string, any> {
+function getCounterSuggestions(q: QuestionRecord): Record<string, unknown> {
   const suggestions = q.config_json.mosaique?.suggestions ?? q.config_json.suggestions
   if (!suggestions || typeof suggestions !== 'object') return {}
-  return suggestions as Record<string, any>
+  return suggestions as Record<string, unknown>
 }
 
-function applyCounterSuggestion(q: QuestionRecord, preset: any) {
+function applyCounterSuggestion(q: QuestionRecord, preset: unknown) {
   if (!preset || typeof preset !== 'object') return
 
   const next: Record<string, number> = {}
-  for (const [k, v] of Object.entries(preset as Record<string, any>)) {
+  for (const [k, v] of Object.entries(preset as Record<string, unknown>)) {
     const fullSlug = k.startsWith(q.slug) ? k : `${q.slug} . ${k}`
     const n = Number(v)
     next[fullSlug] = Number.isFinite(n) ? n : 0
@@ -310,13 +324,13 @@ function applyCounterSuggestion(q: QuestionRecord, preset: any) {
   setAnswer(q.slug, next)
 }
 
-function getNumberSuggestions(q: QuestionRecord): Record<string, any> {
+function getNumberSuggestions(q: QuestionRecord): Record<string, unknown> {
   const suggestions = q.config_json.suggestions
   if (!suggestions || typeof suggestions !== 'object') return {}
-  return suggestions as Record<string, any>
+  return suggestions as Record<string, unknown>
 }
 
-function applyNumberSuggestion(slug: string, value: any) {
+function applyNumberSuggestion(slug: string, value: unknown) {
   const n = Number(value)
   if (Number.isFinite(n)) setAnswer(slug, n)
 }
@@ -538,7 +552,7 @@ function goNext() {
   if (nextQ) currentSlug.value = nextQ.slug
 }
 
-function setAnswer(slug: string, v: any) {
+function setAnswer(slug: string, v: unknown) {
   answers.value = { ...answers.value, [slug]: v }
 }
 
