@@ -54,11 +54,7 @@ export const useNgcQuestionnaireStore = defineStore('ngcQuestionnaire', () => {
   const currentSlug = ref<string | null>(null)
 
   // persist answers
-  watch(
-    answers,
-    (v) => saveAnswers(v),
-    { deep: true }
-  )
+  watch(answers, (v) => saveAnswers(v), { deep: true })
 
   // persist currentSlug per category
   watch([category, currentSlug], ([cat, slug]) => {
@@ -73,12 +69,13 @@ export const useNgcQuestionnaireStore = defineStore('ngcQuestionnaire', () => {
     return Object.fromEntries(
       Object.entries(flat)
         .map(([k, v]) => [k, toPublicodesValue(v)] as const)
-        .filter(([, v]) => v !== undefined)
+        .filter(([, v]) => v !== undefined),
     )
   })
 
   const total = computed(() => {
-    if (!engine.value) return { val: null as number | null, unit: '', err: null as any, raw: null as any }
+    if (!engine.value)
+      return { val: null as number | null, unit: '', err: null as any, raw: null as any }
     try {
       engine.value.setSituation(situation.value)
       const res: any = engine.value.evaluate('bilan')
@@ -99,7 +96,7 @@ export const useNgcQuestionnaireStore = defineStore('ngcQuestionnaire', () => {
       ? questions.value.filter((q) => q.categorie_empreinte === category.value)
       : questions.value
 
-    return base.filter((q) => isQuestionVisible(q, answers.value, engine.value))
+    return base.filter((q) => isQuestionVisible(q, answers.value, engine.value as any))
   })
 
   // IMPORTANT: éviter le “maximum update depth exceeded”
@@ -121,12 +118,14 @@ export const useNgcQuestionnaireStore = defineStore('ngcQuestionnaire', () => {
       const saved = progress.value?.[cat]
       const keep =
         (saved && list.some((q) => q.slug === saved) && saved) ||
-        (currentSlug.value && list.some((q) => q.slug === currentSlug.value) && currentSlug.value) ||
-        list[0].slug
+        (currentSlug.value &&
+          list.some((q) => q.slug === currentSlug.value) &&
+          currentSlug.value) ||
+        list[0]!.slug
 
       currentSlug.value = keep
     },
-    { immediate: true }
+    { immediate: true },
   )
 
   const currentIndex = computed(() => {
@@ -140,9 +139,11 @@ export const useNgcQuestionnaireStore = defineStore('ngcQuestionnaire', () => {
   const currentQuestion = computed(() => visibleQuestions.value[currentIndex.value])
 
   const progressVal = computed(() => (visibleQuestions.value.length ? currentIndex.value + 1 : 0))
-  const progressMax = computed(() => (visibleQuestions.value.length ? visibleQuestions.value.length : 1))
+  const progressMax = computed(() =>
+    visibleQuestions.value.length ? visibleQuestions.value.length : 1,
+  )
   const progressPct = computed(() =>
-    visibleQuestions.value.length ? Math.round((progressVal.value / progressMax.value) * 100) : 0
+    visibleQuestions.value.length ? Math.round((progressVal.value / progressMax.value) * 100) : 0,
   )
 
   function setEngine(e: Engine) {
@@ -169,12 +170,12 @@ export const useNgcQuestionnaireStore = defineStore('ngcQuestionnaire', () => {
 
   function goPrev() {
     if (currentIndex.value <= 0) return
-    currentSlug.value = visibleQuestions.value[currentIndex.value - 1].slug
+    currentSlug.value = visibleQuestions.value[currentIndex.value - 1]!.slug
   }
 
   function goNext() {
     if (currentIndex.value >= visibleQuestions.value.length - 1) return
-    currentSlug.value = visibleQuestions.value[currentIndex.value + 1].slug
+    currentSlug.value = visibleQuestions.value[currentIndex.value + 1]!.slug
   }
 
   return {
