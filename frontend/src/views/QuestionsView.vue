@@ -416,6 +416,7 @@ const situation = computed(() => {
   const flat = flattenAnswers(answers.value)
   return Object.fromEntries(
     Object.entries(flat)
+      .filter(([k]) => !k.startsWith('__'))
       .map(([k, v]) => [k, toPublicodesValue(v)] as const)
       .filter(([, v]) => v !== undefined),
   )
