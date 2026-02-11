@@ -18,6 +18,7 @@ class User(Base):
     mission_statuses = relationship("UserMissionStatus", back_populates="user")
     ngc_stat = relationship("UserNgcStat", back_populates="user", uselist=False)
     ngc_progress = relationship("UserNgcProgress", back_populates="user", uselist=False)
+    ngc_answers = relationship("UserNgcAnswers", back_populates="user", uselist=False)
 
 class Category(Base):
     __tablename__ = "categories"
@@ -100,9 +101,20 @@ class UserNgcProgress(Base):
     logement = Column(Integer, nullable=False, default=0)
     alimentation = Column(Integer, nullable=False, default=0)
     divers = Column(Integer, nullable=False, default=0)
-    updated_at = Column(String, nullable=True)
 
     user = relationship("User", back_populates="ngc_progress")
+
+
+class UserNgcAnswers(Base):
+    __tablename__ = "user_ngc_answers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, index=True, nullable=False)
+    data = Column(String)  # Stored as JSON string
+    updated_at = Column(String, nullable=True)
+
+    user = relationship("User", back_populates="ngc_answers")
+
 
 class UserMissionStatus(Base):
     __tablename__ = "user_mission_statuses"

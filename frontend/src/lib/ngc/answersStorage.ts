@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-
+import { API_URL } from '@/config'
 
 export type Category = 'logement' | 'transport' | 'alimentation' | 'divers'
 
@@ -24,7 +24,7 @@ function getCurrentUserScope(): string {
     const parts = token.split('.')
     if (parts.length < 2) return 'anon'
 
-    const payloadText = decodeBase64Url(parts[1])
+    const payloadText = decodeBase64Url(parts[1]!)
     const payload = JSON.parse(payloadText) as JwtPayload
     const sub = String(payload?.sub ?? '').trim()
     if (!sub) return 'anon'
@@ -48,9 +48,27 @@ function getProgressKey() {
 export function loadAnswers(): Record<string, any> {
   try {
     const raw = localStorage.getItem(getAnswersKey())
-    return raw ? JSON.parse(raw) : {}
-  } catch {
+    if (!raw) return {}
+    return JSON.parse(raw)
+  } catch (e) {
+    console.error('Failed to load answers from localStorage', e)
     return {}
+  }
+}
+
+/** Récupère les réponses depuis le backend (si connecté). */
+export async function fetchRemoteAnswers(token: string): Promise<Record<string, any> | null> {
+  if (!token) return null
+  try {
+    const res = await fetch(`${API_URL}/ngc/answers/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) return null
+    const json = await res.json()
+    return json.data
+  } catch (e) {
+    console.warn('Failed to fetch remote answers', e)
+    return null
   }
 }
 
@@ -58,8 +76,28 @@ export function loadAnswers(): Record<string, any> {
 export function saveAnswers(answers: Record<string, any>) {
   try {
     localStorage.setItem(getAnswersKey(), JSON.stringify(answers))
-  } catch {
-    // ignore
+  } catch (e) {
+    console.error('Failed to save answers to localStorage', e)
+  }
+}
+
+/** Envoie les réponses au backend (si connecté). */
+export async function pushRemoteAnswers(
+  token: string,
+  answers: Record<string, any>,
+): Promise<void> {
+  if (!token) return
+  try {
+    await fetch(`${API_URL}/ngc/answers/me`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ data: answers }),
+    })
+  } catch (e) {
+    console.warn('Failed to push remote answers', e)
   }
 }
 

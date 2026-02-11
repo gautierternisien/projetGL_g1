@@ -9,6 +9,7 @@ from routes import router
 
 import crud, models, schemas, utils
 from database import SessionLocal, engine
+import json
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -398,27 +399,66 @@ def read_user_profile(user_id: int, db: Session = Depends(get_db), current_user:
 
 # --- ROUTES STATISTIQUES NGC (Publicodes) ---
 
-@app.post("/ngc/stats/me", tags=["Statistics"], summary="Upsert current user NGC stats")
-async def upsert_my_ngc_stats(
-        payload: schemas.NgcStatsPayload,
-        current_user: models.User = Depends(get_current_user),
-        db: Session = Depends(get_db),
+@app.post("/ngc/stats/me", response_model=schemas.NgcStatsPayload)
+def update_user_ngc_stats(
+    payload: schemas.NgcStatsPayload,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
-    # C'est ici que le frontend envoie les calculs du moteur Publicodes
-    row = crud.upsert_user_ngc_stats(db, current_user.id, payload)
-    return {
-        "status": "saved",
-        "user_id": current_user.id,
-        "global_score": row.global_score,
-        "details_by_category": {
-            "transport": row.transport,
-            "logement": row.logement,
-            "alimentation": row.alimentation,
-            "divers": row.divers,
-            "services societaux": row.services_societaux,
+    stats = crud.upsert_user_ngc_stats(db, current_user.id, payload)
+
+    # Return what we just saved, but reconstructed as NgcStatsPayload
+    # (or simply return the input payload if everything went well)
+    result = schemas.NgcStatsPayload(
+        global_score=stats.global_score,
+        details_by_category={
+            'transport': stats.transport,
+            'logement': stats.logement,
+            'alimentation': stats.alimentation,
+            'divers': stats.divers,
+            'services societaux': stats.services_societaux
         },
-        "updated_at": row.updated_at,
-    }
+        category_progress={} # Not persisting progress map in details response for now
+    )
+    return result
+
+
+@app.get("/ngc/answers/me", response_model=schemas.UserNgcAnswersResponse)
+def get_ngc_answers_me(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Récupère les réponses brutes (JSON) du questionnaire pour l'utilisateur connecté.
+    """
+    record = crud.get_user_ngc_answers(db, current_user.id)
+    if not record:
+        return schemas.UserNgcAnswersResponse(data={})
+
+    try:
+        data = json.loads(record.data) if record.data else {}
+    except:
+        data = {}
+
+    return schemas.UserNgcAnswersResponse(data=data, updated_at=record.updated_at)
+
+
+@app.post("/ngc/answers/me", response_model=schemas.UserNgcAnswersResponse)
+def update_ngc_answers_me(
+    payload: schemas.UserNgcAnswersCreate,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Enregistre les réponses brutes (JSON) du questionnaire.
+    """
+    data_str = json.dumps(payload.data)
+    record = crud.update_user_ngc_answers(db, current_user.id, data_str)
+
+    return schemas.UserNgcAnswersResponse(
+        data=payload.data,
+        updated_at=record.updated_at
+    )
 
 @app.get("/carbon-score/{user_id}", tags=["Statistics"], summary="Get user stored carbon score")
 async def get_carbon_score(user_id: int, db: Session = Depends(get_db)):

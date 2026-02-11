@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 # --- USER ---
 class UserBase(BaseModel):
@@ -157,3 +157,11 @@ class LeagueInvite(BaseModel):
 
 class LeagueDetail(League):
     members: List[LeagueMember] = []
+
+class UserNgcAnswersCreate(BaseModel):
+    data: Dict[str, Any]
+
+class UserNgcAnswersResponse(UserNgcAnswersCreate):
+    updated_at: Optional[str] = None
+    class Config:
+        from_attributes = True

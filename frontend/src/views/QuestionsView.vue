@@ -16,7 +16,14 @@ import {
   type QuestionRecord,
 } from '@/lib/ngc/questionnaire'
 import { computeCategoryProgressFromAnswers } from '@/utils/ngcProgress'
-import { loadAnswers, loadProgress, saveAnswers, saveProgress } from '@/lib/ngc/answersStorage'
+import {
+  loadAnswers,
+  loadProgress,
+  saveAnswers,
+  saveProgress,
+  fetchRemoteAnswers,
+  pushRemoteAnswers,
+} from '@/lib/ngc/answersStorage'
 
 const router = useRouter()
 const route = useRoute()
@@ -55,6 +62,26 @@ let backendStatsSyncTimer: ReturnType<typeof setTimeout> | null = null
 const isError = computed(() => !isLoading.value && !!engineError.value)
 
 let restoreWarn: (() => void) | null = null
+
+async function syncAnswersWithBackend() {
+  if (!authStore.isConnected || !authStore.token) return
+
+  try {
+    const remote = await fetchRemoteAnswers(authStore.token)
+    if (remote && Object.keys(remote).length > 0) {
+      // Merge strategy: remote wins? or current wins?
+      // Since we just mounted, local might be stale or empty if clearing cookies but keeping account.
+      // Let's say remote is source of truth if connected.
+      // However, we initialised with loadAnswers() (local storage).
+      // If local storage has keys that remote doesn't, we might want to keep then?
+      // For simplicity: Remote overrides local if remote is not empty.
+      answers.value = { ...answers.value, ...remote }
+      saveAnswers(answers.value)
+    }
+  } catch (e) {
+    console.error('Failed to sync answers', e)
+  }
+}
 
 async function fetchRules(): Promise<unknown> {
   const controller = new AbortController()
@@ -223,6 +250,9 @@ function flushLocalPersistence() {
     saveAnswersTimer = null
   }
   saveAnswers(answers.value)
+  if (authStore.isConnected && authStore.token) {
+    void pushRemoteAnswers(authStore.token, answers.value)
+  }
   syncCategoryProgress(answers.value)
 }
 
@@ -492,6 +522,9 @@ watch(
 
     saveAnswersTimer = setTimeout(() => {
       saveAnswers(nextAnswers)
+      if (authStore.isConnected && authStore.token) {
+        void pushRemoteAnswers(authStore.token, nextAnswers)
+      }
       syncCategoryProgress(nextAnswers)
     }, ANSWERS_PERSIST_DEBOUNCE_MS)
 
@@ -685,6 +718,10 @@ onMounted(async () => {
 
   try {
     const rules = await fetchRules()
+
+    // Attempt to sync with backend before initializing engine fully
+    await syncAnswersWithBackend()
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     engine.value = new Engine(rules as any)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

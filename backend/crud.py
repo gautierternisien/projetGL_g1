@@ -98,6 +98,23 @@ def update_user_password(db: Session, user_id: int, new_password: str):
 def get_questions_by_category(db: Session, category_name: str):
     return db.query(models.Question).filter(models.Question.category_name == category_name).all()
 
+def get_user_ngc_answers(db: Session, user_id: int):
+    return db.query(models.UserNgcAnswers).filter(models.UserNgcAnswers.user_id == user_id).first()
+
+def update_user_ngc_answers(db: Session, user_id: int, data_json: str):
+    record = get_user_ngc_answers(db, user_id)
+    now = datetime.utcnow().isoformat()
+    if not record:
+        record = models.UserNgcAnswers(user_id=user_id, data=data_json, updated_at=now)
+        db.add(record)
+    else:
+        record.data = data_json
+        record.updated_at = now
+
+    db.commit()
+    db.refresh(record)
+    return record
+
 def get_missions_by_category(db: Session, category_name: str, user_id: int):
     missions = db.query(models.Mission).filter(models.Mission.category_name == category_name).all()
 
