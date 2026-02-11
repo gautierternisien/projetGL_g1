@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import Engine from 'publicodes'
+import Engine, { type Rule } from 'publicodes'
 import { VCheckbox, VRadio, VRadioGroup, VTextField } from 'vuetify/components'
 
 import Header from '@/components/AppHeader.vue'
@@ -14,6 +14,7 @@ import {
   isQuestionVisible,
   type Category,
   type QuestionRecord,
+  type MosaicOption,
 } from '@/lib/ngc/questionnaire'
 import { computeCategoryProgressFromAnswers } from '@/utils/ngcProgress'
 import { loadAnswers, loadProgress, saveAnswers, saveProgress } from '@/lib/ngc/answersStorage'
@@ -31,15 +32,17 @@ const CATEGORY_DISPLAY_NAMES: Record<string, string> = {
   divers: 'Divers',
 }
 
-const categoryTitle = computed(() => CATEGORY_DISPLAY_NAMES[currentCategory.value] ?? currentCategory.value)
+const categoryTitle = computed(
+  () => CATEGORY_DISPLAY_NAMES[currentCategory.value as string] ?? currentCategory.value,
+)
 
 const isLoading = ref(true)
 const engine = ref<Engine | null>(null)
 const engineError = ref<string | null>(null)
-const situationError = ref<any>(null)
+const situationError = ref<unknown>(null)
 
 const allQuestions = ref<QuestionRecord[]>([])
-const answers = ref<Record<string, any>>(loadAnswers() ?? {})
+const answers = ref<Record<string, unknown>>(loadAnswers() ?? {})
 const currentSlug = ref<string | null>(null)
 
 const ANSWERS_PERSIST_DEBOUNCE_MS = 200
@@ -54,17 +57,19 @@ const isError = computed(() => !isLoading.value && !!engineError.value)
 
 let restoreWarn: (() => void) | null = null
 
-async function fetchRules(): Promise<any> {
+async function fetchRules(): Promise<unknown> {
   const controller = new AbortController()
   const timeoutMs = 10000
   const timer = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
     const res = await fetch(`${API_URL}/rules`, { cache: 'no-store', signal: controller.signal })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    if (!res.ok) {
+      await Promise.reject(new Error(`HTTP ${res.status}`))
+    }
     return await res.json()
-  } catch (e: any) {
-    if (e?.name === 'AbortError') {
+  } catch (e: unknown) {
+    if ((e as Error)?.name === 'AbortError') {
       throw new Error(`Timeout after ${timeoutMs}ms while fetching rules`)
     }
     throw e
@@ -75,7 +80,7 @@ async function fetchRules(): Promise<any> {
 
 function silenceNoisyWarnings() {
   const originalWarn = console.warn
-  console.warn = (...args: any[]) => {
+  console.warn = (...args: unknown[]) => {
     const msg = args
       .map((a) => {
         if (typeof a === 'string') return a
@@ -104,7 +109,7 @@ function silenceNoisyWarnings() {
   }
 }
 
-function toPublicodesValue(v: any) {
+function toPublicodesValue(v: unknown) {
   if (v === undefined || v === null || v === '') return undefined
   if (typeof v === 'boolean') return v ? 'oui' : 'non'
   if (typeof v === 'number') return v
@@ -126,15 +131,15 @@ function toPublicodesValue(v: any) {
   return v
 }
 
-function flattenAnswers(source: Record<string, any>) {
-  const flat: Record<string, any> = {}
+function flattenAnswers(source: Record<string, unknown>) {
+  const flat: Record<string, unknown> = {}
 
   for (const [k, v] of Object.entries(source)) {
     if (v && typeof v === 'object' && !Array.isArray(v)) {
       const keys = Object.keys(v)
       const looksLikeSlugs = keys.some((x) => x.includes(' . '))
       if (looksLikeSlugs) {
-        for (const [subK, subV] of Object.entries(v)) flat[subK] = subV
+        for (const [subK, subV] of Object.entries(v as Record<string, unknown>)) flat[subK] = subV
         continue
       }
     }
@@ -144,18 +149,18 @@ function flattenAnswers(source: Record<string, any>) {
   return flat
 }
 
-function isAnswerFilled(value: any): boolean {
+function isAnswerFilled(value: unknown): boolean {
   if (value === undefined || value === null || value === '') return false
   if (Array.isArray(value)) return value.some(isAnswerFilled)
   if (typeof value === 'object') {
-    const values = Object.values(value)
+    const values = Object.values(value as Record<string, unknown>)
     if (values.length === 0) return false
     return values.some(isAnswerFilled)
   }
   return true
 }
 
-function normalizeBooleanValue(value: any): boolean | null {
+function normalizeBooleanValue(value: unknown): boolean | null {
   if (value === true || value === false) return value
   if (typeof value !== 'string') return null
 
@@ -166,30 +171,50 @@ function normalizeBooleanValue(value: any): boolean | null {
 }
 
 function prettifyCounterLabel(raw: string): string {
-  const cleaned = raw.trim().replace(/\s*\.\s*nombre\s*$/i, '').trim()
-  return cleaned.split(' . ').slice(-1)[0].trim()
+  const cleaned = raw
+    .trim()
+    .replace(/\s*\.\s*nombre\s*$/i, '')
+    .trim()
+  return cleaned.split(' . ').slice(-1)[0]!.trim()
 }
 
-function getMosaicDisplayLabel(opt: any): string {
-  const rawLabel = String(opt?.titre ?? opt?.title ?? opt?.label ?? opt)
+function getMosaicDisplayLabel(opt: unknown): string {
+  const typedOpt = opt as { titre?: string; title?: string; label?: string } | string
+  const rawLabel = String(
+    typeof typedOpt === 'string'
+      ? typedOpt
+      : (typedOpt?.titre ?? typedOpt?.title ?? typedOpt?.label ?? typedOpt),
+  )
   return prettifyCounterLabel(rawLabel)
 }
 
-function getMosaicSubSlug(parentSlug: string, opt: any): string {
+function getMosaicSubSlug(parentSlug: string, opt: MosaicOption | string): string {
+  if (typeof opt === 'string') {
+    if (opt.includes(' . ')) {
+      if (opt.endsWith(' . nombre')) return opt
+      if (opt.endsWith(' . nombre . nombre'))
+        return opt.replace(/ \. nombre \. nombre$/, ' . nombre')
+      return `${opt} . nombre`
+    }
+    const label = prettifyCounterLabel(opt)
+    return `${parentSlug} . ${label} . nombre`
+  }
+
   const candidate = opt?.dottedName ?? opt?.valeur ?? opt?.name
 
   if (typeof candidate === 'string' && candidate.includes(' . ')) {
     if (candidate.endsWith(' . nombre')) return candidate
-    if (candidate.endsWith(' . nombre . nombre')) return candidate.replace(/ \. nombre \. nombre$/, ' . nombre')
+    if (candidate.endsWith(' . nombre . nombre'))
+      return candidate.replace(/ \. nombre \. nombre$/, ' . nombre')
     return `${candidate} . nombre`
   }
 
-  const rawLabel = String(opt?.titre ?? opt?.title ?? opt?.label ?? opt)
+  const rawLabel = String(opt?.titre ?? opt?.title ?? opt?.label ?? '')
   const label = prettifyCounterLabel(rawLabel)
   return `${parentSlug} . ${label} . nombre`
 }
 
-function syncCategoryProgress(nextAnswers: Record<string, any>) {
+function syncCategoryProgress(nextAnswers: Record<string, unknown>) {
   const map = computeCategoryProgressFromAnswers(nextAnswers)
   progressStore.setScore('transport', map.transport)
   progressStore.setScore('logement', map.logement)
@@ -214,7 +239,10 @@ function normalizeToken(value: string): string {
     .trim()
 }
 
-function findRuleNameByNormalizedName(rules: Record<string, any>, expectedName: string): string | null {
+function findRuleNameByNormalizedName(
+  rules: Record<string, Rule>,
+  expectedName: string,
+): string | null {
   const expected = normalizeToken(expectedName)
   for (const key of Object.keys(rules ?? {})) {
     if (normalizeToken(key) === expected) return key
@@ -228,22 +256,24 @@ async function pushNgcStatsToBackend() {
 
   try {
     // Use latest local answers snapshot before evaluating.
-    engine.value.setSituation(situation.value)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    engine.value.setSituation(situation.value as any)
 
-    const bilanRes: any = engine.value.evaluate('bilan')
-    const globalScore = typeof bilanRes?.nodeValue === 'number' ? Math.round(bilanRes.nodeValue) : 8559
+    const bilanRes = engine.value.evaluate('bilan')
+    const globalScore =
+      typeof bilanRes?.nodeValue === 'number' ? Math.round(bilanRes.nodeValue) : 8559
 
     const detailsByCategory: Record<string, number> = {}
     for (const key of ['transport', 'logement', 'alimentation', 'divers']) {
-      const r: any = engine.value.evaluate(key)
+      const r = engine.value.evaluate(key)
       detailsByCategory[key] = typeof r?.nodeValue === 'number' ? Math.round(r.nodeValue) : 0
     }
 
     let servicesScore = 0
-    const parsedRules = engine.value.getParsedRules() as any
+    const parsedRules = engine.value.getParsedRules()
     const servicesRuleName = findRuleNameByNormalizedName(parsedRules, 'services societaux')
     if (servicesRuleName) {
-      const r: any = engine.value.evaluate(servicesRuleName)
+      const r = engine.value.evaluate(servicesRuleName)
       servicesScore = typeof r?.nodeValue === 'number' ? Math.round(r.nodeValue) : 0
     }
     detailsByCategory['services societaux'] = servicesScore
@@ -273,23 +303,23 @@ function getResumeSlug(cat: Category, list: QuestionRecord[]): string | null {
   if (firstUnanswered) return firstUnanswered
 
   const progress = loadProgress() ?? {}
-  const saved = (progress as any)[cat]
+  const saved = progress[cat]
   if (saved && list.some((q) => q.slug === saved)) return saved
 
-  return list[list.length - 1].slug
+  return list[list.length - 1]!.slug
 }
 
-function getCounterSuggestions(q: QuestionRecord): Record<string, any> {
+function getCounterSuggestions(q: QuestionRecord): Record<string, number> {
   const suggestions = q.config_json.mosaique?.suggestions ?? q.config_json.suggestions
   if (!suggestions || typeof suggestions !== 'object') return {}
-  return suggestions as Record<string, any>
+  return suggestions as Record<string, number>
 }
 
-function applyCounterSuggestion(q: QuestionRecord, preset: any) {
+function applyCounterSuggestion(q: QuestionRecord, preset: unknown) {
   if (!preset || typeof preset !== 'object') return
 
   const next: Record<string, number> = {}
-  for (const [k, v] of Object.entries(preset as Record<string, any>)) {
+  for (const [k, v] of Object.entries(preset as Record<string, unknown>)) {
     const fullSlug = k.startsWith(q.slug) ? k : `${q.slug} . ${k}`
     const n = Number(v)
     next[fullSlug] = Number.isFinite(n) ? n : 0
@@ -297,21 +327,21 @@ function applyCounterSuggestion(q: QuestionRecord, preset: any) {
   setAnswer(q.slug, next)
 }
 
-function getNumberSuggestions(q: QuestionRecord): Record<string, any> {
+function getNumberSuggestions(q: QuestionRecord): Record<string, number> {
   const suggestions = q.config_json.suggestions
   if (!suggestions || typeof suggestions !== 'object') return {}
-  return suggestions as Record<string, any>
+  return suggestions as Record<string, number>
 }
 
-function applyNumberSuggestion(slug: string, value: any) {
+function applyNumberSuggestion(slug: string, value: unknown) {
   const n = Number(value)
   if (Number.isFinite(n)) setAnswer(slug, n)
 }
 
 function normalizeStoredAnswersByQuestionType(
-  source: Record<string, any>,
+  source: Record<string, unknown>,
   questions: QuestionRecord[],
-): Record<string, any> {
+): Record<string, unknown> {
   let changed = false
   const next = { ...source }
 
@@ -330,7 +360,7 @@ function normalizeStoredAnswersByQuestionType(
       if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue
 
       const normalizedMap: Record<string, boolean> = {}
-      for (const [key, value] of Object.entries(raw)) {
+      for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
         const normalized = normalizeBooleanValue(value)
         if (normalized !== null) {
           normalizedMap[key] = normalized
@@ -388,9 +418,10 @@ watch(
 
     setSituationTimer = setTimeout(() => {
       try {
-        eng.setSituation(nextSituation)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        eng.setSituation(nextSituation as any)
         situationError.value = null
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error('Publicodes setSituation error:', e)
         situationError.value = e
       }
@@ -400,7 +431,8 @@ watch(
 )
 
 const bilan = computed(() => {
-  if (!engine.value) return { val: null as number | null, unit: '', raw: null as any, err: null as any }
+  if (!engine.value)
+    return { val: null as number | null, unit: '', raw: null as unknown, err: null as unknown }
   if (situationError.value) return { val: null, unit: '', raw: null, err: situationError.value }
 
   try {
@@ -409,7 +441,7 @@ const bilan = computed(() => {
     const val = rawVal === null ? null : Math.round(rawVal)
     const unit = res?.unit?.numerators?.join('.') ?? ''
     return { val, unit, raw: res, err: null }
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('Publicodes evaluate error:', e)
     return { val: null, unit: '', raw: null, err: e }
   }
@@ -417,7 +449,8 @@ const bilan = computed(() => {
 
 const visibleQuestions = computed(() => {
   const scoped = allQuestions.value.filter((q) => q.categorie_empreinte === currentCategory.value)
-  return scoped.filter((q) => isQuestionVisible(q, answers.value, engine.value))
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return scoped.filter((q) => isQuestionVisible(q, answers.value, engine.value as any))
 })
 
 const currentIndex = computed(() => {
@@ -429,6 +462,17 @@ const currentIndex = computed(() => {
 
 const currentQuestion = computed(() => visibleQuestions.value[currentIndex.value] ?? null)
 const isFirstQuestion = computed(() => currentIndex.value === 0)
+
+type Option = {
+  label?: string
+  value?: string
+  slug?: string
+  icone?: string
+  titre?: string
+  title?: string
+  dottedName?: string
+}
+
 const isLastQuestion = computed(() => currentIndex.value >= visibleQuestions.value.length - 1)
 
 const progressPct = computed(() => {
@@ -488,8 +532,8 @@ watch(
   ([cat, slug]) => {
     if (!slug) return
     const progress = loadProgress() ?? {}
-    if ((progress as any)[cat] === slug) return
-    saveProgress({ ...(progress as any), [cat]: slug })
+    if (progress[cat] === slug) return
+    saveProgress({ ...progress, [cat]: slug })
   },
   { immediate: true },
 )
@@ -501,15 +545,17 @@ function saveAndExit() {
 
 function goPrev() {
   if (isFirstQuestion.value) return
-  currentSlug.value = visibleQuestions.value[currentIndex.value - 1].slug
+  const prevQ = visibleQuestions.value[currentIndex.value - 1]
+  if (prevQ) currentSlug.value = prevQ.slug
 }
 
 function goNext() {
   if (isLastQuestion.value) return
-  currentSlug.value = visibleQuestions.value[currentIndex.value + 1].slug
+  const nextQ = visibleQuestions.value[currentIndex.value + 1]
+  if (nextQ) currentSlug.value = nextQ.slug
 }
 
-function setAnswer(slug: string, v: any) {
+function setAnswer(slug: string, v: unknown) {
   answers.value = { ...answers.value, [slug]: v }
 }
 
@@ -522,10 +568,10 @@ function clearAnswer(slug: string) {
 function getBooleanAnswerValue(q: QuestionRecord): boolean | string | null {
   const raw = answers.value[q.slug]
   if (q.config_json.booleanNative) return normalizeBooleanValue(raw)
-  return raw ?? null
+  return (raw as string | null) ?? null
 }
 
-function setBooleanAnswer(q: QuestionRecord, value: any) {
+function setBooleanAnswer(q: QuestionRecord, value: unknown) {
   if (q.config_json.booleanNative) {
     const normalized = normalizeBooleanValue(value)
     if (normalized === null) {
@@ -540,25 +586,31 @@ function setBooleanAnswer(q: QuestionRecord, value: any) {
 }
 
 function isMultiSelected(q: QuestionRecord, subSlug: string): boolean {
-  const value = answers.value[q.slug]?.[subSlug]
+  const value = (answers.value[q.slug] as Record<string, unknown>)?.[subSlug]
   if (q.config_json.multiValuesAsBoolean) {
     const normalized = normalizeBooleanValue(value)
     return normalized === true
   }
   const normalized = normalizeBooleanValue(value)
-  if (normalized !== null) return normalized === true
+  if (normalized !== null) return normalized
   return !!value
 }
 
 function getMultiOptionSlugs(q: QuestionRecord): string[] {
   if (!Array.isArray(q.config_json.options)) return []
-  return q.config_json.options.map((opt: any) => String(opt?.slug ?? opt?.value ?? String(opt)))
+  return q.config_json.options.map((opt: unknown) => {
+    if (typeof opt === 'string') return opt
+    const typedOpt = opt as { slug?: string; value?: string }
+    return String(typedOpt?.slug ?? typedOpt?.value ?? String(typedOpt))
+  })
 }
 
 function isMultiNoneSelected(q: QuestionRecord): boolean {
   const selected =
-    answers.value[q.slug] && typeof answers.value[q.slug] === 'object' && !Array.isArray(answers.value[q.slug])
-      ? (answers.value[q.slug] as Record<string, any>)
+    answers.value[q.slug] &&
+    typeof answers.value[q.slug] === 'object' &&
+    !Array.isArray(answers.value[q.slug])
+      ? (answers.value[q.slug] as Record<string, unknown>)
       : null
   if (!selected) return false
 
@@ -580,7 +632,7 @@ function setMultiNone(q: QuestionRecord, enabled: boolean) {
   const optionSlugs = getMultiOptionSlugs(q)
   if (optionSlugs.length === 0) return
 
-  const next: Record<string, any> = {}
+  const next: Record<string, unknown> = {}
   for (const optionSlug of optionSlugs) {
     next[optionSlug] = q.config_json.multiValuesAsBoolean ? false : 'non'
   }
@@ -588,9 +640,11 @@ function setMultiNone(q: QuestionRecord, enabled: boolean) {
 }
 
 function toggleMulti(q: QuestionRecord, subSlug: string) {
-  const selected: Record<string, any> =
-    answers.value[q.slug] && typeof answers.value[q.slug] === 'object' && !Array.isArray(answers.value[q.slug])
-      ? answers.value[q.slug]
+  const selected: Record<string, unknown> =
+    answers.value[q.slug] &&
+    typeof answers.value[q.slug] === 'object' &&
+    !Array.isArray(answers.value[q.slug])
+      ? (answers.value[q.slug] as Record<string, unknown>)
       : {}
 
   const next = { ...selected }
@@ -601,14 +655,16 @@ function toggleMulti(q: QuestionRecord, subSlug: string) {
 }
 
 function getMosaicCount(slug: string, subSlug: string): string | number {
-  const value = answers.value[slug]?.[subSlug]
-  return value === undefined || value === null ? '' : value
+  const value = (answers.value[slug] as Record<string, unknown>)?.[subSlug]
+  return value === undefined || value === null ? '' : (value as number)
 }
 
-function setMosaicCountFromInput(slug: string, subSlug: string, raw: any) {
+function setMosaicCountFromInput(slug: string, subSlug: string, raw: unknown) {
   const counters: Record<string, number> =
-    answers.value[slug] && typeof answers.value[slug] === 'object' && !Array.isArray(answers.value[slug])
-      ? answers.value[slug]
+    answers.value[slug] &&
+    typeof answers.value[slug] === 'object' &&
+    !Array.isArray(answers.value[slug])
+      ? (answers.value[slug] as Record<string, number>)
       : {}
 
   if (raw === '' || raw === null || raw === undefined) {
@@ -632,15 +688,17 @@ onMounted(async () => {
 
   try {
     const rules = await fetchRules()
-    engine.value = new Engine(rules)
-    allQuestions.value = buildQuestionnaire(engine.value)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    engine.value = new Engine(rules as any)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    allQuestions.value = buildQuestionnaire(engine.value as any)
 
     const normalized = normalizeStoredAnswersByQuestionType(answers.value, allQuestions.value)
     if (normalized !== answers.value) answers.value = normalized
     void pushNgcStatsToBackend()
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error(e)
-    engineError.value = e?.message ?? String(e)
+    engineError.value = (e as Error)?.message ?? String(e)
   } finally {
     isLoading.value = false
   }
@@ -667,7 +725,12 @@ onUnmounted(() => {
 
 <template>
   <div class="dashboard-wrapper">
-    <Header title="Questionnaire" :subtitle="categoryTitle" :showResumeBtn="true" @resumeLater="saveAndExit" />
+    <Header
+      title="Questionnaire"
+      :subtitle="categoryTitle"
+      :showResumeBtn="true"
+      @resumeLater="saveAndExit"
+    />
 
     <div class="scrollable-area">
       <div v-if="isLoading" class="loading-state">Chargement...</div>
@@ -676,13 +739,16 @@ onUnmounted(() => {
         <h2>Oups !</h2>
         <p>Impossible de charger le questionnaire "{{ categoryTitle }}".</p>
         <button class="nav-btn prev-btn" @click="saveAndExit">Retour au menu</button>
-        <pre v-if="engineError" style="white-space: pre-wrap; margin-top: 12px">{{ engineError }}</pre>
+        <pre v-if="engineError" style="white-space: pre-wrap; margin-top: 12px">{{
+          engineError
+        }}</pre>
       </div>
 
       <div v-else class="question-container">
         <h3 class="question-counter">
-          Bilan : {{ bilan.val ?? '—' }} {{ bilan.unit }}
-          • Question {{ visibleQuestions.length === 0 ? '—' : (currentIndex + 1) }} sur {{ visibleQuestions.length }}
+          Bilan : {{ bilan.val ?? '—' }} {{ bilan.unit }} • Question
+          {{ visibleQuestions.length === 0 ? '—' : currentIndex + 1 }} sur
+          {{ visibleQuestions.length }}
         </h3>
 
         <div class="progress-section">
@@ -694,35 +760,35 @@ onUnmounted(() => {
         </div>
 
         <div v-else>
-          <h1 class="question-text">{{ currentQuestion.question }}</h1>
+          <h1 class="question-text">{{ currentQuestion!.question }}</h1>
 
           <div class="answers-area">
-            <div v-if="currentQuestion.type_widget === 'BOOLEEN'">
+            <div v-if="currentQuestion!.type_widget === 'BOOLEEN'">
               <v-radio-group
-                :model-value="getBooleanAnswerValue(currentQuestion)"
-                @update:model-value="(v:any) => setBooleanAnswer(currentQuestion, v)"
+                :model-value="getBooleanAnswerValue(currentQuestion!)"
+                @update:model-value="(v: unknown) => setBooleanAnswer(currentQuestion!, v)"
               >
                 <v-radio
                   label="Oui"
-                  :value="currentQuestion.config_json.booleanNative ? true : 'oui'"
+                  :value="currentQuestion!.config_json.booleanNative ? true : 'oui'"
                   color="#679436"
                 />
                 <v-radio
                   label="Non"
-                  :value="currentQuestion.config_json.booleanNative ? false : 'non'"
+                  :value="currentQuestion!.config_json.booleanNative ? false : 'non'"
                   color="#679436"
                 />
               </v-radio-group>
             </div>
 
-            <div v-else-if="currentQuestion.type_widget === 'CHOIX_UNIQUE'">
+            <div v-else-if="currentQuestion!.type_widget === 'CHOIX_UNIQUE'">
               <v-radio-group
-                :model-value="answers[currentQuestion.slug] ?? null"
-                @update:model-value="(v:any) => setAnswer(currentQuestion.slug, v)"
+                :model-value="answers[currentQuestion!.slug] ?? null"
+                @update:model-value="(v: unknown) => setAnswer(currentQuestion!.slug, v)"
               >
                 <v-radio
-                  v-for="opt in (currentQuestion.config_json.options ?? [])"
-                  :key="opt.value ?? opt"
+                  v-for="opt in (currentQuestion!.config_json.options as Option[]) ?? []"
+                  :key="opt.value ?? String(opt)"
                   :label="opt.label ?? String(opt)"
                   :value="opt.value ?? String(opt)"
                   color="#679436"
@@ -730,41 +796,59 @@ onUnmounted(() => {
               </v-radio-group>
             </div>
 
-            <div v-else-if="currentQuestion.type_widget === 'CHOIX_MULTIPLE'">
-              <div v-for="opt in (currentQuestion.config_json.options ?? [])" :key="opt.slug ?? opt.value ?? opt">
+            <div v-else-if="currentQuestion!.type_widget === 'CHOIX_MULTIPLE'">
+              <div
+                v-for="opt in (currentQuestion!.config_json.options as Option[]) ?? []"
+                :key="opt.slug ?? opt.value ?? String(opt)"
+              >
                 <v-checkbox
                   :label="opt.label ?? String(opt)"
-                  :model-value="isMultiSelected(currentQuestion, opt.slug ?? opt.value ?? String(opt))"
+                  :model-value="
+                    isMultiSelected(currentQuestion!, opt.slug ?? opt.value ?? String(opt))
+                  "
                   color="#679436"
-                  @update:model-value="() => toggleMulti(currentQuestion, opt.slug ?? opt.value ?? String(opt))"
+                  @update:model-value="
+                    () => toggleMulti(currentQuestion!, opt.slug ?? opt.value ?? String(opt))
+                  "
                 />
               </div>
-              <div v-if="currentQuestion.config_json.noneOptionLabel">
+              <div v-if="currentQuestion!.config_json.noneOptionLabel">
                 <v-checkbox
-                  :label="currentQuestion.config_json.noneOptionLabel"
-                  :model-value="isMultiNoneSelected(currentQuestion)"
+                  :label="currentQuestion!.config_json.noneOptionLabel"
+                  :model-value="isMultiNoneSelected(currentQuestion!)"
                   color="#679436"
-                  @update:model-value="(v:any) => setMultiNone(currentQuestion, !!v)"
+                  @update:model-value="(v: any) => setMultiNone(currentQuestion!, !!v)"
                 />
               </div>
             </div>
 
-            <div v-else-if="currentQuestion.type_widget === 'NOMBRE'">
+            <div v-else-if="currentQuestion!.type_widget === 'NOMBRE'">
               <v-text-field
                 type="number"
                 placeholder="ex : 0"
-                :label="currentQuestion.config_json.unit ? `(${currentQuestion.config_json.unit})` : ''"
-                :model-value="answers[currentQuestion.slug] ?? ''"
-                @update:model-value="(v:any) => setAnswer(currentQuestion.slug, v === '' ? '' : Number(v))"
+                :label="
+                  currentQuestion!.config_json.unit ? `(${currentQuestion!.config_json.unit})` : ''
+                "
+                :model-value="answers[currentQuestion!.slug] ?? ''"
+                @update:model-value="
+                  (v: unknown) => setAnswer(currentQuestion!.slug, v === '' ? '' : Number(v))
+                "
               />
               <div style="opacity: 0.7; font-size: 0.9rem">
-                <span v-if="currentQuestion.config_json.min !== undefined">min {{ currentQuestion.config_json.min }}</span>
+                <span v-if="currentQuestion!.config_json.min !== undefined"
+                  >min {{ currentQuestion!.config_json.min }}</span
+                >
                 <span
-                  v-if="currentQuestion.config_json.min !== undefined && currentQuestion.config_json.max !== undefined"
+                  v-if="
+                    currentQuestion!.config_json.min !== undefined &&
+                    currentQuestion!.config_json.max !== undefined
+                  "
                 >
                   ·
                 </span>
-                <span v-if="currentQuestion.config_json.max !== undefined">max {{ currentQuestion.config_json.max }}</span>
+                <span v-if="currentQuestion!.config_json.max !== undefined"
+                  >max {{ currentQuestion!.config_json.max }}</span
+                >
               </div>
 
               <div v-if="numberSuggestionEntries.length > 0" class="suggestions-wrap">
@@ -774,7 +858,7 @@ onUnmounted(() => {
                     v-for="[label, preset] in numberSuggestionEntries"
                     :key="String(label)"
                     class="suggestion-btn"
-                    @click="applyNumberSuggestion(currentQuestion.slug, preset)"
+                    @click="applyNumberSuggestion(currentQuestion!.slug, preset)"
                   >
                     {{ label }}
                   </button>
@@ -782,9 +866,9 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <div v-else-if="currentQuestion.type_widget === 'COMPTEUR'">
+            <div v-else-if="currentQuestion!.type_widget === 'COMPTEUR'">
               <div
-                v-for="(opt, idx) in (currentQuestion.config_json.mosaique?.options ?? [])"
+                v-for="(opt, idx) in currentQuestion!.config_json.mosaique?.options ?? []"
                 :key="idx"
                 style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px"
               >
@@ -797,13 +881,19 @@ onUnmounted(() => {
                   type="number"
                   placeholder="ex : 0"
                   style="max-width: 140px"
-                  :model-value="getMosaicCount(currentQuestion.slug, getMosaicSubSlug(currentQuestion.slug, opt))"
-                  @update:model-value="
-                    (v:any) => setMosaicCountFromInput(
-                      currentQuestion.slug,
-                      getMosaicSubSlug(currentQuestion.slug, opt),
-                      v
+                  :model-value="
+                    getMosaicCount(
+                      currentQuestion!.slug,
+                      getMosaicSubSlug(currentQuestion!.slug, opt),
                     )
+                  "
+                  @update:model-value="
+                    (v: unknown) =>
+                      setMosaicCountFromInput(
+                        currentQuestion!.slug,
+                        getMosaicSubSlug(currentQuestion!.slug, opt),
+                        v,
+                      )
                   "
                 />
               </div>
@@ -815,7 +905,7 @@ onUnmounted(() => {
                     v-for="[label, preset] in counterSuggestionEntries"
                     :key="String(label)"
                     class="suggestion-btn"
-                    @click="applyCounterSuggestion(currentQuestion, preset)"
+                    @click="applyCounterSuggestion(currentQuestion!, preset)"
                   >
                     {{ label }}
                   </button>
@@ -823,15 +913,21 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <div v-else class="error-state">Type de question non gere : {{ currentQuestion.type_widget }}</div>
+            <div v-else class="error-state">
+              Type de question non gere : {{ currentQuestion!.type_widget }}
+            </div>
           </div>
 
           <div class="navigation-buttons">
-            <button v-if="!isFirstQuestion" class="nav-btn prev-btn" @click="goPrev">&lt; Question precedente</button>
+            <button v-if="!isFirstQuestion" class="nav-btn prev-btn" @click="goPrev">
+              &lt; Question precedente
+            </button>
             <div v-else></div>
 
             <div style="display: flex; gap: 10px; align-items: center">
-              <button class="nav-btn reset-btn" @click="clearAnswer(currentQuestion.slug)">Effacer</button>
+              <button class="nav-btn reset-btn" @click="clearAnswer(currentQuestion!.slug)">
+                Effacer
+              </button>
               <button class="nav-btn next-btn" @click="isLastQuestion ? saveAndExit() : goNext()">
                 {{ isLastQuestion ? 'Terminer' : 'Question suivante >' }}
               </button>
@@ -842,9 +938,14 @@ onUnmounted(() => {
             <p>Toute non reponse vaudra la moyenne nationale.</p>
           </div>
 
-          <div v-if="bilan.err" style="margin-top: 16px; padding: 12px; border: 1px solid #f99; border-radius: 10px">
+          <div
+            v-if="bilan.err"
+            style="margin-top: 16px; padding: 12px; border: 1px solid #f99; border-radius: 10px"
+          >
             <strong>Erreur Publicodes</strong>
-            <pre style="white-space: pre-wrap; margin: 8px 0 0">{{ String(bilan.err?.message ?? bilan.err) }}</pre>
+            <pre style="white-space: pre-wrap; margin: 8px 0 0">{{
+              String((bilan.err as Error)?.message ?? bilan.err)
+            }}</pre>
           </div>
 
           <div
@@ -852,8 +953,8 @@ onUnmounted(() => {
             style="margin-top: 16px; padding: 12px; border: 1px solid #f99; border-radius: 10px"
           >
             <strong>Erreur situation</strong>
-            <pre style="white-space: pre-wrap; margin: 8px 0 0">
-{{ String(situationError?.message ?? situationError) }}
+            <pre style="white-space: pre-wrap; margin: 8px 0 0"
+              >{{ String((situationError as Error)?.message ?? situationError) }}
             </pre>
           </div>
         </div>
