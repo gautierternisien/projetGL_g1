@@ -5,12 +5,96 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { Mission, MissionStatus } from '@/types/mission'
 import { useAuthStore } from '@/stores/auth'
+import { PREFERENCE_LABELS, type DerivedPreferences } from '@/utils/profileMapping'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const category = route.params.category as string
 const user = computed(() => authStore.user)
+
+const CATEGORY_PREFS_MAP: Record<string, string[]> = {
+  transport: ['possession_voiture', 'possession_velo', 'prend_avion'],
+  logement: ['est_proprietaire', 'vit_en_maison', 'vit_en_appartement', 'passoire_thermique'],
+  alimentation: [
+    'viande_rouge_importante',
+    'eau_bouteille',
+    'conso_pas_locaux',
+    'conso_pas_saison',
+    'boissons_chaudes',
+    'soda',
+    'alcool',
+    'dechets_importants',
+  ],
+  divers: ['shopping_important', 'fumeur'],
+}
+
+// --- LOGIQUE PREFERENCES ---
+const showPrefsModal = ref(false)
+const userPreferences = ref<Partial<DerivedPreferences>>({})
+const isSubmittingPrefs = ref(false)
+const API_URL = 'http://localhost:8000'
+
+// Filtre les labels pour n'afficher que ceux de la catégorie en cours
+const filteredPreferenceLabels = computed(() => {
+  const allowedKeys = CATEGORY_PREFS_MAP[category] || []
+  const filtered: Record<string, string> = {}
+
+  // Si la catégorie n'est pas mappée (ex: "quotidien" si ajouté plus tard), on montre tout ou rien.
+  // Ici on montre tout par défaut si pas mappé, sinon on filtre.
+  if (allowedKeys.length === 0) return PREFERENCE_LABELS
+
+  for (const key of allowedKeys) {
+    if (key in PREFERENCE_LABELS) {
+      filtered[key] = PREFERENCE_LABELS[key as keyof DerivedPreferences]
+    }
+  }
+  return filtered
+})
+
+async function openCategorySettings() {
+  if (!authStore.isConnected) return
+
+  try {
+    const res = await fetch(`${API_URL}/users/me/preferences`, {
+      headers: { Authorization: `Bearer ${authStore.token}` },
+    })
+    if (res.ok) {
+      const data = await res.json()
+      userPreferences.value = data.data || {}
+      showPrefsModal.value = true
+    }
+  } catch (e) {
+    console.error('Erreur chargement prefs', e)
+  }
+}
+
+async function saveCategoryPreferences() {
+  isSubmittingPrefs.value = true
+  try {
+    const payload = {
+      data: userPreferences.value,
+      has_completed_onboarding: true,
+    }
+    const res = await fetch(`${API_URL}/users/me/preferences`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authStore.token}`,
+      },
+      body: JSON.stringify(payload),
+    })
+    if (res.ok) {
+      showPrefsModal.value = false
+      // On recharge les missions car le filtrage a pu changer
+      await loadMissions()
+    }
+  } catch (e) {
+    console.error('Erreur save', e)
+  } finally {
+    isSubmittingPrefs.value = false
+  }
+}
 
 onMounted(() => {
   if (!authStore.isConnected) {
@@ -48,7 +132,6 @@ import { reactive } from 'vue'
 const sampleMissions = reactive<Record<number, Mission[]>>({ 0: [], 1: [], 2: [] })
 
 // Remote missions (fetched from backend)
-const API_URL = 'http://localhost:8000'
 const remoteMissions = ref<Mission[]>([])
 
 interface RawMission {
@@ -90,38 +173,38 @@ import { watch } from 'vue'
 
 onMounted(() => {
   const init = async () => {
-     if (user.value) {
-        await loadMissions()
-        handleScrollQuery()
-     }
+    if (user.value) {
+      await loadMissions()
+      handleScrollQuery()
+    }
   }
   init()
 })
 
 watch(user, async (newUser) => {
-    if (newUser) {
-        await loadMissions()
-        handleScrollQuery()
-    }
+  if (newUser) {
+    await loadMissions()
+    handleScrollQuery()
+  }
 })
 
 async function handleScrollQuery() {
-    const q = route.query.missionId
-    if (q) {
-      const id = Number(q)
-      const found = remoteMissions.value.find((m) => Number(m.id) === id)
-      if (found) {
-        const st = (found.status || 'new').toLowerCase()
-        if (['en_cours', 'encours', 'in_progress', 'ongoing'].some((x) => st.includes(x)))
-          activeTab.value = 0
-        else if (['termine', 'terminee', 'done', 'completed'].some((x) => st.includes(x)))
-          activeTab.value = 1
-        else activeTab.value = 2
+  const q = route.query.missionId
+  if (q) {
+    const id = Number(q)
+    const found = remoteMissions.value.find((m) => Number(m.id) === id)
+    if (found) {
+      const st = (found.status || 'new').toLowerCase()
+      if (['en_cours', 'encours', 'in_progress', 'ongoing'].some((x) => st.includes(x)))
+        activeTab.value = 0
+      else if (['termine', 'terminee', 'done', 'completed'].some((x) => st.includes(x)))
+        activeTab.value = 1
+      else activeTab.value = 2
 
-        await nextTick()
-        scrollToMission(id)
-      }
+      await nextTick()
+      scrollToMission(id)
     }
+  }
 }
 
 function scrollToMission(id: number) {
@@ -266,7 +349,38 @@ const goBack = () => router.push('/missions')
             </button>
           </div>
         </Card>
-        <div v-if="missionsForActiveTab.length === 0" class="empty-state">Aucune mission ici.</div>
+        <div v-if="missionsForActiveTab.length === 0" class="empty-state">
+          <span v-if="activeTab === 2"
+            >Toutes les missions sont prises ou filtrées selon vos préférences.</span
+          >
+          <span v-else>Aucune mission ici.</span>
+        </div>
+      </div>
+    </div>
+
+    <button class="fab-settings" @click="openCategorySettings">⚙️</button>
+
+    <div v-if="showPrefsModal" class="blur-overlay">
+      <div class="onboarding-card">
+        <h2>Réglages : {{ title }}</h2>
+        <p class="intro-text">Ajustez vos préférences pour cette catégorie :</p>
+
+        <div class="prefs-scroll">
+          <div v-for="(label, key) in filteredPreferenceLabels" :key="key" class="pref-item">
+            <label class="switch-container">
+              <span>{{ label }}</span>
+              <input type="checkbox" v-model="userPreferences[key as keyof DerivedPreferences]" />
+              <span class="checkmark"></span>
+            </label>
+          </div>
+          <div v-if="Object.keys(filteredPreferenceLabels).length === 0" class="empty-state-prefs">
+            Aucun réglage spécifique pour cette catégorie.
+          </div>
+        </div>
+
+        <button class="save-btn" @click="saveCategoryPreferences" :disabled="isSubmittingPrefs">
+          {{ isSubmittingPrefs ? '...' : 'Enregistrer' }}
+        </button>
       </div>
     </div>
   </div>
@@ -317,5 +431,147 @@ const goBack = () => router.push('/missions')
   background: #ffecec;
   color: #c0392b;
   border: 1px solid #f5c6c6;
+}
+
+/* FAB */
+.fab-settings {
+  position: fixed;
+  bottom: 90px;
+  right: 20px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background-color: #f0f0f0;
+  border: 1px solid #ddd;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 90;
+  transition: transform 0.2s;
+}
+.fab-settings:active {
+  transform: scale(0.95);
+}
+
+/* Modale */
+.blur-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(5px);
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.onboarding-card {
+  background: white;
+  width: 90%;
+  max-width: 400px;
+  max-height: 85vh;
+  border-radius: 20px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  animation: popIn 0.3s ease-out;
+}
+@keyframes popIn {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.onboarding-card h2 {
+  font-size: 1.3rem;
+  color: #2c3e50;
+  margin-bottom: 10px;
+  text-align: center;
+}
+.intro-text {
+  font-size: 0.9rem;
+  color: #666;
+  text-align: center;
+  margin-bottom: 20px;
+}
+.prefs-scroll {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 20px;
+  border-top: 1px solid #eee;
+  border-bottom: 1px solid #eee;
+  padding: 10px 0;
+}
+.pref-item {
+  padding: 10px 0;
+  border-bottom: 1px solid #f5f5f5;
+}
+.switch-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  font-size: 0.95rem;
+  color: #333;
+}
+.switch-container input {
+  display: none;
+}
+.checkmark {
+  width: 44px;
+  height: 24px;
+  background-color: #ddd;
+  border-radius: 24px;
+  position: relative;
+  transition: 0.2s;
+  flex-shrink: 0;
+}
+.checkmark::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background-color: white;
+  border-radius: 50%;
+  transition: 0.2s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+.switch-container input:checked + .checkmark {
+  background-color: #679436;
+}
+.switch-container input:checked + .checkmark::after {
+  transform: translateX(20px);
+}
+.save-btn {
+  background-color: #679436;
+  color: white;
+  border: none;
+  padding: 14px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.save-btn:disabled {
+  background-color: #ccc;
+}
+.empty-state-prefs {
+  text-align: center;
+  color: #999;
+  font-style: italic;
+  padding: 20px 0;
 }
 </style>

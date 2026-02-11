@@ -72,22 +72,168 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 NGC_DEFAULT_SCORE = 8559
 
 # --- SIMULATION DES MISSIONS (On garde ça pour l'instant) ---
+# --- SIMULATION DES MISSIONS ---
+# Les conditions correspondent aux clés de UserPreference.data (déduites du questionnaire)
 MISSIONS_DB = {
     "transport": [
-        { "id": 1, "title": 'Prendre le vélo', "description": 'Remplacez un trajet voiture par vélo', "status": 'en_cours' },
-        { "id": 2, "title": 'Privilégier les transports en commun', "description": 'Utilisez le bus ou le tram pour au moins un trajet cette semaine', "status": 'new' },
+        # Missions Ciblées
+        {
+            "id": 1,
+            "title": 'Vélotaf',
+            "description": 'Remplacez un trajet voiture par le vélo pour aller au travail ou faire une course.',
+            "conditions": ["possession_voiture", "possession_velo"]
+        },
+        {
+            "id": 10,
+            "title": 'Pression des pneus',
+            "description": 'Vérifiez la pression de vos pneus. Des pneus sous-gonflés augmentent la consommation de carburant de 5% !',
+            "conditions": ["possession_voiture"]
+        },
+        {
+            "id": 11,
+            "title": 'Covoiturage malin',
+            "description": 'Proposez ou cherchez un covoiturage pour votre prochain trajet moyen/longue distance.',
+            "conditions": ["possession_voiture"]
+        },
+        {
+            "id": 12,
+            "title": 'Vacances sur rails',
+            "description": 'Planifiez vos prochaines vacances en train plutôt qu\'en avion.',
+            "conditions": ["prend_avion"]
+        },
+        # Missions Génériques
+        {
+            "id": 2,
+            "title": 'Journée sans voiture',
+            "description": 'Utilisez les transports en commun, la marche ou le vélo pour tous vos déplacements aujourd\'hui.',
+            "conditions": []
+        },
     ],
     "logement": [
-        { "id": 101, "title": 'Isolation fenêtre', "description": 'Vérifier les joints des fenêtres', "status": 'new' },
-        { "id": 3, "title": 'Baisser le chauffage', "description": 'Réduire la température de 1°C pendant une semaine', "status": 'en_cours' },
+        # Missions Ciblées
+        {
+            "id": 101,
+            "title": 'Chasse aux fuites',
+            "description": 'Vérifiez les joints des fenêtres et portes. Une mauvaise isolation, c\'est chauffer le jardin !',
+            "conditions": ["passoire_thermique"]
+        },
+        {
+            "id": 20,
+            "title": 'Thermostat intelligent',
+            "description": 'Installez un thermostat programmable pour ne pas chauffer quand vous n\'êtes pas là.',
+            "conditions": ["est_proprietaire"]
+        },
+        {
+            "id": 21,
+            "title": 'Récupérateur d\'eau',
+            "description": 'Installez un système simple pour récupérer l\'eau de pluie pour arroser vos plantes.',
+            "conditions": ["vit_en_maison"]
+        },
+        # Missions Génériques
+        {
+            "id": 3,
+            "title": 'Pull over chauffage',
+            "description": 'Réduisez la température de 1°C (ex: 19°C au lieu de 20°C). C\'est -7% sur la facture !',
+            "conditions": []
+        },
+        {
+            "id": 22,
+            "title": 'Douche express',
+            "description": 'Essayez de limiter votre douche à 3 minutes (le temps d\'une chanson).',
+            "conditions": []
+        },
+        {
+            "id": 23,
+            "title": 'Multiprise à interrupteur',
+            "description": 'Éteignez complètement vos appareils en veille (TV, Ordi) la nuit.',
+            "conditions": []
+        }
     ],
     "alimentation": [
-        { "id": 4, "title": 'Recette végétarienne', "description": 'Essayez une recette végétarienne', "status": 'new' },
-        { "id": 5, "title": 'Acheter local', "description": 'Acheter au moins un produit local et de saison', "status": 'termine' },
+        # Missions Ciblées
+        {
+            "id": 4,
+            "title": 'Lundi Vert',
+            "description": 'Remplacez la viande rouge par des légumineuses pour vos repas d\'aujourd\'hui.',
+            "conditions": ["viande_rouge_importante"]
+        },
+        {
+            "id": 5,
+            "title": 'Acheter local',
+            "description": 'Achetez vos fruits et légumes au marché ou chez un producteur local cette semaine.',
+            "conditions": ["conso_pas_locaux"]
+        },
+        {
+            "id": 30,
+            "title": 'Calendrier de saison',
+            "description": 'Vérifiez si les produits de votre panier sont de saison. Pas de tomates en hiver !',
+            "conditions": ["conso_pas_saison"]
+        },
+        {
+            "id": 31,
+            "title": 'Gourde attitude',
+            "description": 'Adoptez une gourde et bannissez les bouteilles en plastique pendant une semaine.',
+            "conditions": ["eau_bouteille"]
+        },
+        {
+            "id": 32,
+            "title": 'Pause café zéro déchet',
+            "description": 'Amenez votre propre tasse au travail pour éviter les gobelets jetables.',
+            "conditions": ["boissons_chaudes", "dechets_importants"]
+        },
+        {
+            "id": 33,
+            "title": 'Semaine sans soda',
+            "description": 'Remplacez les sodas par de l\'eau ou des tisanes maison.',
+            "conditions": ["soda"]
+        },
+        # Missions Génériques
+        {
+            "id": 34,
+            "title": 'Cuisine des restes',
+            "description": 'Faites un repas "touski" (tout ce qu\'il reste) pour éviter le gaspillage.',
+            "conditions": []
+        }
     ],
     "divers": [
-        { "id": 14, "title": 'Acheter d’occasion', "description": 'Acheter un article d’occasion cette semaine', "status": 'en_cours' },
-        { "id": 15, "title": 'Attendre avant achat', "description": 'Attendre 48h avant un achat non essentiel', "status": 'new' },
+        # Missions Ciblées
+        {
+            "id": 15,
+            "title": 'Règle des 48h',
+            "description": 'Vous avez envie d\'acheter ce vêtement neuf ? Attendez 48h pour voir si l\'envie passe.',
+            "conditions": ["shopping_important"]
+        },
+        {
+            "id": 40,
+            "title": 'Cendrier de poche',
+            "description": 'Si vous fumez à l\'extérieur, ne jetez aucun mégot par terre cette semaine.',
+            "conditions": ["fumeur"]
+        },
+        {
+            "id": 41,
+            "title": 'Compostage',
+            "description": 'Installez un bac à compost dans votre jardin pour vos épluchures.',
+            "conditions": ["vit_en_maison", "dechets_importants"]
+        },
+        # Missions Génériques
+        {
+            "id": 14,
+            "title": 'Seconde main',
+            "description": 'Pour votre prochain achat (livre, vêtement, déco), regardez d\'abord sur LeBonCoin ou Vinted.',
+            "conditions": []
+        },
+        {
+            "id": 42,
+            "title": 'Réparer avant de jeter',
+            "description": 'Recousez un bouton ou collez cet objet cassé au lieu de le remplacer.',
+            "conditions": []
+        },
+        {
+            "id": 43,
+            "title": 'Ménage au naturel',
+            "description": 'Fabriquez un produit ménager maison (vinaigre blanc + eau) pour remplacer un produit chimique.',
+            "conditions": []
+        }
     ],
 }
 
@@ -305,29 +451,61 @@ async def root():
 async def get_missions_by_category(category: str, user_id: Optional[int] = None, db: Session = Depends(get_db)):
     """
     Récupère les missions d'une catégorie spécifique.
+    Filtre les missions en fonction des préférences de l'utilisateur s'il est connecté.
     """
+    # 1. On récupère toutes les missions de la BDD pour cette catégorie
+    all_missions_db = db.query(models.Mission).filter(models.Mission.category_name == category).all()
+
+    # 2. S'il n'y en a pas en BDD, on utilise le fallback statique (MISSIONS_DB)
+    if not all_missions_db and category in MISSIONS_DB:
+        all_missions_db = [models.Mission(**m) for m in MISSIONS_DB[category]]
+
+    if not all_missions_db:
+        raise HTTPException(status_code=404, detail="Catégorie de missions non trouvée")
+
+    # 3. Filtrage basé sur les préférences de l'utilisateur
+    filtered_missions = []
+
     if user_id:
-        return crud.get_missions_by_category(db, category, user_id)
+        # On récupère les préférences de l'utilisateur
+        user_prefs = crud.get_user_preferences(db, user_id)
+        pref_data = user_prefs.data if user_prefs and user_prefs.data else {}
+
+        for mission in all_missions_db:
+            # On vérifie les conditions
+            conditions = mission.conditions or []
+
+            # Si aucune condition, la mission est pour tout le monde
+            is_eligible = True
+
+            # Si des conditions existent, l'utilisateur doit remplir TOUTES les conditions
+            # ex: conditions = ["voiture"], pref_data doit contenir {"voiture": True}
+            for cond in conditions:
+                if not pref_data.get(cond, False): # Si la clé n'existe pas ou est False
+                    is_eligible = False
+                    break
+
+            if is_eligible:
+                filtered_missions.append(mission)
     else:
-        # anonymous view -> default status
-        missions = db.query(models.Mission).filter(models.Mission.category_name == category).all()
-        result = []
-        for m in missions:
-            m_data = schemas.Mission.model_validate(m)
+        # Si pas connecté, on montre tout
+        filtered_missions = all_missions_db
+
+    # 4. Formatage et ajout des statuts
+    result = []
+    for m in filtered_missions:
+        m_data = schemas.Mission.model_validate(m)
+
+        if user_id:
+            # On récupère le statut spécifique de cet utilisateur
+            status_entry = crud.get_user_mission_status(db, user_id, m.id)
+            m_data.status = status_entry.status if status_entry else "new"
+        else:
             m_data.status = "new"
-            result.append(m_data)
 
-        # Fallback si la DB est vide mais que la variable statique existe
-        if not result and category in MISSIONS_DB:
-            for m in MISSIONS_DB[category]:
-                m_obj = schemas.Mission(**m)
-                m_obj.status = "new"
-                result.append(m_obj)
+        result.append(m_data)
 
-        if not result:
-            raise HTTPException(status_code=404, detail="Catégorie de missions non trouvée")
-
-        return result
+    return result
 
 @app.put("/missions/{mission_id}", tags=["Missions"], summary="Update mission status")
 async def update_mission(mission_id: int, payload: schemas.MissionUpdate, db: Session = Depends(get_db)):
@@ -396,6 +574,30 @@ def read_user_profile(user_id: int, db: Session = Depends(get_db), current_user:
         xp=xp,
         profile_image=user.profile_image
     )
+
+# --- ROUTES PREFERENCES MISSIONS ---
+
+@app.get("/users/me/preferences", response_model=schemas.UserPreferenceResponse, tags=["Users"], summary="Get user mission preferences")
+def read_user_preferences(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Récupère les préférences de missions de l'utilisateur.
+    """
+    prefs = crud.get_user_preferences(db, current_user.id)
+    # On mock l'ID si c'est un objet par défaut généré par le CRUD
+    return schemas.UserPreferenceResponse(
+        id=prefs.id or 0,
+        user_id=current_user.id,
+        data=prefs.data,
+        has_completed_onboarding=prefs.has_completed_onboarding
+    )
+
+@app.put("/users/me/preferences", response_model=schemas.UserPreferenceResponse, tags=["Users"], summary="Update user mission preferences")
+def update_user_preferences_route(payload: schemas.UserPreferenceCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Met à jour les préférences de missions de l'utilisateur (validées lors de l'onboarding).
+    """
+    prefs = crud.update_user_preferences(db, current_user.id, payload)
+    return prefs
 
 # --- ROUTES STATISTIQUES NGC (Publicodes) ---
 

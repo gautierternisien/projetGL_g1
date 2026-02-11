@@ -19,6 +19,8 @@ class User(UserBase):
     class Config:
         from_attributes = True
 
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str
@@ -88,6 +90,8 @@ class Question(QuestionBase):
 class MissionBase(BaseModel):
     title: str
     description: Optional[str] = None
+    category_name: str
+    conditions: Optional[List[str]] = []
 
 class Mission(MissionBase):
     id: int
@@ -163,5 +167,19 @@ class UserNgcAnswersCreate(BaseModel):
 
 class UserNgcAnswersResponse(UserNgcAnswersCreate):
     updated_at: Optional[str] = None
+    class Config:
+        from_attributes = True
+
+class UserPreferenceBase(BaseModel):
+    data: Dict[str, bool]
+    has_completed_onboarding: bool
+
+class UserPreferenceCreate(UserPreferenceBase):
+    pass
+
+class UserPreferenceResponse(UserPreferenceBase):
+    id: int
+    user_id: int
+
     class Config:
         from_attributes = True

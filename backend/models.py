@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, UniqueConstraint, JSON
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -19,6 +19,7 @@ class User(Base):
     ngc_stat = relationship("UserNgcStat", back_populates="user", uselist=False)
     ngc_progress = relationship("UserNgcProgress", back_populates="user", uselist=False)
     ngc_answers = relationship("UserNgcAnswers", back_populates="user", uselist=False)
+    preferences = relationship("UserPreference", back_populates="user", uselist=False)
 
 class Category(Base):
     __tablename__ = "categories"
@@ -59,8 +60,30 @@ class Mission(Base):
     description = Column(String)
     category_name = Column(String, ForeignKey("categories.name"))
 
+    conditions = Column(JSON, nullable=True, default=list)
+
     category = relationship("Category", back_populates="missions")
     user_statuses = relationship("UserMissionStatus", back_populates="mission")
+
+class UserPreference(Base):
+    """
+    Stocke le profil utilisateur déduit du questionnaire et validé par l'utilisateur.
+    Utilise un champ JSON pour de la flexibilité (ex: {"has_car": true, "diet": "omnivore"})
+    """
+    __tablename__ = "user_preferences"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, index=True, nullable=False)
+
+    # On stocke les préférences sous forme de dictionnaire JSON.
+    # Si True, l'utilisateur est d'accord pour recevoir ces missions.
+    # Ex: {"voiture": True, "velo": False, "viande": True}
+    data = Column(JSON, default=dict)
+
+    # Flag pour savoir si l'utilisateur a validé l'écran d'onboarding des missions
+    has_completed_onboarding = Column(Boolean, default=False)
+
+    user = relationship("User", back_populates="preferences")
 
 class UserAnswer(Base):
     __tablename__ = "user_answers"

@@ -722,13 +722,55 @@ def create_question(db: Session, question_data: dict, category_name: str):
 
 def create_mission(db: Session, mission_data: dict, category_name: str):
     m = db.query(models.Mission).filter(models.Mission.id == mission_data['id']).first()
+
+    # Si la mission n'existe pas, on la crée
     if not m:
         m = models.Mission(
             id=mission_data['id'],
             title=mission_data['title'],
             description=mission_data.get('description', ""),
-            category_name=category_name
+            category_name=category_name,
+            # AJOUT ICI : On enregistre les conditions
+            conditions=mission_data.get('conditions', [])
         )
         db.add(m)
-        db.commit()
+    else:
+        # AJOUT ICI : Si elle existe déjà, on met à jour ses infos (titre, desc, conditions)
+        # Cela permet d'appliquer vos changements sans supprimer la BDD
+        m.title = mission_data['title']
+        m.description = mission_data.get('description', "")
+        m.conditions = mission_data.get('conditions', [])
+        m.category_name = category_name
+
+    db.commit()
+    db.refresh(m)
     return m
+
+
+# --- USER PREFERENCES ---
+
+def get_user_preferences(db: Session, user_id: int):
+    pref = db.query(models.UserPreference).filter(models.UserPreference.user_id == user_id).first()
+    if not pref:
+        # Si pas de préférences, on renvoie un objet par défaut non sauvegardé
+        # Le frontend saura qu'il faut afficher l'onboarding car has_completed_onboarding = False
+        return models.UserPreference(user_id=user_id, data={}, has_completed_onboarding=False)
+    return pref
+
+def update_user_preferences(db: Session, user_id: int, pref_data: schemas.UserPreferenceCreate):
+    pref = db.query(models.UserPreference).filter(models.UserPreference.user_id == user_id).first()
+
+    if not pref:
+        pref = models.UserPreference(
+            user_id=user_id,
+            data=pref_data.data,
+            has_completed_onboarding=pref_data.has_completed_onboarding
+        )
+        db.add(pref)
+    else:
+        pref.data = pref_data.data
+        pref.has_completed_onboarding = pref_data.has_completed_onboarding
+
+    db.commit()
+    db.refresh(pref)
+    return pref
