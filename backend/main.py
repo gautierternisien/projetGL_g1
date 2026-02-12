@@ -78,162 +78,230 @@ MISSIONS_DB = {
     "transport": [
         # Missions Ciblées
         {
-            "id": 1,
+            "id": 100,
             "title": 'Vélotaf',
             "description": 'Remplacez un trajet voiture par le vélo pour aller au travail ou faire une course.',
             "conditions": ["possession_voiture", "possession_velo"]
         },
         {
-            "id": 10,
+            "id": 101,
             "title": 'Pression des pneus',
             "description": 'Vérifiez la pression de vos pneus. Des pneus sous-gonflés augmentent la consommation de carburant de 5% !',
             "conditions": ["possession_voiture"]
         },
         {
-            "id": 11,
+            "id": 102,
             "title": 'Covoiturage malin',
             "description": 'Proposez ou cherchez un covoiturage pour votre prochain trajet moyen/longue distance.',
             "conditions": ["possession_voiture"]
         },
         {
-            "id": 12,
+            "id": 103,
             "title": 'Vacances sur rails',
             "description": 'Planifiez vos prochaines vacances en train plutôt qu\'en avion.',
             "conditions": ["prend_avion"]
         },
+        {
+            "id": 105,
+            "title": 'Transport en commun',
+            "description": 'Utilisez les transports en commun au moins 3 jours cette semaine.',
+            "conditions": ["possession_voiture"]
+        },
         # Missions Génériques
         {
-            "id": 2,
+            "id": 104,
             "title": 'Journée sans voiture',
             "description": 'Utilisez les transports en commun, la marche ou le vélo pour tous vos déplacements aujourd\'hui.',
             "conditions": []
-        },
+        }
     ],
     "logement": [
         # Missions Ciblées
         {
-            "id": 101,
+            "id": 200,
             "title": 'Chasse aux fuites',
             "description": 'Vérifiez les joints des fenêtres et portes. Une mauvaise isolation, c\'est chauffer le jardin !',
             "conditions": ["passoire_thermique"]
         },
         {
-            "id": 20,
+            "id": 201,
             "title": 'Thermostat intelligent',
             "description": 'Installez un thermostat programmable pour ne pas chauffer quand vous n\'êtes pas là.',
             "conditions": ["est_proprietaire"]
         },
         {
-            "id": 21,
+            "id": 202,
             "title": 'Récupérateur d\'eau',
             "description": 'Installez un système simple pour récupérer l\'eau de pluie pour arroser vos plantes.',
             "conditions": ["vit_en_maison"]
         },
         # Missions Génériques
         {
-            "id": 3,
+            "id": 203,
             "title": 'Pull over chauffage',
-            "description": 'Réduisez la température de 1°C (ex: 19°C au lieu de 20°C). C\'est -7% sur la facture !',
+            "description": 'Réduisez la température de 1°C pendant 1 semaine (ex: 19°C au lieu de 20°C). C\'est -7% sur la facture !',
             "conditions": []
         },
         {
-            "id": 22,
+            "id": 204,
             "title": 'Douche express',
-            "description": 'Essayez de limiter votre douche à 3 minutes (le temps d\'une chanson).',
+            "description": 'Essayez de limiter votre douche à 5 minutes pendant une semaine (le temps d\'une chanson).',
             "conditions": []
         },
         {
-            "id": 23,
+            "id": 205,
             "title": 'Multiprise à interrupteur',
             "description": 'Éteignez complètement vos appareils en veille (TV, Ordi) la nuit.',
             "conditions": []
+        },
+        {
+            "id": 206,
+            "title": 'Lavage efficace',
+            "description": 'Laver le linge à 30°C pendant 5 lessives.',
+            "conditions": []
+        },
+        {
+            "id": 207,
+            "title": 'Séchage à l\'air',
+            "description": 'Sécher le linge à l\'air libre.',
+            "conditions": []
         }
+
     ],
     "alimentation": [
         # Missions Ciblées
         {
-            "id": 4,
-            "title": 'Lundi Vert',
+            "id": 300,
+            "title": 'Journée Verte',
             "description": 'Remplacez la viande rouge par des légumineuses pour vos repas d\'aujourd\'hui.',
             "conditions": ["viande_rouge_importante"]
         },
         {
-            "id": 5,
+            "id": 301,
             "title": 'Acheter local',
             "description": 'Achetez vos fruits et légumes au marché ou chez un producteur local cette semaine.',
             "conditions": ["conso_pas_locaux"]
         },
         {
-            "id": 30,
+            "id": 302,
             "title": 'Calendrier de saison',
             "description": 'Vérifiez si les produits de votre panier sont de saison. Pas de tomates en hiver !',
             "conditions": ["conso_pas_saison"]
         },
         {
-            "id": 31,
+            "id": 303,
             "title": 'Gourde attitude',
             "description": 'Adoptez une gourde et bannissez les bouteilles en plastique pendant une semaine.',
             "conditions": ["eau_bouteille"]
         },
         {
-            "id": 32,
+            "id": 304,
             "title": 'Pause café zéro déchet',
             "description": 'Amenez votre propre tasse au travail pour éviter les gobelets jetables.',
             "conditions": ["boissons_chaudes", "dechets_importants"]
         },
         {
-            "id": 33,
+            "id": 305,
             "title": 'Semaine sans soda',
             "description": 'Remplacez les sodas par de l\'eau ou des tisanes maison.',
             "conditions": ["soda"]
         },
+        {
+            "id": 309,
+            "title": 'Semaine sans déchet alimentaire',
+            "description": 'Éviter le gaspillage alimentaire pendant une semaine.',
+            "conditions": ["dechets_importants"]
+        },
         # Missions Génériques
         {
-            "id": 34,
+            "id": 306,
             "title": 'Cuisine des restes',
             "description": 'Faites un repas "touski" (tout ce qu\'il reste) pour éviter le gaspillage.',
+            "conditions": []
+        },
+        {
+            "id": 307,
+            "title": 'Semaine végétarienne',
+            "description": 'Faire 3 jours végétarien cette semaine.',
+            "conditions": []
+        },
+        {
+            "id": 308,
+            "title": 'Aujourd\'hui en vrac',
+            "description": 'Acheter 5 produits différents en vrac.',
             "conditions": []
         }
     ],
     "divers": [
         # Missions Ciblées
         {
-            "id": 15,
+            "id": 400,
             "title": 'Règle des 48h',
             "description": 'Vous avez envie d\'acheter ce vêtement neuf ? Attendez 48h pour voir si l\'envie passe.',
             "conditions": ["shopping_important"]
         },
         {
-            "id": 40,
+            "id": 401,
             "title": 'Cendrier de poche',
             "description": 'Si vous fumez à l\'extérieur, ne jetez aucun mégot par terre cette semaine.',
             "conditions": ["fumeur"]
         },
         {
-            "id": 41,
+            "id": 402,
             "title": 'Compostage',
             "description": 'Installez un bac à compost dans votre jardin pour vos épluchures.',
             "conditions": ["vit_en_maison", "dechets_importants"]
         },
         # Missions Génériques
         {
-            "id": 14,
+            "id": 403,
             "title": 'Seconde main',
-            "description": 'Pour votre prochain achat (livre, vêtement, déco), regardez d\'abord sur LeBonCoin ou Vinted.',
+            "description": 'Pour votre prochain achat (livre, vêtement, déco), regardez l\'achat d\'occasion.',
             "conditions": []
         },
         {
-            "id": 42,
+            "id": 404,
             "title": 'Réparer avant de jeter',
             "description": 'Recousez un bouton ou collez cet objet cassé au lieu de le remplacer.',
             "conditions": []
         },
         {
-            "id": 43,
+            "id": 405,
             "title": 'Ménage au naturel',
             "description": 'Fabriquez un produit ménager maison (vinaigre blanc + eau) pour remplacer un produit chimique.',
             "conditions": []
+        },
+        {
+            "id": 406,
+            "title": 'Nettoyage numérique',
+            "description": 'Supprimer 100 mails inutiles.',
+            "conditions": []
+        },
+        {
+            "id": 407,
+            "title": 'Désabonnement',
+            "description": 'Se désabonner de 5 listes de distribution non lues.',
+            "conditions": []
+        },
+        {
+            "id": 408,
+            "title": 'Veille nocturne',
+            "description": 'Éteindre votre box internet pendant la nuit.',
+            "conditions": []
+        },
+        {
+            "id": 409,
+            "title": 'Stop Sac Plastique',
+            "description": 'Ne pas utiliser de sacs plastiques jetable pendant 1 semaine.',
+            "conditions": []
+        },
+        {
+            "id": 410,
+            "title": 'Seconde vie',
+            "description": 'Revendre ou donner 1 objet inutilisé.',
+            "conditions": []
         }
+
     ],
 }
 
