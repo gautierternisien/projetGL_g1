@@ -56,10 +56,15 @@ async function confirmRemove() {
 const goBack = () => router.push('/communaute/amis')
 
 // For progress bar
-const progressProps = computed(() => ({
-  value: profile.value?.xp || 0,
-  max: 100,
-}))
+const friendXp = computed(() => profile.value?.xp || 0)
+
+const friendLevel = computed(() => {
+  return Math.floor(friendXp.value / 100) + 1
+})
+
+const xpProgress = computed(() => {
+  return friendXp.value % 100
+})
 </script>
 
 <template>
@@ -81,12 +86,13 @@ const progressProps = computed(() => ({
         <h2 class="username">{{ profile.username }}</h2>
 
         <div class="level-section">
-          <span class="level-text">Niveau {{ profile.level }}</span>
+          <span class="level-text">Niveau {{ friendLevel }}</span>
           <ProgressBar
-            :value="progressProps.value"
-            :max="progressProps.max"
+            :value="xpProgress"
+            :max="100"
             :showLabel="false"
-            class="xp-bar"
+            class="xp-progress-bar"
+            color="#679436"
           />
         </div>
 

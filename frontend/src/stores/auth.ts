@@ -9,6 +9,8 @@ interface User {
   first_name?: string
   last_name?: string
   profile_image?: string
+  xp: number
+  level: number
 }
 
 export const useAuthStore = defineStore('auth', () => {

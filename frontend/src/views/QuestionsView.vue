@@ -666,13 +666,25 @@ function getMosaicCount(slug: string, subSlug: string): string | number {
   return value === undefined || value === null ? '' : value
 }
 
-function finishQuestionnaire() {
+async function finishQuestionnaire() {
   try {
     const flag = `__completed_${currentCategory.value}`
     answers.value = { ...answers.value, [flag]: true }
 
     isCompletedMode.value = true
     flushLocalPersistence()
+
+    if (authStore.isConnected && authStore.token) {
+      // 1. On prévient le backend que c'est fini pour gagner l'XP
+      await fetch(`${API_URL}/ngc/category/${currentCategory.value}/complete`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${authStore.token}` },
+      })
+
+      // 2. On rafraîchit le user localement pour voir la barre d'XP augmenter
+      await authStore.fetchUser()
+    }
+
     window.scrollTo({ top: 0, behavior: 'smooth' })
   } catch (e) {
     console.error('Error in finishQuestionnaire', e)

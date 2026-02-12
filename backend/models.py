@@ -13,6 +13,7 @@ class User(Base):
     hashed_password = Column(String)
     is_active = Column(Boolean, default=True)
     profile_image = Column(String, nullable=True)
+    xp = Column(Integer, default=0)
 
     answers = relationship("UserAnswer", back_populates="user")
     mission_statuses = relationship("UserMissionStatus", back_populates="user")
@@ -20,6 +21,7 @@ class User(Base):
     ngc_progress = relationship("UserNgcProgress", back_populates="user", uselist=False)
     ngc_answers = relationship("UserNgcAnswers", back_populates="user", uselist=False)
     preferences = relationship("UserPreference", back_populates="user", uselist=False)
+    category_rewards = relationship("UserQuestionnaireReward", back_populates="user")
 
 class Category(Base):
     __tablename__ = "categories"
@@ -59,6 +61,7 @@ class Mission(Base):
     title = Column(String)
     description = Column(String)
     category_name = Column(String, ForeignKey("categories.name"))
+    mission_type = Column(String, default="one_shot")
 
     conditions = Column(JSON, nullable=True, default=list)
 
@@ -152,6 +155,14 @@ class UserMissionStatus(Base):
 
     completed_at = Column(String, nullable=True) # ISO Date timestamp
 
+class UserQuestionnaireReward(Base):
+    __tablename__ = "user_questionnaire_rewards"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    category_name = Column(String) # ex: "transport", "logement"
+
+    user = relationship("User", back_populates="category_rewards")
 
 class FriendLink(Base):
     __tablename__ = "friend_links"
@@ -193,6 +204,7 @@ class League(Base):
     end_date = Column(String)
     is_archived = Column(Boolean, default=False)
     created_at = Column(String) # ISO Date
+    rewards_distributed = Column(Boolean, default=False)
 
     members = relationship("LeagueMember", back_populates="league")
     invites = relationship("LeagueInvite", back_populates="league")
@@ -220,3 +232,5 @@ class LeagueInvite(Base):
     league = relationship("League", back_populates="invites")
     inviter = relationship("User", foreign_keys=[inviter_id])
     invitee = relationship("User", foreign_keys=[invitee_id])
+
+

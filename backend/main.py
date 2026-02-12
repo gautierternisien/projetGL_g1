@@ -81,38 +81,44 @@ MISSIONS_DB = {
             "id": 100,
             "title": 'Vélotaf',
             "description": 'Remplacez un trajet voiture par le vélo pour aller au travail ou faire une course.',
-            "conditions": ["possession_voiture", "possession_velo"]
+            "conditions": ["possession_voiture", "possession_velo"],
+            "mission_type": "one_shot"
         },
         {
             "id": 101,
             "title": 'Pression des pneus',
             "description": 'Vérifiez la pression de vos pneus. Des pneus sous-gonflés augmentent la consommation de carburant de 5% !',
-            "conditions": ["possession_voiture"]
+            "conditions": ["possession_voiture"],
+            "mission_type": "one_shot"
         },
         {
             "id": 102,
             "title": 'Covoiturage malin',
             "description": 'Proposez ou cherchez un covoiturage pour votre prochain trajet moyen/longue distance.',
-            "conditions": ["possession_voiture"]
+            "conditions": ["possession_voiture"],
+            "mission_type": "one_shot"
         },
         {
             "id": 103,
             "title": 'Vacances sur rails',
             "description": 'Planifiez vos prochaines vacances en train plutôt qu\'en avion.',
-            "conditions": ["prend_avion"]
+            "conditions": ["prend_avion"],
+            "mission_type": "one_shot"
         },
         {
             "id": 105,
             "title": 'Transport en commun',
             "description": 'Utilisez les transports en commun au moins 3 jours cette semaine.',
-            "conditions": ["possession_voiture"]
+            "conditions": ["possession_voiture"],
+            "mission_type": "long_term"
         },
         # Missions Génériques
         {
             "id": 104,
             "title": 'Journée sans voiture',
             "description": 'Utilisez les transports en commun, la marche ou le vélo pour tous vos déplacements aujourd\'hui.',
-            "conditions": []
+            "conditions": [],
+            "mission_type": "one_shot"
         }
     ],
     "logement": [
@@ -121,50 +127,58 @@ MISSIONS_DB = {
             "id": 200,
             "title": 'Chasse aux fuites',
             "description": 'Vérifiez les joints des fenêtres et portes. Une mauvaise isolation, c\'est chauffer le jardin !',
-            "conditions": ["passoire_thermique"]
+            "conditions": ["passoire_thermique"],
+            "mission_type": "one_shot"
         },
         {
             "id": 201,
             "title": 'Thermostat intelligent',
             "description": 'Installez un thermostat programmable pour ne pas chauffer quand vous n\'êtes pas là.',
-            "conditions": ["est_proprietaire"]
+            "conditions": ["est_proprietaire"],
+            "mission_type": "one_shot"
         },
         {
             "id": 202,
             "title": 'Récupérateur d\'eau',
             "description": 'Installez un système simple pour récupérer l\'eau de pluie pour arroser vos plantes.',
-            "conditions": ["vit_en_maison"]
+            "conditions": ["vit_en_maison"],
+            "mission_type": "one_shot"
         },
         # Missions Génériques
         {
             "id": 203,
             "title": 'Pull over chauffage',
             "description": 'Réduisez la température de 1°C pendant 1 semaine (ex: 19°C au lieu de 20°C). C\'est -7% sur la facture !',
-            "conditions": []
+            "conditions": [],
+            "mission_type": "long_term"
         },
         {
             "id": 204,
             "title": 'Douche express',
             "description": 'Essayez de limiter votre douche à 5 minutes pendant une semaine (le temps d\'une chanson).',
-            "conditions": []
+            "conditions": [],
+            "mission_type": "long_term"
         },
         {
             "id": 205,
             "title": 'Multiprise à interrupteur',
             "description": 'Éteignez complètement vos appareils en veille (TV, Ordi) la nuit.',
-            "conditions": []
+            "conditions": [],
+            "mission_type": "one_shot"
         },
         {
             "id": 206,
             "title": 'Lavage efficace',
             "description": 'Laver le linge à 30°C pendant 5 lessives.',
-            "conditions": []
+            "conditions": [],
+            "mission_type": "long_term"
         },
         {
             "id": 207,
             "title": 'Séchage à l\'air',
             "description": 'Sécher le linge à l\'air libre.',
-            "conditions": []
+            "conditions": [],
+            "mission_type": "one_shot"
         }
 
     ],
@@ -174,62 +188,72 @@ MISSIONS_DB = {
             "id": 300,
             "title": 'Journée Verte',
             "description": 'Remplacez la viande rouge par des légumineuses pour vos repas d\'aujourd\'hui.',
-            "conditions": ["viande_rouge_importante"]
+            "conditions": ["viande_rouge_importante"],
+            "mission_type": "one_shot"
         },
         {
             "id": 301,
             "title": 'Acheter local',
             "description": 'Achetez vos fruits et légumes au marché ou chez un producteur local cette semaine.',
-            "conditions": ["conso_pas_locaux"]
+            "conditions": ["conso_pas_locaux"],
+            "mission_type": "long_term"
         },
         {
             "id": 302,
             "title": 'Calendrier de saison',
             "description": 'Vérifiez si les produits de votre panier sont de saison. Pas de tomates en hiver !',
-            "conditions": ["conso_pas_saison"]
+            "conditions": ["conso_pas_saison"],
+            "mission_type": "one_shot"
         },
         {
             "id": 303,
             "title": 'Gourde attitude',
             "description": 'Adoptez une gourde et bannissez les bouteilles en plastique pendant une semaine.',
-            "conditions": ["eau_bouteille"]
+            "conditions": ["eau_bouteille"],
+            "mission_type": "long_term"
         },
         {
             "id": 304,
             "title": 'Pause café zéro déchet',
             "description": 'Amenez votre propre tasse au travail pour éviter les gobelets jetables.',
-            "conditions": ["boissons_chaudes", "dechets_importants"]
+            "conditions": ["boissons_chaudes", "dechets_importants"],
+            "mission_type": "one_shot"
         },
         {
             "id": 305,
             "title": 'Semaine sans soda',
             "description": 'Remplacez les sodas par de l\'eau ou des tisanes maison.',
-            "conditions": ["soda"]
+            "conditions": ["soda"],
+            "mission_type": "long_term"
         },
         {
             "id": 309,
             "title": 'Semaine sans déchet alimentaire',
             "description": 'Éviter le gaspillage alimentaire pendant une semaine.',
-            "conditions": ["dechets_importants"]
+            "conditions": ["dechets_importants"],
+            "mission_type": "long_term"
         },
         # Missions Génériques
         {
             "id": 306,
             "title": 'Cuisine des restes',
             "description": 'Faites un repas "touski" (tout ce qu\'il reste) pour éviter le gaspillage.',
-            "conditions": []
+            "conditions": [],
+            "mission_type": "one_shot"
         },
         {
             "id": 307,
             "title": 'Semaine végétarienne',
             "description": 'Faire 3 jours végétarien cette semaine.',
-            "conditions": []
+            "conditions": [],
+            "mission_type": "long_term"
         },
         {
             "id": 308,
             "title": 'Aujourd\'hui en vrac',
             "description": 'Acheter 5 produits différents en vrac.',
-            "conditions": []
+            "conditions": [],
+            "mission_type": "one_shot"
         }
     ],
     "divers": [
@@ -238,68 +262,79 @@ MISSIONS_DB = {
             "id": 400,
             "title": 'Règle des 48h',
             "description": 'Vous avez envie d\'acheter ce vêtement neuf ? Attendez 48h pour voir si l\'envie passe.',
-            "conditions": ["shopping_important"]
+            "conditions": ["shopping_important"],
+            "mission_type": "one_shot"
         },
         {
             "id": 401,
             "title": 'Cendrier de poche',
             "description": 'Si vous fumez à l\'extérieur, ne jetez aucun mégot par terre cette semaine.',
-            "conditions": ["fumeur"]
+            "conditions": ["fumeur"],
+            "mission_type": "long_term"
         },
         {
             "id": 402,
             "title": 'Compostage',
             "description": 'Installez un bac à compost dans votre jardin pour vos épluchures.',
-            "conditions": ["vit_en_maison", "dechets_importants"]
+            "conditions": ["vit_en_maison", "dechets_importants"],
+            "mission_type": "one_shot"
         },
         # Missions Génériques
         {
             "id": 403,
             "title": 'Seconde main',
             "description": 'Pour votre prochain achat (livre, vêtement, déco), regardez l\'achat d\'occasion.',
-            "conditions": []
+            "conditions": [],
+            "mission_type": "one_shot"
         },
         {
             "id": 404,
             "title": 'Réparer avant de jeter',
             "description": 'Recousez un bouton ou collez cet objet cassé au lieu de le remplacer.',
-            "conditions": []
+            "conditions": [],
+            "mission_type": "one_shot"
         },
         {
             "id": 405,
             "title": 'Ménage au naturel',
             "description": 'Fabriquez un produit ménager maison (vinaigre blanc + eau) pour remplacer un produit chimique.',
-            "conditions": []
+            "conditions": [],
+            "mission_type": "one_shot"
         },
         {
             "id": 406,
             "title": 'Nettoyage numérique',
             "description": 'Supprimer 100 mails inutiles.',
-            "conditions": []
+            "conditions": [],
+            "mission_type": "one_shot"
         },
         {
             "id": 407,
             "title": 'Désabonnement',
             "description": 'Se désabonner de 5 listes de distribution non lues.',
-            "conditions": []
+            "conditions": [],
+            "mission_type": "one_shot"
         },
         {
             "id": 408,
             "title": 'Veille nocturne',
             "description": 'Éteindre votre box internet pendant la nuit.',
-            "conditions": []
+            "conditions": [],
+            "mission_type": "one_shot"
         },
         {
             "id": 409,
             "title": 'Stop Sac Plastique',
             "description": 'Ne pas utiliser de sacs plastiques jetable pendant 1 semaine.',
-            "conditions": []
+            "conditions": [],
+            "mission_type": "long_term"
         },
         {
             "id": 410,
             "title": 'Seconde vie',
             "description": 'Revendre ou donner 1 objet inutilisé.',
-            "conditions": []
+            "conditions": [],
+            "mission_type": "one_shot"
         }
 
     ],
@@ -628,18 +663,19 @@ def read_user_profile(user_id: int, db: Session = Depends(get_db), current_user:
     if not user: raise HTTPException(status_code=404, detail="User not found")
 
     mission_count = crud.get_completed_missions_count(db, user_id=user_id)
+
+    real_xp = user.xp
+    real_level = 1 + (real_xp // 100)
     # Placeholder stats
     trophy_count = 0
-    level = 5
-    xp = 60
 
     return schemas.FriendProfile(
         id=user.id,
         username=user.username,
         mission_count=mission_count,
         trophy_count=trophy_count,
-        level=level,
-        xp=xp,
+        level=real_level,
+        xp=real_xp,
         profile_image=user.profile_image
     )
 
@@ -827,10 +863,12 @@ async def create_league_route(league: schemas.LeagueCreate, current_user: models
 
 @app.get("/leagues/active", response_model=List[schemas.League], tags=["Leagues"])
 def get_active_leagues(current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    crud.process_league_rewards(db)
     return crud.get_active_leagues_for_user(db, current_user.id)
 
 @app.get("/leagues/archived", response_model=List[schemas.League], tags=["Leagues"])
 def get_archived_leagues(current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    crud.process_league_rewards(db)
     return crud.get_archived_leagues_for_user(db, current_user.id)
 
 @app.get("/leagues/invites", response_model=List[schemas.LeagueInvite], tags=["Leagues"])
@@ -848,6 +886,7 @@ def get_league_invites_route(league_id: int, current_user: schemas.User = Depend
 
 @app.get("/leagues/{league_id}", response_model=schemas.LeagueDetail, tags=["Leagues"])
 def get_league_detail(league_id: int, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    crud.process_league_rewards(db)
     league = crud.get_league(db, league_id)
     if not league: raise HTTPException(status_code=404, detail="League not found")
     if not any(m.user_id == current_user.id for m in league.members): raise HTTPException(status_code=403, detail="Not a member")
@@ -895,3 +934,12 @@ def update_profile_image(profile_image: str, current_user: schemas.User = Depend
     db.commit()
     db.refresh(user)
     return user
+
+@app.post("/ngc/category/{category}/complete", tags=["Statistics"], summary="Mark category as completed and award XP")
+def complete_category_route(category: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Appelé par le frontend quand le questionnaire d'une catégorie est fini.
+    Donne 50 XP si c'est la première fois.
+    """
+    crud.award_category_completion_xp(db, current_user.id, category)
+    return {"status": "completed", "category": category}

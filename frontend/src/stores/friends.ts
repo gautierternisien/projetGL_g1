@@ -7,6 +7,8 @@ export interface UserSummary {
   id: number
   username: string
   profile_image?: string
+  xp?: number // Optionnel car dépend du schéma backend UserPublic
+  level?: number // Optionnel
 }
 
 export interface FriendRequest {

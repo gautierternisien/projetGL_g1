@@ -7,6 +7,7 @@ class UserBase(BaseModel):
     username: str
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+    xp:Optional[int] = 0
 
 class UserCreate(UserBase):
     password: str
@@ -15,6 +16,11 @@ class User(UserBase):
     id: int
     is_active: bool
     profile_image: Optional[str] = None
+    xp: int = 0
+
+    @property
+    def level(self) -> int:
+        return 1 + (self.xp // 100)
 
     class Config:
         from_attributes = True
@@ -92,6 +98,7 @@ class MissionBase(BaseModel):
     description: Optional[str] = None
     category_name: str
     conditions: Optional[List[str]] = []
+    mission_type: Optional[str] = "one_shot"
 
 class Mission(MissionBase):
     id: int
