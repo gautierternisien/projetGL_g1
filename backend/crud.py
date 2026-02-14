@@ -235,7 +235,7 @@ def upsert_user_ngc_stats(db: Session, user_id: int, payload: schemas.NgcStatsPa
     row.alimentation = normalized_details.get('alimentation', 0)
     row.divers = normalized_details.get('divers', 0)
     row.services_societaux = normalized_details.get('services_societaux', 0)
-    row.updated_at = datetime.now().isoformat()
+    row.updated_at = datetime.now()
 
     progress_row = db.query(models.UserNgcProgress).filter(models.UserNgcProgress.user_id == user_id).first()
     if not progress_row:
@@ -246,7 +246,7 @@ def upsert_user_ngc_stats(db: Session, user_id: int, payload: schemas.NgcStatsPa
     progress_row.logement = progress.get('logement', 0)
     progress_row.alimentation = progress.get('alimentation', 0)
     progress_row.divers = progress.get('divers', 0)
-    progress_row.updated_at = datetime.now().isoformat()
+    progress_row.updated_at = datetime.now()
 
     db.commit()
     db.refresh(row)
@@ -473,7 +473,7 @@ def update_user_mission_status(db: Session, user_id: int, mission_id: int, statu
         db.add(db_status)
 
     if status == 'termine':
-        db_status.completed_at = datetime.now().isoformat()
+        db_status.completed_at = datetime.now()
 
     db.commit()
     db.refresh(db_status)
@@ -500,12 +500,12 @@ def get_accepted_friends(db: Session, user_id: int):
 
 # --- LEAGUES ---
 def create_league(db: Session, league: schemas.LeagueCreate, creator_id: int):
-    now_iso = datetime.now().isoformat()
+    now = datetime.now()
     db_league = models.League(
         name=league.name,
         start_date=league.start_date,
         end_date=league.end_date,
-        created_at=now_iso,
+        created_at=now,
         is_archived=False
     )
     db.add(db_league)
@@ -516,7 +516,7 @@ def create_league(db: Session, league: schemas.LeagueCreate, creator_id: int):
     member = models.LeagueMember(
         league_id=db_league.id,
         user_id=creator_id,
-        joined_at=now_iso
+        joined_at=now
     )
     db.add(member)
     db.commit()
@@ -658,7 +658,7 @@ def respond_league_invite(db: Session, invite_id: int, accept: bool):
         new_member = models.LeagueMember(
             league_id=invite.league_id,
             user_id=invite.invitee_id,
-            joined_at=datetime.now().isoformat()
+            joined_at=datetime.now()
         )
         db.add(new_member)
     else:
@@ -715,3 +715,144 @@ def create_mission(db: Session, mission_data: dict, category_name: str):
         db.add(m)
         db.commit()
     return m
+
+
+# --- TROPHY CRUD ---
+
+def create_trophy(db: Session, trophy_data: dict):
+    """Create a trophy if it doesn't exist"""
+    t = db.query(models.Trophy).filter(models.Trophy.name == trophy_data['name']).first()
+    if not t:
+        t = models.Trophy(
+            name=trophy_data['name'],
+            title=trophy_data['title'],
+            description=trophy_data['description'],
+            icon=trophy_data['icon'],
+            tier=trophy_data['tier'],
+            requirement_type=trophy_data['requirement_type'],
+            requirement_value=trophy_data['requirement_value'],
+            milestones=trophy_data.get('milestones', [])
+        )
+        db.add(t)
+        db.commit()
+        db.refresh(t)
+    return t
+
+
+def get_all_trophies(db: Session):
+    """Get all trophies"""
+    return db.query(models.Trophy).all()
+
+
+def get_user_trophies(db: Session, user_id: int):
+    """Get all trophies for a user with progress"""
+    return db.query(models.UserTrophy).filter(
+        models.UserTrophy.user_id == user_id
+    ).all()
+
+
+def get_user_trophy(db: Session, user_id: int, trophy_id: int):
+    """Get a specific user trophy"""
+    return db.query(models.UserTrophy).filter(
+        models.UserTrophy.user_id == user_id,
+        models.UserTrophy.trophy_id == trophy_id
+    ).first()
+
+
+def upsert_user_trophy(db: Session, user_id: int, trophy_id: int, progress: int, is_obtained: bool = False, obtained_at: str = None, last_milestone_date: str = None):
+    """Create or update a user trophy"""
+    ut = get_user_trophy(db, user_id, trophy_id)
+    if not ut:
+        ut = models.UserTrophy(
+            user_id=user_id,
+            trophy_id=trophy_id,
+            progress=progress,
+            is_obtained=is_obtained,
+            obtained_at=obtained_at,
+            last_milestone_date=last_milestone_date
+        )
+        db.add(ut)
+    else:
+        ut.progress = progress
+        ut.is_obtained = is_obtained
+        if obtained_at and not ut.obtained_at:
+            ut.obtained_at = obtained_at
+        if last_milestone_date:
+            ut.last_milestone_date = last_milestone_date
+    db.commit()
+    db.refresh(ut)
+    return ut
+
+
+def record_user_login(db: Session, user_id: int):
+    """Record a user login"""
+    from datetime import datetime
+    login = models.UserLogin(
+        user_id=user_id,
+        login_at=datetime.utcnow()
+    )
+    db.add(login)
+    db.commit()
+    return login
+
+
+def get_user_login_count(db: Session, user_id: int):
+    """Get the total number of logins for a user"""
+    return db.query(models.UserLogin).filter(models.UserLogin.user_id == user_id).count()
+
+
+def update_trophy_progress(db: Session, user_id: int):
+    """Update trophy progress for a user based on their activities"""
+    from datetime import datetime
+    
+    # Get login count and mission count
+    login_count = get_user_login_count(db, user_id)
+    mission_count = get_completed_missions_count(db, user_id)
+    
+    # Get all trophies
+    trophies = get_all_trophies(db)
+    
+    for trophy in trophies:
+        # Determine the count based on trophy type
+        if trophy.requirement_type == "login_count":
+            count = login_count
+        elif trophy.requirement_type == "mission_count":
+            count = mission_count
+        else:
+            continue
+        
+        progress = min(count, trophy.requirement_value)
+        is_obtained = count >= trophy.requirement_value
+        obtained_at = None
+        last_milestone_date = None
+        
+        # Check if already obtained
+        existing_trophy = get_user_trophy(db, user_id, trophy.id)
+        
+        # Get milestones from database
+        milestones = trophy.milestones or []
+        
+        # Preserve existing obtained_at if trophée is already obtained
+        if existing_trophy and existing_trophy.obtained_at:
+            obtained_at = existing_trophy.obtained_at
+        
+        # If trophée just became obtained
+        if is_obtained and existing_trophy and not existing_trophy.is_obtained:
+            obtained_at = datetime.utcnow()
+        elif is_obtained and not existing_trophy:
+            obtained_at = datetime.utcnow()
+        
+        # Update last_milestone_date when a milestone is reached
+        # Chercher la médaille la plus haute obtenue (tri décroissant)
+        if milestones:
+            sorted_milestones = sorted(milestones, key=lambda m: m["value"], reverse=True)
+            for milestone in sorted_milestones:
+                if count >= milestone["value"]:
+                    # Only update if not already set or if we're reaching a new milestone
+                    if not existing_trophy or not existing_trophy.last_milestone_date or existing_trophy.progress < count:
+                        last_milestone_date = datetime.utcnow()
+                    else:
+                        last_milestone_date = existing_trophy.last_milestone_date
+                    break
+        
+        upsert_user_trophy(db, user_id, trophy.id, progress, is_obtained, obtained_at, last_milestone_date)

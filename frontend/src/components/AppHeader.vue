@@ -45,11 +45,13 @@ defineEmits(['resumeLater'])
         {{ resumeBtnLabel }}
       </button>
 
-      <RouterLink to="/profile" v-if="isConnected">
+      <RouterLink to="/profile" v-if="isConnected" class="avatar-link">
         <div v-if="authStore.user?.profile_image" class="user-avatar user-avatar-image">
           <img :src="authStore.user.profile_image" :alt="'Image de profil'" />
         </div>
-        <div v-else class="user-avatar">{{ authStore.user?.username.charAt(0).toUpperCase() }}</div>
+        <div v-else class="user-avatar">
+          {{ authStore.user?.username.charAt(0).toUpperCase() }}
+        </div>
       </RouterLink>
       <div v-else class="auth-buttons">
         <RouterLink to="/login" class="login-btn"> Se connecter </RouterLink>
@@ -168,6 +170,11 @@ defineEmits(['resumeLater'])
   margin-bottom: 4px;
 }
 
+.avatar-link {
+  position: relative;
+  text-decoration: none;
+}
+
 .user-avatar {
   font-size: 1rem;
   background: #e3eddd;
@@ -180,6 +187,7 @@ defineEmits(['resumeLater'])
   justify-content: center;
   flex-shrink: 0;
   font-weight: 600;
+  position: relative;
 }
 
 .user-avatar-image {

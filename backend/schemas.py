@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import Dict, List, Optional
+from datetime import datetime
 
 # --- USER ---
 class UserBase(BaseModel):
@@ -127,7 +128,7 @@ class LeagueCreate(LeagueBase):
 class League(LeagueBase):
     id: int
     is_archived: bool
-    created_at: str
+    created_at: datetime
     members_count: int = 0
 
     class Config:
@@ -137,7 +138,7 @@ class LeagueMember(BaseModel):
     id: int
     user_id: int
     username: str
-    joined_at: str
+    joined_at: datetime
     missions_completed: Optional[int] = 0 # Computed for ranking
 
     class Config:
@@ -157,3 +158,33 @@ class LeagueInvite(BaseModel):
 
 class LeagueDetail(League):
     members: List[LeagueMember] = []
+
+# --- TROPHY ---
+class TrophyBase(BaseModel):
+    name: str
+    title: str
+    description: str
+    icon: str
+    tier: str  # bronze, silver, gold
+    requirement_type: str
+    requirement_value: int
+
+class Trophy(TrophyBase):
+    id: int
+    class Config:
+        from_attributes = True
+
+class UserTrophyBase(BaseModel):
+    trophy_id: int
+
+class UserTrophy(UserTrophyBase):
+    id: int
+    user_id: int
+    obtained_at: Optional[str] = None
+    last_milestone_date: Optional[str] = None
+    progress: int = 0
+    is_obtained: bool = False
+    trophy: Optional[Trophy] = None
+    
+    class Config:
+        from_attributes = True

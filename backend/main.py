@@ -105,6 +105,48 @@ def init_db_from_static_data(db: Session):
 
         for m_data in missions:
             crud.create_mission(db, m_data, category_name)
+    
+    # Initialiser les trophées
+    init_trophies(db)
+
+
+# Définition des trophées avec leurs paliers intermédiaires
+TROPHIES_DATA = [
+    {
+        "name": "trop_connecte",
+        "title": "Trop connecté",
+        "description": "Collectez toutes les médailles de connexion",
+        "icon": "🏆",
+        "tier": "progressive",
+        "requirement_type": "login_count",
+        "requirement_value": 5,
+        "milestones": [
+            {"value": 2, "label": "Bronze", "icon": "🥉"},
+            {"value": 3, "label": "Argent", "icon": "🥈"},
+            {"value": 4, "label": "Or", "icon": "🥇"}
+        ]
+    },
+    {
+        "name": "champion_missions",
+        "title": "Champion des missions",
+        "description": "Collectez toutes les médailles de missions",
+        "icon": "🏆",
+        "tier": "progressive",
+        "requirement_type": "mission_count",
+        "requirement_value": 8,
+        "milestones": [
+            {"value": 2, "label": "Bronze", "icon": "🥉"},
+            {"value": 4, "label": "Argent", "icon": "🥈"},
+            {"value": 6, "label": "Or", "icon": "🥇"}
+        ]
+    }
+]
+
+def init_trophies(db: Session):
+    """Initialize trophy definitions"""
+    for trophy_data in TROPHIES_DATA:
+        # Les descriptions sont maintenant générées côté frontend
+        crud.create_trophy(db, trophy_data)
 
 @app.on_event("startup")
 def startup_event():
@@ -141,6 +183,12 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
             detail="Pseudo/Email ou Mot de passe incorrect",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    # Enregistrer la connexion
+    crud.record_user_login(db, user.id)
+    
+    # Mettre à jour les progrès des trophées
+    crud.update_trophy_progress(db, user.id)
 
     access_token_expires = timedelta(minutes=utils.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = utils.create_access_token(
@@ -352,6 +400,10 @@ async def update_mission(mission_id: int, payload: schemas.MissionUpdate, db: Se
 
     if payload.user_id:
         crud.update_user_mission_status(db, payload.user_id, mission_id, payload.status)
+        
+        # Mettre à jour les progrès des trophées à chaque changement de statut
+        # (important si une mission passe de "termine" à "en_cours")
+        crud.update_trophy_progress(db, payload.user_id)
 
         # Feed activity
         if payload.status == 'termine':
@@ -381,8 +433,11 @@ def read_user_profile(user_id: int, db: Session = Depends(get_db), current_user:
     if not user: raise HTTPException(status_code=404, detail="User not found")
 
     mission_count = crud.get_completed_missions_count(db, user_id=user_id)
-    # Placeholder stats
-    trophy_count = 0
+    
+    # Count obtained trophies
+    user_trophies = crud.get_user_trophies(db, user_id=user_id)
+    trophy_count = sum(1 for ut in user_trophies if ut.is_obtained)
+    
     level = 5
     xp = 60
 
@@ -395,6 +450,150 @@ def read_user_profile(user_id: int, db: Session = Depends(get_db), current_user:
         xp=xp,
         profile_image=user.profile_image
     )
+
+# --- ROUTES TROPHÉES ---
+
+def get_trophy_milestones(trophy):
+    """Retourne les paliers intermédiaires pour un trophée depuis la BD"""
+    return trophy.milestones or []
+
+@app.get("/trophies", tags=["Trophies"], summary="Get all trophies with user progress")
+async def get_all_trophies_with_progress(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get all trophies with progress for current user"""
+    all_trophies = crud.get_all_trophies(db)
+    user_trophies = crud.get_user_trophies(db, current_user.id)
+    
+    # Create a dict for quick lookup
+    user_trophy_dict = {ut.trophy_id: ut for ut in user_trophies}
+    
+    result = []
+    for trophy in all_trophies:
+        user_trophy = user_trophy_dict.get(trophy.id)
+        result.append({
+            "id": trophy.id,
+            "name": trophy.name,
+            "title": trophy.title,
+            "description": trophy.description,
+            "icon": trophy.icon,
+            "tier": trophy.tier,
+            "requirement_type": trophy.requirement_type,
+            "requirement_value": trophy.requirement_value,
+            "progress": user_trophy.progress if user_trophy else 0,
+            "is_obtained": user_trophy.is_obtained if user_trophy else False,
+            "obtained_at": user_trophy.obtained_at if user_trophy else None,
+            "milestones": get_trophy_milestones(trophy)
+        })
+    
+    return result
+
+@app.get("/trophies/obtained", tags=["Trophies"], summary="Get obtained or partially obtained trophies for current user")
+async def get_obtained_trophies(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get trophies with progress (obtained or partially obtained) for current user"""
+    all_trophies = crud.get_all_trophies(db)
+    user_trophies_map = {ut.trophy_id: ut for ut in crud.get_user_trophies(db, current_user.id)}
+    
+    trophies_list = []
+    summary = {"Bronze": 0, "Argent": 0, "Or": 0, "Trophée": 0}
+
+    for trophy in all_trophies:
+        user_trophy = user_trophies_map.get(trophy.id)
+        
+        # On ne s'intéresse qu'aux trophées où il y a une progression
+        if not user_trophy or user_trophy.progress == 0:
+            continue
+
+        milestones = get_trophy_milestones(trophy)
+        
+        # Vérifier si le trophée final est obtenu
+        is_final_trophy_obtained = user_trophy.progress >= trophy.requirement_value
+        
+        # Trouver la dernière médaille/trophée obtenu (la plus haute)
+        last_milestone_obtained = None
+        if is_final_trophy_obtained:
+            # Le trophée final est obtenu
+            last_milestone_obtained = {
+                "label": "Trophée",
+                "icon": trophy.icon,
+                "value": trophy.requirement_value
+            }
+        else:
+            # Chercher la médaille la plus haute obtenue
+            for milestone in sorted(milestones, key=lambda m: m['value'], reverse=True):
+                if user_trophy.progress >= milestone['value']:
+                    last_milestone_obtained = milestone
+                    break
+
+        # Compter uniquement la médaille/trophée la plus haute obtenue
+        if last_milestone_obtained:
+            if last_milestone_obtained['label'] in summary:
+                summary[last_milestone_obtained['label']] += 1
+            
+            # Gérer la sérialisation des dates (peut être datetime ou string selon le modèle)
+            obtained_at_str = None
+            if user_trophy.obtained_at:
+                obtained_at_str = user_trophy.obtained_at if isinstance(user_trophy.obtained_at, str) else user_trophy.obtained_at.isoformat()
+            
+            last_milestone_date_str = None
+            if user_trophy.last_milestone_date:
+                last_milestone_date_str = user_trophy.last_milestone_date if isinstance(user_trophy.last_milestone_date, str) else user_trophy.last_milestone_date.isoformat()
+            
+            trophies_list.append({
+                "id": trophy.id,
+                "name": trophy.name,
+                "title": trophy.title,
+                "description": trophy.description,
+                "icon": trophy.icon,
+                "tier": last_milestone_obtained['label'],  # Tier actuel calculé (Bronze/Argent/Or/Trophée)
+                "requirement_type": trophy.requirement_type,
+                "requirement_value": trophy.requirement_value,
+                "progress": user_trophy.progress,
+                "is_obtained": is_final_trophy_obtained,
+                "obtained_at": obtained_at_str,
+                "last_milestone_date": last_milestone_date_str,
+                "milestones": milestones
+            })
+    
+    return {"trophies": trophies_list, "summary": summary}
+
+@app.get("/trophies/in-progress", tags=["Trophies"], summary="Get in-progress trophies for current user")
+async def get_in_progress_trophies(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get only in-progress trophies for current user"""
+    all_trophies = crud.get_all_trophies(db)
+    user_trophies = crud.get_user_trophies(db, current_user.id)
+    
+    user_trophy_dict = {ut.trophy_id: ut for ut in user_trophies}
+    
+    result = []
+    for trophy in all_trophies:
+        user_trophy = user_trophy_dict.get(trophy.id)
+        if not user_trophy or not user_trophy.is_obtained:
+            progress = user_trophy.progress if user_trophy else 0
+            milestones = get_trophy_milestones(trophy)
+            
+            # Les descriptions sont maintenant générées côté frontend
+            result.append({
+                "id": trophy.id,
+                "name": trophy.name,
+                "title": trophy.title,
+                "description": trophy.description,
+                "icon": trophy.icon,
+                "tier": trophy.tier,
+                "requirement_type": trophy.requirement_type,
+                "requirement_value": trophy.requirement_value,
+                "progress": progress,
+                "milestones": milestones
+            })
+    
+    return result
 
 # --- ROUTES STATISTIQUES NGC (Publicodes) ---
 
@@ -501,8 +700,12 @@ async def get_global_stats(db: Session = Depends(get_db)):
             print(f"Erreur stats missions: {e}")
 
         # --- 4. TROPHÉES ---
-        if stats["total_missions_completed"] > 0:
-            stats["total_trophies"] = int(stats["total_missions_completed"] // 3)
+        try:
+            stats["total_trophies"] = db.query(models.UserTrophy).filter(
+                models.UserTrophy.is_obtained == True
+            ).count()
+        except Exception as e:
+            print(f"Erreur stats trophées: {e}")
 
     except Exception as global_e:
         print(f"ERREUR CRITIQUE DANS GET_GLOBAL_STATS: {global_e}")

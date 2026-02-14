@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, UniqueConstraint, JSON, DateTime
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -18,6 +18,8 @@ class User(Base):
     mission_statuses = relationship("UserMissionStatus", back_populates="user")
     ngc_stat = relationship("UserNgcStat", back_populates="user", uselist=False)
     ngc_progress = relationship("UserNgcProgress", back_populates="user", uselist=False)
+    trophies = relationship("UserTrophy", back_populates="user")
+    logins = relationship("UserLogin", back_populates="user")
 
 class Category(Base):
     __tablename__ = "categories"
@@ -85,7 +87,7 @@ class UserNgcStat(Base):
     alimentation = Column(Integer, nullable=False, default=0)
     divers = Column(Integer, nullable=False, default=0)
     services_societaux = Column(Integer, nullable=False, default=0)
-    updated_at = Column(String, nullable=True)
+    updated_at = Column(DateTime, nullable=True)
 
     user = relationship("User", back_populates="ngc_stat")
 
@@ -100,7 +102,7 @@ class UserNgcProgress(Base):
     logement = Column(Integer, nullable=False, default=0)
     alimentation = Column(Integer, nullable=False, default=0)
     divers = Column(Integer, nullable=False, default=0)
-    updated_at = Column(String, nullable=True)
+    updated_at = Column(DateTime, nullable=True)
 
     user = relationship("User", back_populates="ngc_progress")
 
@@ -115,7 +117,7 @@ class UserMissionStatus(Base):
     user = relationship("User", back_populates="mission_statuses")
     mission = relationship("Mission", back_populates="user_statuses")
 
-    completed_at = Column(String, nullable=True) # ISO Date timestamp
+    completed_at = Column(DateTime, nullable=True)
 
 
 class FriendLink(Base):
@@ -157,7 +159,7 @@ class League(Base):
     start_date = Column(String) # ISO 8601 string
     end_date = Column(String)
     is_archived = Column(Boolean, default=False)
-    created_at = Column(String) # ISO Date
+    created_at = Column(DateTime)
 
     members = relationship("LeagueMember", back_populates="league")
     invites = relationship("LeagueInvite", back_populates="league")
@@ -168,7 +170,7 @@ class LeagueMember(Base):
     id = Column(Integer, primary_key=True, index=True)
     league_id = Column(Integer, ForeignKey("leagues.id"))
     user_id = Column(Integer, ForeignKey("users.id"))
-    joined_at = Column(String) # ISO Date
+    joined_at = Column(DateTime)
 
     league = relationship("League", back_populates="members")
     user = relationship("User")
@@ -185,3 +187,48 @@ class LeagueInvite(Base):
     league = relationship("League", back_populates="invites")
     inviter = relationship("User", foreign_keys=[inviter_id])
     invitee = relationship("User", foreign_keys=[invitee_id])
+
+
+class Trophy(Base):
+    __tablename__ = "trophies"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)
+    title = Column(String)
+    description = Column(String)
+    icon = Column(String)
+    tier = Column(String)  # bronze, silver, gold
+    requirement_type = Column(String)  # login_count, mission_count, etc.
+    requirement_value = Column(Integer)
+    milestones = Column(JSON, default=[])  # List of {value, label, icon}
+
+    user_trophies = relationship("UserTrophy", back_populates="trophy")
+
+
+class UserTrophy(Base):
+    __tablename__ = "user_trophies"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    trophy_id = Column(Integer, ForeignKey("trophies.id"))
+    obtained_at = Column(DateTime)  # Timestamp when trophée is fully obtained
+    last_milestone_date = Column(DateTime)  # Timestamp when last milestone was reached
+    progress = Column(Integer, default=0)
+    is_obtained = Column(Boolean, default=False)
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'trophy_id', name='uq_user_trophy'),
+    )
+
+    user = relationship("User", back_populates="trophies")
+    trophy = relationship("Trophy", back_populates="user_trophies")
+
+
+class UserLogin(Base):
+    __tablename__ = "user_logins"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    login_at = Column(DateTime)
+
+    user = relationship("User", back_populates="logins")
