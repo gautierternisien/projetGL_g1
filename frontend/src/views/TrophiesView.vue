@@ -14,12 +14,12 @@ function goBack() {
   router.back()
 }
 
-// Gestion des onglets : 0 = Obtenus, 1 = En cours, 2 = À commencer
+// Gestion des onglets : 0 = En cours, 1 = Obtenus, 2 = À commencer
 const activeTab = ref(0)
 
 const tabs = [
-  { id: 0, label: 'Obtenus' },
-  { id: 1, label: 'En cours' },
+  { id: 0, label: 'En cours' },
+  { id: 1, label: 'Obtenus' },
   { id: 2, label: 'À commencer' },
 ]
 
@@ -111,9 +111,9 @@ function getTrophyLevel(trophy: Trophy): number {
 const trophiesForActiveTab = computed(() => {
   let trophies = []
   if (activeTab.value === 0) {
-    trophies = [...obtainedTrophies.value]
-  } else if (activeTab.value === 1) {
     trophies = [...inProgressTrophies.value]
+  } else if (activeTab.value === 1) {
+    trophies = [...obtainedTrophies.value]
   } else {
     trophies = [...notStartedTrophies.value]
   }
@@ -241,7 +241,7 @@ function getDescription(progress: number, milestones: { value: number; label: st
       <div v-if="loading" class="loading">Chargement...</div>
       
       <!-- Résumé des médailles pour l'onglet "Récompenses obtenues" - toujours affiché -->
-      <div v-if="!loading && activeTab === 0" class="medals-summary">
+      <div v-if="!loading && activeTab === 1" class="medals-summary">
         <div class="medal-item">
           <span class="medal-icon">🏆</span>
           <span class="medal-label">Trophée</span>
@@ -273,8 +273,8 @@ function getDescription(progress: number, milestones: { value: number; label: st
             class="trophy-card"
           >
             <div class="trophy-content">
-              <div class="trophy-icon" :class="{ 'trophy-icon-dimmed': activeTab === 1, 'trophy-icon-locked': activeTab === 2 }">
-                {{ activeTab === 0 ? getLastObtainedMilestoneIcon(trophy.progress || 0, trophy.milestones || [], trophy.requirement_value || 5, trophy.icon) : getNextMilestoneIcon(trophy.progress || 0, trophy.milestones || [], trophy.icon) }}
+              <div class="trophy-icon" :class="{ 'trophy-icon-dimmed': activeTab === 0, 'trophy-icon-locked': activeTab === 2 }">
+                {{ activeTab === 1 ? getLastObtainedMilestoneIcon(trophy.progress || 0, trophy.milestones || [], trophy.requirement_value || 5, trophy.icon) : getNextMilestoneIcon(trophy.progress || 0, trophy.milestones || [], trophy.icon) }}
               </div>
               <div class="trophy-info">
                 <p class="trophy-description">
@@ -282,7 +282,7 @@ function getDescription(progress: number, milestones: { value: number; label: st
                 </p>
                 
                 <!-- En cours : afficher la progression -->
-                <div v-if="activeTab === 1" class="trophy-progress">
+                <div v-if="activeTab === 0" class="trophy-progress">
                   <!-- Prochain objectif -->
                   <div v-if="getNextMilestone(trophy.progress || 0, trophy.milestones || [], trophy.requirement_value || 60)" class="next-milestone">
                     <div class="progress-text">
@@ -301,7 +301,7 @@ function getDescription(progress: number, milestones: { value: number; label: st
                 </div>
                 
                 <!-- Obtenus : afficher la date de la dernière médaille obtenue -->
-                <div v-else-if="activeTab === 0" class="trophy-obtained">
+                <div v-else-if="activeTab === 1" class="trophy-obtained">
                   <span class="obtained-date">
                     {{ getLastObtainedMilestone(trophy.progress || 0, trophy.milestones || [], trophy.requirement_value || 5)?.label }} obtenue le {{ formatDate(trophy.last_milestone_date) }}
                   </span>
@@ -320,13 +320,13 @@ function getDescription(progress: number, milestones: { value: number; label: st
       </template>
       
       <div v-if="!loading && trophiesForActiveTab.length === 0" class="empty-state">
-        <p v-if="activeTab === 0">
+        <p v-if="activeTab === 0">Aucun trophée en cours. Commencez une nouvelle récompense !</p>
+        <p v-else-if="activeTab === 1">
           Aucune récompense obtenue pour le moment.<br>
           <small style="color: #999; margin-top: 8px; display: block;">
             Venez régulièrement pour gagner des médailles !
           </small>
         </p>
-        <p v-else-if="activeTab === 1">Aucun trophée en cours. Commencez une nouvelle récompense !</p>
         <p v-else>Toutes les récompenses ont été commencées ! 🎉</p>
       </div>
     </div>
