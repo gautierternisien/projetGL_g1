@@ -24,24 +24,24 @@ export interface NewTrophyNotification {
   milestoneIcon: string
 }
 
-const SEEN_TROPHIES_KEY = 'seen_trophy_ids'
+const getSeenTrophiesKey = (userId: number) => `seen_trophy_ids_${userId}`
 
 export const useTrophiesStore = defineStore('trophies', () => {
   const obtainedTrophies = ref<Trophy[]>([])
   const newTrophyNotification = ref<NewTrophyNotification | null>(null)
 
-  function getSeenTrophyIds(): Set<string> {
+  function getSeenTrophyIds(userId: number): Set<string> {
     try {
-      const stored = localStorage.getItem(SEEN_TROPHIES_KEY)
+      const stored = localStorage.getItem(getSeenTrophiesKey(userId))
       return stored ? new Set(JSON.parse(stored)) : new Set()
     } catch {
       return new Set()
     }
   }
 
-  function saveSeenTrophyIds(ids: Set<string>) {
+  function saveSeenTrophyIds(userId: number, ids: Set<string>) {
     try {
-      localStorage.setItem(SEEN_TROPHIES_KEY, JSON.stringify(Array.from(ids)))
+      localStorage.setItem(getSeenTrophiesKey(userId), JSON.stringify(Array.from(ids)))
     } catch {
       // ignore
     }
@@ -84,7 +84,7 @@ export const useTrophiesStore = defineStore('trophies', () => {
     }
   }
 
-  async function checkNewTrophies(token: string) {
+  async function checkNewTrophies(token: string, userId: number, silent: boolean = false) {
     try {
       const response = await fetch(`${API_URL}/trophies/obtained`, {
         headers: {
@@ -95,7 +95,7 @@ export const useTrophiesStore = defineStore('trophies', () => {
       if (response.ok) {
         const data = await response.json()
         const trophies: Trophy[] = data.trophies || []
-        const seenIds = getSeenTrophyIds()
+        const seenIds = getSeenTrophyIds(userId)
         
         // Créer un Set des trophées actuellement obtenus pour nettoyage
         const currentTrophyKeys = new Set(
@@ -112,7 +112,15 @@ export const useTrophiesStore = defineStore('trophies', () => {
         
         // Sauvegarder la liste nettoyée
         if (cleanedSeenIds.size !== seenIds.size) {
-          saveSeenTrophyIds(cleanedSeenIds)
+          saveSeenTrophyIds(userId, cleanedSeenIds)
+        }
+        
+        // En mode silencieux, marquer tous les trophées comme vus sans notification
+        if (silent) {
+          const allTrophyKeys = new Set(trophies.map(t => `${t.id}_${t.progress}`))
+          saveSeenTrophyIds(userId, allTrophyKeys)
+          newTrophyNotification.value = null
+          return
         }
         
         // Trouver le premier nouveau trophée non vu
@@ -136,17 +144,18 @@ export const useTrophiesStore = defineStore('trophies', () => {
     }
   }
 
-  function markTrophyAsSeen(trophyId: number, progress: number) {
-    const seenIds = getSeenTrophyIds()
+  function markTrophyAsSeen(userId: number, trophyId: number, progress: number) {
+    const seenIds = getSeenTrophyIds(userId)
     const trophyKey = `${trophyId}_${progress}`
     seenIds.add(trophyKey)
-    saveSeenTrophyIds(seenIds)
+    saveSeenTrophyIds(userId, seenIds)
     newTrophyNotification.value = null
   }
 
-  function dismissNotification() {
+  function dismissNotification(userId: number) {
     if (newTrophyNotification.value) {
       markTrophyAsSeen(
+        userId,
         newTrophyNotification.value.trophy.id,
         newTrophyNotification.value.trophy.progress || 0
       )

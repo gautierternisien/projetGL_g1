@@ -89,10 +89,20 @@ async function checkRequests() {
   }
 }
 
-async function checkTrophies() {
-  if (authStore.isConnected && authStore.token) {
+async function initializeTrophies() {
+  if (authStore.isConnected && authStore.token && authStore.user) {
     try {
-      await trophiesStore.checkNewTrophies(authStore.token)
+      await trophiesStore.checkNewTrophies(authStore.token, authStore.user.id, true)
+    } catch {
+      // ignore
+    }
+  }
+}
+
+async function checkTrophies() {
+  if (authStore.isConnected && authStore.token && authStore.user) {
+    try {
+      await trophiesStore.checkNewTrophies(authStore.token, authStore.user.id)
     } catch {
       // ignore
     }
@@ -100,11 +110,15 @@ async function checkTrophies() {
 }
 
 function dismissTrophyNotification() {
-  trophiesStore.dismissNotification()
+  if (authStore.user) {
+    trophiesStore.dismissNotification(authStore.user.id)
+  }
 }
 
 function goToTrophies() {
-  trophiesStore.dismissNotification()
+  if (authStore.user) {
+    trophiesStore.dismissNotification(authStore.user.id)
+  }
   router.push({ name: 'trophees', query: { tab: 'obtained' } })
 }
 
@@ -152,7 +166,7 @@ onMounted(() => {
     })
   }
   checkRequests()
-  checkTrophies()
+  initializeTrophies()
 })
 
 watch(() => authStore.isConnected, (connected) => {
