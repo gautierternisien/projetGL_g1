@@ -58,6 +58,7 @@ import { useLeaguesStore } from '@/stores/leagues'
 import { useAuthStore } from '@/stores/auth'
 import { useTrophiesStore } from '@/stores/trophies'
 import { computed, watch, onMounted } from 'vue'
+import confetti from 'canvas-confetti'
 
 const uiStore = useUiStore()
 const friendsStore = useFriendsStore()
@@ -107,6 +108,43 @@ function goToTrophies() {
   router.push({ name: 'trophees', query: { tab: 'obtained' } })
 }
 
+function launchConfetti() {
+  // Effet de confettis multicolore pour célébrer le trophée
+  const duration = 3000
+  const end = Date.now() + duration
+
+  const colors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DFE6E9', '#A29BFE', '#FD79A8', '#FDCB6E']
+  
+  const frame = () => {
+    confetti({
+      particleCount: 4,
+      angle: 60,
+      spread: 20,
+      origin: { x: 0 },
+      colors: colors,
+      scalar: 1.5,
+      gravity: 0.8,
+      zIndex: 100000
+    })
+    confetti({
+      particleCount: 4,
+      angle: 120,
+      spread: 20,
+      origin: { x: 1 },
+      colors: colors,
+      scalar: 1.5,
+      gravity: 0.8,
+      zIndex: 100000
+    })
+
+    if (Date.now() < end) {
+      requestAnimationFrame(frame)
+    }
+  }
+  
+  frame()
+}
+
 onMounted(() => {
   if (authStore.isConnected && !authStore.user) {
     authStore.fetchUser().catch(() => {
@@ -128,6 +166,13 @@ watch(() => authStore.isConnected, (connected) => {
 watch(() => route.path, () => {
   checkRequests()
   checkTrophies()
+})
+
+// Lance les confettis quand une notification de trophée apparaît
+watch(() => showTrophyNotification.value, (isVisible) => {
+  if (isVisible) {
+    launchConfetti()
+  }
 })
 </script>
 
@@ -216,14 +261,13 @@ watch(() => route.path, () => {
   position: fixed;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  width: 100%;
+  height: 100%;
+  z-index: 1000;
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 2000;
-  backdrop-filter: blur(2px);
+  background-color: rgba(255, 255, 255, 0.6);
 }
 
 .trophy-popup {
