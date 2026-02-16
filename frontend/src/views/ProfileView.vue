@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import Header from '@/components/AppHeader.vue'
 import Card from '@/components/AppCard.vue'
+import ProgressBar from '@/components/ProgressBar.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { useRouter } from 'vue-router'
-import { onMounted, ref, onUnmounted } from 'vue'
+import { onMounted, ref, onUnmounted, computed } from 'vue'
 
 const authStore = useAuthStore()
 const uiStore = useUiStore()
@@ -25,6 +26,11 @@ const allProfileImages = ref<string[]>([])
 const currentImageIndex = ref(0)
 const selectedProfileImage = ref<string | undefined>(undefined)
 
+const userLevel = computed(() => {
+  return Math.floor(userXp.value / 100) + 1
+})
+const userXp = computed(() => authStore.user?.xp || 0)
+
 onMounted(async () => {
   if (!authStore.isConnected) {
     router.push('/login')
@@ -37,9 +43,16 @@ onMounted(async () => {
   }
   // Charger toutes les images du dossier image_profil
   try {
-    const imageNames = ['plante1.png', 'plante2.png', 'plante3.png', 'plante4.png', 'plante5.png', 'plante6.png']
-    allProfileImages.value = imageNames.map(name => 
-      new URL(`../components/image_profil/${name}`, import.meta.url).href
+    const imageNames = [
+      'plante1.png',
+      'plante2.png',
+      'plante3.png',
+      'plante4.png',
+      'plante5.png',
+      'plante6.png',
+    ]
+    allProfileImages.value = imageNames.map(
+      (name) => new URL(`../components/image_profil/${name}`, import.meta.url).href,
     )
     currentImageIndex.value = 0
   } catch (e) {
@@ -88,17 +101,21 @@ function closeProfileImageModal() {
 }
 
 function saveProfileImage() {
-  if (allProfileImages.value.length > 0 && currentImageIndex.value < allProfileImages.value.length) {
+  if (
+    allProfileImages.value.length > 0 &&
+    currentImageIndex.value < allProfileImages.value.length
+  ) {
     const imageUrl = allProfileImages.value[currentImageIndex.value]
     if (imageUrl) {
       selectedProfileImage.value = imageUrl
       // Sauvegarder l'image dans la base de données
-      authStore.updateProfileImage(imageUrl)
+      authStore
+        .updateProfileImage(imageUrl)
         .then(() => {
           closeProfileImageModal()
         })
         .catch((e: unknown) => {
-          console.error('Erreur lors de la sauvegarde de l\'image:', e)
+          console.error("Erreur lors de la sauvegarde de l'image:", e)
         })
     }
   }
@@ -110,15 +127,16 @@ function removeProfileImage() {
     closeProfileImageModal()
     return
   }
-  
+
   // Sinon, supprimer l'image
   selectedProfileImage.value = undefined
-  authStore.removeProfileImage()
+  authStore
+    .removeProfileImage()
     .then(() => {
       closeProfileImageModal()
     })
     .catch((e: unknown) => {
-      console.error('Erreur lors de la suppression de l\'image:', e)
+      console.error("Erreur lors de la suppression de l'image:", e)
     })
 }
 
@@ -130,7 +148,8 @@ function nextImage() {
 
 function previousImage() {
   if (allProfileImages.value.length > 0) {
-    currentImageIndex.value = (currentImageIndex.value - 1 + allProfileImages.value.length) % allProfileImages.value.length
+    currentImageIndex.value =
+      (currentImageIndex.value - 1 + allProfileImages.value.length) % allProfileImages.value.length
   }
 }
 
@@ -146,7 +165,10 @@ function handleEditOption(option: string) {
     return
   }
 
-  const fieldMap: Record<string, { label: string; type: 'text' | 'email' | 'password'; old: string }> = {
+  const fieldMap: Record<
+    string,
+    { label: string; type: 'text' | 'email' | 'password'; old: string }
+  > = {
     email: {
       label: 'adresse mail',
       type: 'email',
@@ -211,7 +233,7 @@ function submitEditModal() {
     }
 
     if (currentPassword.value === newFieldValue.value) {
-      modalErrorMessage.value = 'Le nouveau mot de passe doit être différent de l\'ancien'
+      modalErrorMessage.value = "Le nouveau mot de passe doit être différent de l'ancien"
       return
     }
 
@@ -242,7 +264,7 @@ function submitEditModal() {
   }
 
   if (newFieldValue.value === oldFieldValue.value) {
-    modalErrorMessage.value = 'La nouvelle valeur est identique à l\'ancienne'
+    modalErrorMessage.value = "La nouvelle valeur est identique à l'ancienne"
     return
   }
 
@@ -272,6 +294,11 @@ function submitEditModal() {
       })
   }
 }
+
+const xpProgress = computed(() => {
+  const xp = userXp.value
+  return xp % 100 // Comme un niveau = 100pts, le modulo nous donne le % directement
+})
 </script>
 
 <template>
@@ -290,10 +317,32 @@ function submitEditModal() {
 
         <!-- Icône de profil -->
         <div class="profile-icon-container">
-          <div v-if="selectedProfileImage" class="profile-icon" @click="openProfileImageModal" style="cursor: pointer;">
+          <div
+            v-if="selectedProfileImage"
+            class="profile-icon"
+            @click="openProfileImageModal"
+            style="cursor: pointer"
+          >
             <img :src="selectedProfileImage" :alt="'Image de profil'" class="profile-icon-image" />
           </div>
-          <div v-else class="profile-icon" @click="openProfileImageModal" style="cursor: pointer;">{{ authStore.user.username.charAt(0).toUpperCase() }}</div>
+          <div v-else class="profile-icon" @click="openProfileImageModal" style="cursor: pointer">
+            {{ authStore.user.username.charAt(0).toUpperCase() }}
+          </div>
+        </div>
+
+        <div class="xp-container">
+          <div class="xp-info">
+            <span class="level-badge">Niveau {{ userLevel }}</span>
+            <span class="xp-text">{{ userXp }} XP</span>
+          </div>
+          <ProgressBar
+            :value="xpProgress"
+            :max="100"
+            :showLabel="false"
+            class="xp-progress-bar"
+            color="#679436"
+          />
+          <div class="xp-next-level">{{ 100 - xpProgress }} pts avant le niveau suivant</div>
         </div>
 
         <!-- Boutons sous l'icône -->
@@ -354,20 +403,12 @@ function submitEditModal() {
 
           <div v-if="selectedFieldKey === 'password'" class="field-group">
             <label>Actuel *</label>
-            <input
-              v-model="currentPassword"
-              type="password"
-              required
-            />
+            <input v-model="currentPassword" type="password" required />
           </div>
 
           <div class="field-group">
             <label>Nouveau *</label>
-            <input
-              v-model="newFieldValue"
-              :type="newFieldType"
-              required
-            />
+            <input v-model="newFieldValue" :type="newFieldType" required />
           </div>
 
           <div class="modal-actions">
@@ -395,14 +436,33 @@ function submitEditModal() {
       <div class="modal-box">
         <h3>Modifier l'image de profil</h3>
         <div class="carousel-container">
-          <button v-if="allProfileImages.length > 0" class="carousel-arrow carousel-arrow-left" @click="previousImage">❮</button>
+          <button
+            v-if="allProfileImages.length > 0"
+            class="carousel-arrow carousel-arrow-left"
+            @click="previousImage"
+          >
+            ❮
+          </button>
           <div class="profile-image-placeholder">
-            <img v-if="allProfileImages.length > 0" :src="allProfileImages[currentImageIndex]" :alt="'Image de profil'" class="gallery-image" />
+            <img
+              v-if="allProfileImages.length > 0"
+              :src="allProfileImages[currentImageIndex]"
+              :alt="'Image de profil'"
+              class="gallery-image"
+            />
             <span v-else>Aucune image disponible</span>
           </div>
-          <button v-if="allProfileImages.length > 0" class="carousel-arrow carousel-arrow-right" @click="nextImage">❯</button>
+          <button
+            v-if="allProfileImages.length > 0"
+            class="carousel-arrow carousel-arrow-right"
+            @click="nextImage"
+          >
+            ❯
+          </button>
         </div>
-        <div v-if="allProfileImages.length > 0" class="image-counter">{{ currentImageIndex + 1 }} / {{ allProfileImages.length }}</div>
+        <div v-if="allProfileImages.length > 0" class="image-counter">
+          {{ currentImageIndex + 1 }} / {{ allProfileImages.length }}
+        </div>
         <div class="remove-link" @click="removeProfileImage">Retirer</div>
         <div class="modal-actions">
           <button type="button" class="cancel-btn" @click="closeProfileImageModal">Annuler</button>
@@ -779,5 +839,46 @@ function submitEditModal() {
   border-radius: 10px;
   font-size: 1rem;
   color: #999;
+}
+
+/* --- Styles pour l'XP --- */
+.xp-container {
+  width: 100%;
+  margin-bottom: 1.5rem;
+  padding: 0 10px;
+}
+
+.xp-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.level-badge {
+  background-color: #679436;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.xp-text {
+  font-weight: 600;
+  color: #555;
+  font-size: 0.9rem;
+}
+
+.xp-next-level {
+  text-align: right;
+  font-size: 0.75rem;
+  color: #888;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.xp-progress-bar {
+  height: 12px; /* Un peu plus épais pour le profil */
 }
 </style>

@@ -62,6 +62,14 @@ export function computeCategoryProgressFromAnswers(
     divers: 0,
   }
 
+  // Check explicit completion flags
+  const explicitCompletion: Record<Category, boolean> = {
+    transport: !!answers['__completed_transport'],
+    logement: !!answers['__completed_logement'],
+    alimentation: !!answers['__completed_alimentation'],
+    divers: !!answers['__completed_divers'],
+  }
+
   for (const [slug, , category] of TARGET_QUESTIONS) {
     if (!isQuestionRequired(slug, answers)) continue
 
@@ -70,10 +78,22 @@ export function computeCategoryProgressFromAnswers(
   }
 
   return {
-    transport: totals.transport === 0 ? 0 : Math.round((answered.transport / totals.transport) * 100),
-    logement: totals.logement === 0 ? 0 : Math.round((answered.logement / totals.logement) * 100),
-    alimentation: totals.alimentation === 0 ? 0 : Math.round((answered.alimentation / totals.alimentation) * 100),
-    divers: totals.divers === 0 ? 0 : Math.round((answered.divers / totals.divers) * 100),
+    transport:
+      explicitCompletion.transport || totals.transport === 0
+        ? 100
+        : Math.round((answered.transport / totals.transport) * 100),
+    logement:
+      explicitCompletion.logement || totals.logement === 0
+        ? 100
+        : Math.round((answered.logement / totals.logement) * 100),
+    alimentation:
+      explicitCompletion.alimentation || totals.alimentation === 0
+        ? 100
+        : Math.round((answered.alimentation / totals.alimentation) * 100),
+    divers:
+      explicitCompletion.divers || totals.divers === 0
+        ? 100
+        : Math.round((answered.divers / totals.divers) * 100),
   }
 }
 

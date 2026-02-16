@@ -98,6 +98,23 @@ def update_user_password(db: Session, user_id: int, new_password: str):
 def get_questions_by_category(db: Session, category_name: str):
     return db.query(models.Question).filter(models.Question.category_name == category_name).all()
 
+def get_user_ngc_answers(db: Session, user_id: int):
+    return db.query(models.UserNgcAnswers).filter(models.UserNgcAnswers.user_id == user_id).first()
+
+def update_user_ngc_answers(db: Session, user_id: int, data_json: str):
+    record = get_user_ngc_answers(db, user_id)
+    now = datetime.utcnow().isoformat()
+    if not record:
+        record = models.UserNgcAnswers(user_id=user_id, data=data_json, updated_at=now)
+        db.add(record)
+    else:
+        record.data = data_json
+        record.updated_at = now
+
+    db.commit()
+    db.refresh(record)
+    return record
+
 def get_missions_by_category(db: Session, category_name: str, user_id: int):
     missions = db.query(models.Mission).filter(models.Mission.category_name == category_name).all()
 
@@ -140,6 +157,38 @@ def save_user_answer(db: Session, user_id: int, answer: schemas.UserAnswerBase):
 
     db.commit()
     db.refresh(db_answer)
+
+    question = db.query(models.Question).filter(models.Question.id == answer.question_id).first()
+
+    if question:
+        category_name = question.category_name
+
+        # Vérifie si on a déjà eu la récompense pour cette catégorie
+        existing_reward = db.query(models.UserQuestionnaireReward).filter(
+            models.UserQuestionnaireReward.user_id == user_id,
+            models.UserQuestionnaireReward.category_name == category_name
+        ).first()
+
+        if not existing_reward:
+            # Compte le nombre total de questions dans cette catégorie
+            total_questions = db.query(models.Question).filter(models.Question.category_name == category_name).count()
+
+            # Compte le nombre de réponses de l'utilisateur pour cette catégorie
+            # (Attention : ceci suppose que UserAnswer contient une ligne par question répondue)
+            answered_count = db.query(models.UserAnswer).join(models.Question).filter(
+                models.UserAnswer.user_id == user_id,
+                models.Question.category_name == category_name
+            ).count()
+
+            # Si tout est répondu
+            if total_questions > 0 and answered_count >= total_questions:
+                # Ajout XP
+                add_user_xp(db, user_id, 50)
+                # Marquer comme récompensé
+                reward = models.UserQuestionnaireReward(user_id=user_id, category_name=category_name)
+                db.add(reward)
+                db.commit()
+
     return db_answer
 
 
@@ -466,6 +515,8 @@ def get_user_mission_statuses_dict(db: Session, user_id: int):
 def update_user_mission_status(db: Session, user_id: int, mission_id: int, status: str):
     db_status = get_user_mission_status(db, user_id, mission_id)
 
+    was_completed = db_status and db_status.status == 'termine'
+
     if db_status:
         db_status.status = status
     else:
@@ -474,6 +525,13 @@ def update_user_mission_status(db: Session, user_id: int, mission_id: int, statu
 
     if status == 'termine':
         db_status.completed_at = datetime.now()
+        if not was_completed:
+            mission = db.query(models.Mission).filter(models.Mission.id == mission_id).first()
+            if mission:
+                # 1. Points de mission
+                points = 35 if mission.mission_type == 'long_term' else 10
+                add_user_xp(db, user_id, points)
+
 
     db.commit()
     db.refresh(db_status)
@@ -523,6 +581,8 @@ def create_league(db: Session, league: schemas.LeagueCreate, creator_id: int):
     db.refresh(db_league)
 
     db_league.members_count = 1
+
+    add_user_xp(db, creator_id, 5)
     return db_league
 
 
@@ -705,15 +765,32 @@ def create_question(db: Session, question_data: dict, category_name: str):
 
 def create_mission(db: Session, mission_data: dict, category_name: str):
     m = db.query(models.Mission).filter(models.Mission.id == mission_data['id']).first()
+
+    m_type = mission_data.get('mission_type', 'one_shot')
+
+    # Si la mission n'existe pas, on la crée
     if not m:
         m = models.Mission(
             id=mission_data['id'],
             title=mission_data['title'],
             description=mission_data.get('description', ""),
-            category_name=category_name
+            category_name=category_name,
+            # AJOUT ICI : On enregistre les conditions
+            conditions=mission_data.get('conditions', []),
+            mission_type=m_type
         )
         db.add(m)
-        db.commit()
+    else:
+        # AJOUT ICI : Si elle existe déjà, on met à jour ses infos (titre, desc, conditions)
+        # Cela permet d'appliquer vos changements sans supprimer la BDD
+        m.title = mission_data['title']
+        m.description = mission_data.get('description', "")
+        m.conditions = mission_data.get('conditions', [])
+        m.category_name = category_name
+        m.mission_type=m_type
+
+    db.commit()
+    db.refresh(m)
     return m
 
 
@@ -804,14 +881,14 @@ def get_user_login_count(db: Session, user_id: int):
 def update_trophy_progress(db: Session, user_id: int):
     """Update trophy progress for a user based on their activities"""
     from datetime import datetime
-    
+
     # Get login count and mission count
     login_count = get_user_login_count(db, user_id)
     mission_count = get_completed_missions_count(db, user_id)
-    
+
     # Get all trophies
     trophies = get_all_trophies(db)
-    
+
     for trophy in trophies:
         # Determine the count based on trophy type
         if trophy.requirement_type == "login_count":
@@ -820,28 +897,28 @@ def update_trophy_progress(db: Session, user_id: int):
             count = mission_count
         else:
             continue
-        
+
         progress = min(count, trophy.requirement_value)
         is_obtained = count >= trophy.requirement_value
         obtained_at = None
         last_milestone_date = None
-        
+
         # Check if already obtained
         existing_trophy = get_user_trophy(db, user_id, trophy.id)
-        
+
         # Get milestones from database
         milestones = trophy.milestones or []
-        
+
         # Preserve existing obtained_at if trophée is already obtained
         if existing_trophy and existing_trophy.obtained_at:
             obtained_at = existing_trophy.obtained_at
-        
+
         # If trophée just became obtained
         if is_obtained and existing_trophy and not existing_trophy.is_obtained:
             obtained_at = datetime.utcnow()
         elif is_obtained and not existing_trophy:
             obtained_at = datetime.utcnow()
-        
+
         # Update last_milestone_date when a milestone is reached
         # Chercher la médaille la plus haute obtenue (tri décroissant)
         if milestones:
@@ -854,5 +931,120 @@ def update_trophy_progress(db: Session, user_id: int):
                     else:
                         last_milestone_date = existing_trophy.last_milestone_date
                     break
-        
+
         upsert_user_trophy(db, user_id, trophy.id, progress, is_obtained, obtained_at, last_milestone_date)
+
+
+# --- USER PREFERENCES ---
+
+def get_user_preferences(db: Session, user_id: int):
+    pref = db.query(models.UserPreference).filter(models.UserPreference.user_id == user_id).first()
+    if not pref:
+        # Si pas de préférences, on renvoie un objet par défaut non sauvegardé
+        # Le frontend saura qu'il faut afficher l'onboarding car has_completed_onboarding = False
+        return models.UserPreference(user_id=user_id, data={}, has_completed_onboarding=False)
+    return pref
+
+def update_user_preferences(db: Session, user_id: int, pref_data: schemas.UserPreferenceCreate):
+    pref = db.query(models.UserPreference).filter(models.UserPreference.user_id == user_id).first()
+
+    if not pref:
+        pref = models.UserPreference(
+            user_id=user_id,
+            data=pref_data.data,
+            has_completed_onboarding=pref_data.has_completed_onboarding
+        )
+        db.add(pref)
+    else:
+        pref.data = pref_data.data
+        pref.has_completed_onboarding = pref_data.has_completed_onboarding
+
+    db.commit()
+    db.refresh(pref)
+    return pref
+
+
+def add_user_xp(db: Session, user_id: int, amount: int):
+    user = get_user(db, user_id)
+    if user:
+        user.xp += amount
+        db.commit()
+        db.refresh(user)
+    return user
+
+def award_category_completion_xp(db: Session, user_id: int, category_name: str):
+    """
+    Attribue 50 XP pour la complétion d'une catégorie si pas déjà reçu.
+    """
+    # Vérifier si déjà récompensé
+    existing_reward = db.query(models.UserQuestionnaireReward).filter(
+        models.UserQuestionnaireReward.user_id == user_id,
+        models.UserQuestionnaireReward.category_name == category_name
+    ).first()
+
+    if existing_reward:
+        return None # Déjà gagné
+
+    # Donner 50 XP
+    add_user_xp(db, user_id, 50)
+
+    # Marquer comme récompensé
+    reward = models.UserQuestionnaireReward(user_id=user_id, category_name=category_name)
+    db.add(reward)
+    db.commit()
+    db.refresh(reward)
+    return reward
+
+def process_league_rewards(db: Session):
+    """
+    Vérifie toutes les ligues terminées qui n'ont pas encore distribué leurs récompenses.
+    Calcule le classement et attribue l'XP.
+    """
+    today = datetime.now().strftime("%Y-%m-%d") # Format ISO YYYY-MM-DD
+
+    # 1. Récupérer les ligues terminées (date de fin passée) et non traitées
+    # On suppose que end_date est inclusif, donc terminé si today > end_date
+    # Ou si on veut être précis à la seconde près, il faudrait des datetime complets.
+    # Ici on fait simple : si on est le lendemain de la fin.
+
+    # Note: Dans votre modèle, end_date est une string ISO.
+    # Pour être sûr, on prend celles dont la date est < today (donc hier ou avant).
+    leagues_to_process = db.query(models.League).filter(
+        models.League.end_date < today,
+        models.League.rewards_distributed == False
+    ).all()
+
+    for league in leagues_to_process:
+        print(f"Distribution des récompenses pour la ligue {league.name} ({league.id})...")
+
+        # 2. Récupérer les membres et leurs scores
+        members_stats = get_league_members_with_stats(db, league.id)
+
+        # 3. Trier par score décroissant (missions_completed)
+        # En cas d'égalité, on peut départager par date de jointure ou laisser ex-aequo.
+        # Ici : tri simple.
+        sorted_members = sorted(members_stats, key=lambda x: x['missions_completed'], reverse=True)
+
+        # 4. Attribuer les points selon le rang
+        for index, member_data in enumerate(sorted_members):
+            rank = index + 1
+            user_id = member_data['user_id']
+            xp_bonus = 0
+
+            if rank == 1:
+                xp_bonus = 75
+            elif rank == 2:
+                xp_bonus = 50
+            elif rank == 3:
+                xp_bonus = 30
+            else:
+                xp_bonus = 20 # Pour le reste
+
+            # Donner l'XP
+            if xp_bonus > 0:
+                add_user_xp(db, user_id, xp_bonus)
+                print(f"  - User {member_data['username']} (Rang {rank}) : +{xp_bonus} XP")
+
+        # 5. Marquer la ligue comme traitée
+        league.rewards_distributed = True
+        db.commit()

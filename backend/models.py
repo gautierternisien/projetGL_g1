@@ -13,11 +13,15 @@ class User(Base):
     hashed_password = Column(String)
     is_active = Column(Boolean, default=True)
     profile_image = Column(String, nullable=True)
+    xp = Column(Integer, default=0)
 
     answers = relationship("UserAnswer", back_populates="user")
     mission_statuses = relationship("UserMissionStatus", back_populates="user")
     ngc_stat = relationship("UserNgcStat", back_populates="user", uselist=False)
     ngc_progress = relationship("UserNgcProgress", back_populates="user", uselist=False)
+    ngc_answers = relationship("UserNgcAnswers", back_populates="user", uselist=False)
+    preferences = relationship("UserPreference", back_populates="user", uselist=False)
+    category_rewards = relationship("UserQuestionnaireReward", back_populates="user")
     trophies = relationship("UserTrophy", back_populates="user")
     logins = relationship("UserLogin", back_populates="user")
 
@@ -59,9 +63,32 @@ class Mission(Base):
     title = Column(String)
     description = Column(String)
     category_name = Column(String, ForeignKey("categories.name"))
+    mission_type = Column(String, default="one_shot")
+
+    conditions = Column(JSON, nullable=True, default=list)
 
     category = relationship("Category", back_populates="missions")
     user_statuses = relationship("UserMissionStatus", back_populates="mission")
+
+class UserPreference(Base):
+    """
+    Stocke le profil utilisateur déduit du questionnaire et validé par l'utilisateur.
+    Utilise un champ JSON pour de la flexibilité (ex: {"has_car": true, "diet": "omnivore"})
+    """
+    __tablename__ = "user_preferences"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, index=True, nullable=False)
+
+    # On stocke les préférences sous forme de dictionnaire JSON.
+    # Si True, l'utilisateur est d'accord pour recevoir ces missions.
+    # Ex: {"voiture": True, "velo": False, "viande": True}
+    data = Column(JSON, default=dict)
+
+    # Flag pour savoir si l'utilisateur a validé l'écran d'onboarding des missions
+    has_completed_onboarding = Column(Boolean, default=False)
+
+    user = relationship("User", back_populates="preferences")
 
 class UserAnswer(Base):
     __tablename__ = "user_answers"
@@ -106,6 +133,18 @@ class UserNgcProgress(Base):
 
     user = relationship("User", back_populates="ngc_progress")
 
+
+class UserNgcAnswers(Base):
+    __tablename__ = "user_ngc_answers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, index=True, nullable=False)
+    data = Column(String)  # Stored as JSON string
+    updated_at = Column(String, nullable=True)
+
+    user = relationship("User", back_populates="ngc_answers")
+
+
 class UserMissionStatus(Base):
     __tablename__ = "user_mission_statuses"
 
@@ -119,6 +158,14 @@ class UserMissionStatus(Base):
 
     completed_at = Column(DateTime, nullable=True)
 
+class UserQuestionnaireReward(Base):
+    __tablename__ = "user_questionnaire_rewards"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    category_name = Column(String) # ex: "transport", "logement"
+
+    user = relationship("User", back_populates="category_rewards")
 
 class FriendLink(Base):
     __tablename__ = "friend_links"
@@ -160,6 +207,7 @@ class League(Base):
     end_date = Column(String)
     is_archived = Column(Boolean, default=False)
     created_at = Column(DateTime)
+    rewards_distributed = Column(Boolean, default=False)
 
     members = relationship("LeagueMember", back_populates="league")
     invites = relationship("LeagueInvite", back_populates="league")

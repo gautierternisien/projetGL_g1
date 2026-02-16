@@ -9,6 +9,7 @@ from routes import router
 
 import crud, models, schemas, utils
 from database import SessionLocal, engine
+import json
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -71,22 +72,271 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 NGC_DEFAULT_SCORE = 8559
 
 # --- SIMULATION DES MISSIONS (On garde ça pour l'instant) ---
+# --- SIMULATION DES MISSIONS ---
+# Les conditions correspondent aux clés de UserPreference.data (déduites du questionnaire)
 MISSIONS_DB = {
     "transport": [
-        { "id": 1, "title": 'Prendre le vélo', "description": 'Remplacez un trajet voiture par vélo', "status": 'en_cours' },
-        { "id": 2, "title": 'Privilégier les transports en commun', "description": 'Utilisez le bus ou le tram pour au moins un trajet cette semaine', "status": 'new' },
+        # Missions Ciblées
+        {
+            "id": 100,
+            "title": 'Vélotaf',
+            "description": 'Remplacez un trajet voiture par le vélo pour aller au travail ou faire une course.',
+            "conditions": ["possession_voiture", "possession_velo"],
+            "mission_type": "one_shot"
+        },
+        {
+            "id": 101,
+            "title": 'Pression des pneus',
+            "description": 'Vérifiez la pression de vos pneus. Des pneus sous-gonflés augmentent la consommation de carburant de 5% !',
+            "conditions": ["possession_voiture"],
+            "mission_type": "one_shot"
+        },
+        {
+            "id": 102,
+            "title": 'Covoiturage malin',
+            "description": 'Proposez ou cherchez un covoiturage pour votre prochain trajet moyen/longue distance.',
+            "conditions": ["possession_voiture"],
+            "mission_type": "one_shot"
+        },
+        {
+            "id": 103,
+            "title": 'Vacances sur rails',
+            "description": 'Planifiez vos prochaines vacances en train plutôt qu\'en avion.',
+            "conditions": ["prend_avion"],
+            "mission_type": "one_shot"
+        },
+        {
+            "id": 105,
+            "title": 'Transport en commun',
+            "description": 'Utilisez les transports en commun au moins 3 jours cette semaine.',
+            "conditions": ["possession_voiture"],
+            "mission_type": "long_term"
+        },
+        # Missions Génériques
+        {
+            "id": 104,
+            "title": 'Journée sans voiture',
+            "description": 'Utilisez les transports en commun, la marche ou le vélo pour tous vos déplacements aujourd\'hui.',
+            "conditions": [],
+            "mission_type": "one_shot"
+        }
     ],
     "logement": [
-        { "id": 101, "title": 'Isolation fenêtre', "description": 'Vérifier les joints des fenêtres', "status": 'new' },
-        { "id": 3, "title": 'Baisser le chauffage', "description": 'Réduire la température de 1°C pendant une semaine', "status": 'en_cours' },
+        # Missions Ciblées
+        {
+            "id": 200,
+            "title": 'Chasse aux fuites',
+            "description": 'Vérifiez les joints des fenêtres et portes. Une mauvaise isolation, c\'est chauffer le jardin !',
+            "conditions": ["passoire_thermique"],
+            "mission_type": "one_shot"
+        },
+        {
+            "id": 201,
+            "title": 'Thermostat intelligent',
+            "description": 'Installez un thermostat programmable pour ne pas chauffer quand vous n\'êtes pas là.',
+            "conditions": ["est_proprietaire"],
+            "mission_type": "one_shot"
+        },
+        {
+            "id": 202,
+            "title": 'Récupérateur d\'eau',
+            "description": 'Installez un système simple pour récupérer l\'eau de pluie pour arroser vos plantes.',
+            "conditions": ["vit_en_maison"],
+            "mission_type": "one_shot"
+        },
+        # Missions Génériques
+        {
+            "id": 203,
+            "title": 'Pull over chauffage',
+            "description": 'Réduisez la température de 1°C pendant 1 semaine (ex: 19°C au lieu de 20°C). C\'est -7% sur la facture !',
+            "conditions": [],
+            "mission_type": "long_term"
+        },
+        {
+            "id": 204,
+            "title": 'Douche express',
+            "description": 'Essayez de limiter votre douche à 5 minutes pendant une semaine (le temps d\'une chanson).',
+            "conditions": [],
+            "mission_type": "long_term"
+        },
+        {
+            "id": 205,
+            "title": 'Multiprise à interrupteur',
+            "description": 'Éteignez complètement vos appareils en veille (TV, Ordi) la nuit.',
+            "conditions": [],
+            "mission_type": "one_shot"
+        },
+        {
+            "id": 206,
+            "title": 'Lavage efficace',
+            "description": 'Laver le linge à 30°C pendant 5 lessives.',
+            "conditions": [],
+            "mission_type": "long_term"
+        },
+        {
+            "id": 207,
+            "title": 'Séchage à l\'air',
+            "description": 'Sécher le linge à l\'air libre.',
+            "conditions": [],
+            "mission_type": "one_shot"
+        }
+
     ],
     "alimentation": [
-        { "id": 4, "title": 'Recette végétarienne', "description": 'Essayez une recette végétarienne', "status": 'new' },
-        { "id": 5, "title": 'Acheter local', "description": 'Acheter au moins un produit local et de saison', "status": 'termine' },
+        # Missions Ciblées
+        {
+            "id": 300,
+            "title": 'Journée Verte',
+            "description": 'Remplacez la viande rouge par des légumineuses pour vos repas d\'aujourd\'hui.',
+            "conditions": ["viande_rouge_importante"],
+            "mission_type": "one_shot"
+        },
+        {
+            "id": 301,
+            "title": 'Acheter local',
+            "description": 'Achetez vos fruits et légumes au marché ou chez un producteur local cette semaine.',
+            "conditions": ["conso_pas_locaux"],
+            "mission_type": "long_term"
+        },
+        {
+            "id": 302,
+            "title": 'Calendrier de saison',
+            "description": 'Vérifiez si les produits de votre panier sont de saison. Pas de tomates en hiver !',
+            "conditions": ["conso_pas_saison"],
+            "mission_type": "one_shot"
+        },
+        {
+            "id": 303,
+            "title": 'Gourde attitude',
+            "description": 'Adoptez une gourde et bannissez les bouteilles en plastique pendant une semaine.',
+            "conditions": ["eau_bouteille"],
+            "mission_type": "long_term"
+        },
+        {
+            "id": 304,
+            "title": 'Pause café zéro déchet',
+            "description": 'Amenez votre propre tasse au travail pour éviter les gobelets jetables.',
+            "conditions": ["boissons_chaudes", "dechets_importants"],
+            "mission_type": "one_shot"
+        },
+        {
+            "id": 305,
+            "title": 'Semaine sans soda',
+            "description": 'Remplacez les sodas par de l\'eau ou des tisanes maison.',
+            "conditions": ["soda"],
+            "mission_type": "long_term"
+        },
+        {
+            "id": 309,
+            "title": 'Semaine sans déchet alimentaire',
+            "description": 'Éviter le gaspillage alimentaire pendant une semaine.',
+            "conditions": ["dechets_importants"],
+            "mission_type": "long_term"
+        },
+        # Missions Génériques
+        {
+            "id": 306,
+            "title": 'Cuisine des restes',
+            "description": 'Faites un repas "touski" (tout ce qu\'il reste) pour éviter le gaspillage.',
+            "conditions": [],
+            "mission_type": "one_shot"
+        },
+        {
+            "id": 307,
+            "title": 'Semaine végétarienne',
+            "description": 'Faire 3 jours végétarien cette semaine.',
+            "conditions": [],
+            "mission_type": "long_term"
+        },
+        {
+            "id": 308,
+            "title": 'Aujourd\'hui en vrac',
+            "description": 'Acheter 5 produits différents en vrac.',
+            "conditions": [],
+            "mission_type": "one_shot"
+        }
     ],
     "divers": [
-        { "id": 14, "title": 'Acheter d’occasion', "description": 'Acheter un article d’occasion cette semaine', "status": 'en_cours' },
-        { "id": 15, "title": 'Attendre avant achat', "description": 'Attendre 48h avant un achat non essentiel', "status": 'new' },
+        # Missions Ciblées
+        {
+            "id": 400,
+            "title": 'Règle des 48h',
+            "description": 'Vous avez envie d\'acheter ce vêtement neuf ? Attendez 48h pour voir si l\'envie passe.',
+            "conditions": ["shopping_important"],
+            "mission_type": "one_shot"
+        },
+        {
+            "id": 401,
+            "title": 'Cendrier de poche',
+            "description": 'Si vous fumez à l\'extérieur, ne jetez aucun mégot par terre cette semaine.',
+            "conditions": ["fumeur"],
+            "mission_type": "long_term"
+        },
+        {
+            "id": 402,
+            "title": 'Compostage',
+            "description": 'Installez un bac à compost dans votre jardin pour vos épluchures.',
+            "conditions": ["vit_en_maison", "dechets_importants"],
+            "mission_type": "one_shot"
+        },
+        # Missions Génériques
+        {
+            "id": 403,
+            "title": 'Seconde main',
+            "description": 'Pour votre prochain achat (livre, vêtement, déco), regardez l\'achat d\'occasion.',
+            "conditions": [],
+            "mission_type": "one_shot"
+        },
+        {
+            "id": 404,
+            "title": 'Réparer avant de jeter',
+            "description": 'Recousez un bouton ou collez cet objet cassé au lieu de le remplacer.',
+            "conditions": [],
+            "mission_type": "one_shot"
+        },
+        {
+            "id": 405,
+            "title": 'Ménage au naturel',
+            "description": 'Fabriquez un produit ménager maison (vinaigre blanc + eau) pour remplacer un produit chimique.',
+            "conditions": [],
+            "mission_type": "one_shot"
+        },
+        {
+            "id": 406,
+            "title": 'Nettoyage numérique',
+            "description": 'Supprimer 100 mails inutiles.',
+            "conditions": [],
+            "mission_type": "one_shot"
+        },
+        {
+            "id": 407,
+            "title": 'Désabonnement',
+            "description": 'Se désabonner de 5 listes de distribution non lues.',
+            "conditions": [],
+            "mission_type": "one_shot"
+        },
+        {
+            "id": 408,
+            "title": 'Veille nocturne',
+            "description": 'Éteindre votre box internet pendant la nuit.',
+            "conditions": [],
+            "mission_type": "one_shot"
+        },
+        {
+            "id": 409,
+            "title": 'Stop Sac Plastique',
+            "description": 'Ne pas utiliser de sacs plastiques jetable pendant 1 semaine.',
+            "conditions": [],
+            "mission_type": "long_term"
+        },
+        {
+            "id": 410,
+            "title": 'Seconde vie',
+            "description": 'Revendre ou donner 1 objet inutilisé.',
+            "conditions": [],
+            "mission_type": "one_shot"
+        }
+
     ],
 }
 
@@ -105,7 +355,7 @@ def init_db_from_static_data(db: Session):
 
         for m_data in missions:
             crud.create_mission(db, m_data, category_name)
-    
+
     # Initialiser les trophées
     init_trophies(db)
 
@@ -186,7 +436,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
 
     # Enregistrer la connexion
     crud.record_user_login(db, user.id)
-    
+
     # Mettre à jour les progrès des trophées
     crud.update_trophy_progress(db, user.id)
 
@@ -352,29 +602,61 @@ async def root():
 async def get_missions_by_category(category: str, user_id: Optional[int] = None, db: Session = Depends(get_db)):
     """
     Récupère les missions d'une catégorie spécifique.
+    Filtre les missions en fonction des préférences de l'utilisateur s'il est connecté.
     """
+    # 1. On récupère toutes les missions de la BDD pour cette catégorie
+    all_missions_db = db.query(models.Mission).filter(models.Mission.category_name == category).all()
+
+    # 2. S'il n'y en a pas en BDD, on utilise le fallback statique (MISSIONS_DB)
+    if not all_missions_db and category in MISSIONS_DB:
+        all_missions_db = [models.Mission(**m) for m in MISSIONS_DB[category]]
+
+    if not all_missions_db:
+        raise HTTPException(status_code=404, detail="Catégorie de missions non trouvée")
+
+    # 3. Filtrage basé sur les préférences de l'utilisateur
+    filtered_missions = []
+
     if user_id:
-        return crud.get_missions_by_category(db, category, user_id)
+        # On récupère les préférences de l'utilisateur
+        user_prefs = crud.get_user_preferences(db, user_id)
+        pref_data = user_prefs.data if user_prefs and user_prefs.data else {}
+
+        for mission in all_missions_db:
+            # On vérifie les conditions
+            conditions = mission.conditions or []
+
+            # Si aucune condition, la mission est pour tout le monde
+            is_eligible = True
+
+            # Si des conditions existent, l'utilisateur doit remplir TOUTES les conditions
+            # ex: conditions = ["voiture"], pref_data doit contenir {"voiture": True}
+            for cond in conditions:
+                if not pref_data.get(cond, False): # Si la clé n'existe pas ou est False
+                    is_eligible = False
+                    break
+
+            if is_eligible:
+                filtered_missions.append(mission)
     else:
-        # anonymous view -> default status
-        missions = db.query(models.Mission).filter(models.Mission.category_name == category).all()
-        result = []
-        for m in missions:
-            m_data = schemas.Mission.model_validate(m)
+        # Si pas connecté, on montre tout
+        filtered_missions = all_missions_db
+
+    # 4. Formatage et ajout des statuts
+    result = []
+    for m in filtered_missions:
+        m_data = schemas.Mission.model_validate(m)
+
+        if user_id:
+            # On récupère le statut spécifique de cet utilisateur
+            status_entry = crud.get_user_mission_status(db, user_id, m.id)
+            m_data.status = status_entry.status if status_entry else "new"
+        else:
             m_data.status = "new"
-            result.append(m_data)
 
-        # Fallback si la DB est vide mais que la variable statique existe
-        if not result and category in MISSIONS_DB:
-            for m in MISSIONS_DB[category]:
-                m_obj = schemas.Mission(**m)
-                m_obj.status = "new"
-                result.append(m_obj)
+        result.append(m_data)
 
-        if not result:
-            raise HTTPException(status_code=404, detail="Catégorie de missions non trouvée")
-
-        return result
+    return result
 
 @app.put("/missions/{mission_id}", tags=["Missions"], summary="Update mission status")
 async def update_mission(mission_id: int, payload: schemas.MissionUpdate, db: Session = Depends(get_db)):
@@ -400,7 +682,7 @@ async def update_mission(mission_id: int, payload: schemas.MissionUpdate, db: Se
 
     if payload.user_id:
         crud.update_user_mission_status(db, payload.user_id, mission_id, payload.status)
-        
+
         # Mettre à jour les progrès des trophées à chaque changement de statut
         # (important si une mission passe de "termine" à "en_cours")
         crud.update_trophy_progress(db, payload.user_id)
@@ -433,21 +715,22 @@ def read_user_profile(user_id: int, db: Session = Depends(get_db), current_user:
     if not user: raise HTTPException(status_code=404, detail="User not found")
 
     mission_count = crud.get_completed_missions_count(db, user_id=user_id)
-    
+
+    real_xp = user.xp
+    real_level = 1 + (real_xp // 100)
+
     # Count obtained trophies
     user_trophies = crud.get_user_trophies(db, user_id=user_id)
     trophy_count = sum(1 for ut in user_trophies if ut.is_obtained)
-    
-    level = 5
-    xp = 60
+
 
     return schemas.FriendProfile(
         id=user.id,
         username=user.username,
         mission_count=mission_count,
         trophy_count=trophy_count,
-        level=level,
-        xp=xp,
+        level=real_level,
+        xp=real_xp,
         profile_image=user.profile_image
     )
 
@@ -465,10 +748,10 @@ async def get_all_trophies_with_progress(
     """Get all trophies with progress for current user"""
     all_trophies = crud.get_all_trophies(db)
     user_trophies = crud.get_user_trophies(db, current_user.id)
-    
+
     # Create a dict for quick lookup
     user_trophy_dict = {ut.trophy_id: ut for ut in user_trophies}
-    
+
     result = []
     for trophy in all_trophies:
         user_trophy = user_trophy_dict.get(trophy.id)
@@ -486,7 +769,7 @@ async def get_all_trophies_with_progress(
             "obtained_at": user_trophy.obtained_at if user_trophy else None,
             "milestones": get_trophy_milestones(trophy)
         })
-    
+
     return result
 
 @app.get("/trophies/obtained", tags=["Trophies"], summary="Get obtained or partially obtained trophies for current user")
@@ -497,22 +780,22 @@ async def get_obtained_trophies(
     """Get trophies with progress (obtained or partially obtained) for current user"""
     all_trophies = crud.get_all_trophies(db)
     user_trophies_map = {ut.trophy_id: ut for ut in crud.get_user_trophies(db, current_user.id)}
-    
+
     trophies_list = []
     summary = {"Bronze": 0, "Argent": 0, "Or": 0, "Trophée": 0}
 
     for trophy in all_trophies:
         user_trophy = user_trophies_map.get(trophy.id)
-        
+
         # On ne s'intéresse qu'aux trophées où il y a une progression
         if not user_trophy or user_trophy.progress == 0:
             continue
 
         milestones = get_trophy_milestones(trophy)
-        
+
         # Vérifier si le trophée final est obtenu
         is_final_trophy_obtained = user_trophy.progress >= trophy.requirement_value
-        
+
         # Trouver la dernière médaille/trophée obtenu (la plus haute)
         last_milestone_obtained = None
         if is_final_trophy_obtained:
@@ -533,16 +816,16 @@ async def get_obtained_trophies(
         if last_milestone_obtained:
             if last_milestone_obtained['label'] in summary:
                 summary[last_milestone_obtained['label']] += 1
-            
+
             # Gérer la sérialisation des dates (peut être datetime ou string selon le modèle)
             obtained_at_str = None
             if user_trophy.obtained_at:
                 obtained_at_str = user_trophy.obtained_at if isinstance(user_trophy.obtained_at, str) else user_trophy.obtained_at.isoformat()
-            
+
             last_milestone_date_str = None
             if user_trophy.last_milestone_date:
                 last_milestone_date_str = user_trophy.last_milestone_date if isinstance(user_trophy.last_milestone_date, str) else user_trophy.last_milestone_date.isoformat()
-            
+
             trophies_list.append({
                 "id": trophy.id,
                 "name": trophy.name,
@@ -558,7 +841,7 @@ async def get_obtained_trophies(
                 "last_milestone_date": last_milestone_date_str,
                 "milestones": milestones
             })
-    
+
     return {"trophies": trophies_list, "summary": summary}
 
 @app.get("/trophies/in-progress", tags=["Trophies"], summary="Get in-progress trophies for current user")
@@ -569,16 +852,16 @@ async def get_in_progress_trophies(
     """Get only in-progress trophies for current user"""
     all_trophies = crud.get_all_trophies(db)
     user_trophies = crud.get_user_trophies(db, current_user.id)
-    
+
     user_trophy_dict = {ut.trophy_id: ut for ut in user_trophies}
-    
+
     result = []
     for trophy in all_trophies:
         user_trophy = user_trophy_dict.get(trophy.id)
         if not user_trophy or not user_trophy.is_obtained:
             progress = user_trophy.progress if user_trophy else 0
             milestones = get_trophy_milestones(trophy)
-            
+
             # Les descriptions sont maintenant générées côté frontend
             result.append({
                 "id": trophy.id,
@@ -592,32 +875,95 @@ async def get_in_progress_trophies(
                 "progress": progress,
                 "milestones": milestones
             })
-    
+
     return result
+
+# --- ROUTES PREFERENCES MISSIONS ---
+
+@app.get("/users/me/preferences", response_model=schemas.UserPreferenceResponse, tags=["Users"], summary="Get user mission preferences")
+def read_user_preferences(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Récupère les préférences de missions de l'utilisateur.
+    """
+    prefs = crud.get_user_preferences(db, current_user.id)
+    # On mock l'ID si c'est un objet par défaut généré par le CRUD
+    return schemas.UserPreferenceResponse(
+        id=prefs.id or 0,
+        user_id=current_user.id,
+        data=prefs.data,
+        has_completed_onboarding=prefs.has_completed_onboarding
+    )
+
+@app.put("/users/me/preferences", response_model=schemas.UserPreferenceResponse, tags=["Users"], summary="Update user mission preferences")
+def update_user_preferences_route(payload: schemas.UserPreferenceCreate, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Met à jour les préférences de missions de l'utilisateur (validées lors de l'onboarding).
+    """
+    prefs = crud.update_user_preferences(db, current_user.id, payload)
+    return prefs
 
 # --- ROUTES STATISTIQUES NGC (Publicodes) ---
 
-@app.post("/ngc/stats/me", tags=["Statistics"], summary="Upsert current user NGC stats")
-async def upsert_my_ngc_stats(
-        payload: schemas.NgcStatsPayload,
-        current_user: models.User = Depends(get_current_user),
-        db: Session = Depends(get_db),
+@app.post("/ngc/stats/me", response_model=schemas.NgcStatsPayload)
+def update_user_ngc_stats(
+    payload: schemas.NgcStatsPayload,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
-    # C'est ici que le frontend envoie les calculs du moteur Publicodes
-    row = crud.upsert_user_ngc_stats(db, current_user.id, payload)
-    return {
-        "status": "saved",
-        "user_id": current_user.id,
-        "global_score": row.global_score,
-        "details_by_category": {
-            "transport": row.transport,
-            "logement": row.logement,
-            "alimentation": row.alimentation,
-            "divers": row.divers,
-            "services societaux": row.services_societaux,
+    stats = crud.upsert_user_ngc_stats(db, current_user.id, payload)
+
+    # Return what we just saved, but reconstructed as NgcStatsPayload
+    # (or simply return the input payload if everything went well)
+    result = schemas.NgcStatsPayload(
+        global_score=stats.global_score,
+        details_by_category={
+            'transport': stats.transport,
+            'logement': stats.logement,
+            'alimentation': stats.alimentation,
+            'divers': stats.divers,
+            'services societaux': stats.services_societaux
         },
-        "updated_at": row.updated_at,
-    }
+        category_progress={} # Not persisting progress map in details response for now
+    )
+    return result
+
+
+@app.get("/ngc/answers/me", response_model=schemas.UserNgcAnswersResponse)
+def get_ngc_answers_me(
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Récupère les réponses brutes (JSON) du questionnaire pour l'utilisateur connecté.
+    """
+    record = crud.get_user_ngc_answers(db, current_user.id)
+    if not record:
+        return schemas.UserNgcAnswersResponse(data={})
+
+    try:
+        data = json.loads(record.data) if record.data else {}
+    except:
+        data = {}
+
+    return schemas.UserNgcAnswersResponse(data=data, updated_at=record.updated_at)
+
+
+@app.post("/ngc/answers/me", response_model=schemas.UserNgcAnswersResponse)
+def update_ngc_answers_me(
+    payload: schemas.UserNgcAnswersCreate,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Enregistre les réponses brutes (JSON) du questionnaire.
+    """
+    data_str = json.dumps(payload.data)
+    record = crud.update_user_ngc_answers(db, current_user.id, data_str)
+
+    return schemas.UserNgcAnswersResponse(
+        data=payload.data,
+        updated_at=record.updated_at
+    )
 
 @app.get("/carbon-score/{user_id}", tags=["Statistics"], summary="Get user stored carbon score")
 async def get_carbon_score(user_id: int, db: Session = Depends(get_db)):
@@ -720,10 +1066,12 @@ async def create_league_route(league: schemas.LeagueCreate, current_user: models
 
 @app.get("/leagues/active", response_model=List[schemas.League], tags=["Leagues"])
 def get_active_leagues(current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    crud.process_league_rewards(db)
     return crud.get_active_leagues_for_user(db, current_user.id)
 
 @app.get("/leagues/archived", response_model=List[schemas.League], tags=["Leagues"])
 def get_archived_leagues(current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    crud.process_league_rewards(db)
     return crud.get_archived_leagues_for_user(db, current_user.id)
 
 @app.get("/leagues/invites", response_model=List[schemas.LeagueInvite], tags=["Leagues"])
@@ -741,12 +1089,15 @@ def get_league_invites_route(league_id: int, current_user: schemas.User = Depend
 
 @app.get("/leagues/{league_id}", response_model=schemas.LeagueDetail, tags=["Leagues"])
 def get_league_detail(league_id: int, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    crud.process_league_rewards(db)
     league = crud.get_league(db, league_id)
     if not league: raise HTTPException(status_code=404, detail="League not found")
     if not any(m.user_id == current_user.id for m in league.members): raise HTTPException(status_code=403, detail="Not a member")
     members_stats = crud.get_league_members_with_stats(db, league_id)
     league_base = schemas.League.model_validate(league)
-    return schemas.LeagueDetail(**league_base.model_dump(), members=[schemas.LeagueMember(**m) for m in members_stats], members_count=len(members_stats))
+    league_data = league_base.model_dump()
+    league_data['members_count'] = len(members_stats)
+    return schemas.LeagueDetail(**league_data, members=[schemas.LeagueMember(**m) for m in members_stats])
 
 @app.post("/leagues/{league_id}/invite/{user_id}", response_model=schemas.LeagueInvite, tags=["Leagues"])
 def invite_user(league_id: int, user_id: int, current_user: schemas.User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -786,3 +1137,12 @@ def update_profile_image(profile_image: str, current_user: schemas.User = Depend
     db.commit()
     db.refresh(user)
     return user
+
+@app.post("/ngc/category/{category}/complete", tags=["Statistics"], summary="Mark category as completed and award XP")
+def complete_category_route(category: str, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Appelé par le frontend quand le questionnaire d'une catégorie est fini.
+    Donne 50 XP si c'est la première fois.
+    """
+    crud.award_category_completion_xp(db, current_user.id, category)
+    return {"status": "completed", "category": category}

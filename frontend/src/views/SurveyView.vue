@@ -6,37 +6,53 @@ import { useProgressStore } from '@/stores/progress'
 import { useAuthStore } from '@/stores/auth'
 import { onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { fetchRemoteAnswers } from '@/lib/ngc/answersStorage'
+import { computeCategoryProgressFromAnswers } from '@/utils/ngcProgress'
 
 const store = useProgressStore()
 const authStore = useAuthStore()
 const router = useRouter()
 const isConnected = computed(() => authStore.isConnected)
 
-function syncProgressFromLocalStorage() {
-  store.syncFromLocalAnswers()
+async function syncProgress() {
+  if (!isConnected.value || !authStore.token) {
+    // Si invité, on nettoie ou on laisse à 0
+    // Mais comme on a désactivé le local storage, c'est 0.
+    return
+  }
+
+  try {
+    const remote = await fetchRemoteAnswers(authStore.token)
+    if (remote) {
+      const progress = computeCategoryProgressFromAnswers(remote)
+      store.setScore('transport', progress.transport)
+      store.setScore('logement', progress.logement)
+      store.setScore('alimentation', progress.alimentation)
+      store.setScore('divers', progress.divers)
+    }
+  } catch (e) {
+    console.error('Erreur syncProgress', e)
+  }
 }
 
 onMounted(async () => {
   // ton comportement actuel
   if (isConnected.value) {
     if (!authStore.user) await authStore.fetchUser()
-    if (authStore.user) await store.fetchAllProgress(authStore.user.id)
   }
 
-  // + sync local progress NGC (si tu passes par localStorage)
-  syncProgressFromLocalStorage()
-  window.addEventListener('focus', syncProgressFromLocalStorage)
+  await syncProgress()
+  window.addEventListener('focus', syncProgress)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('focus', syncProgressFromLocalStorage)
+  window.removeEventListener('focus', syncProgress)
 })
 
 watch(
   () => authStore.user,
-  async (newUser) => {
-    if (newUser) await store.fetchAllProgress(newUser.id)
-    syncProgressFromLocalStorage()
+  async () => {
+    await syncProgress()
   },
 )
 
@@ -123,4 +139,3 @@ function handleCardClick(e: Event) {
   font-size: 2.5rem;
 }
 </style>
-

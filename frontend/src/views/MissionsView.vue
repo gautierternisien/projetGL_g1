@@ -5,12 +5,145 @@ import ProgressBar from '@/components/ProgressBar.vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { computed, ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { useProgressStore } from '@/stores/progress'
+import {
+  derivePreferencesFromAnswers,
+  PREFERENCE_LABELS,
+  type DerivedPreferences,
+} from '@/utils/profileMapping'
+import { loadAnswers } from '@/lib/ngc/answersStorage.ts'
 
 const API_URL = 'http://localhost:8000'
 const authStore = useAuthStore()
+const progressStore = useProgressStore()
 const router = useRouter()
+
 const isConnected = computed(() => authStore.isConnected)
 const user = computed(() => authStore.user)
+
+// --- GESTION DES PREFERENCES / ONBOARDING ---
+const showOnboardingModal = ref(false)
+const userPreferences = ref<Partial<DerivedPreferences>>({})
+const isSubmittingPrefs = ref(false)
+
+async function fetchPreferencesAndOpenModal(forceOpen = false) {
+  if (!isConnected.value || !user.value) return
+
+  try {
+    const res = await fetch(`${API_URL}/users/me/preferences`, {
+      headers: { Authorization: `Bearer ${authStore.token}` },
+    })
+
+    if (res.ok) {
+      const prefsData = await res.json()
+
+      // Si on force l'ouverture (clic bouton) OU si jamais fait (onboarding)
+      if (forceOpen || !prefsData.has_completed_onboarding) {
+        // Si les données existent en base, on les prend
+        if (Object.keys(prefsData.data || {}).length > 0) {
+          userPreferences.value = prefsData.data
+          showOnboardingModal.value = true
+        } else {
+          // Sinon on déduit du questionnaire
+          launchOnboarding()
+        }
+      } else {
+        loadCategoryCounts()
+      }
+    }
+  } catch (e) {
+    console.error('Erreur check preferences', e)
+  }
+}
+
+// Lance le calcul automatique et ouvre la modale
+async function launchOnboarding() {
+  try {
+    // On tente d'abord de récupérer depuis la BDD
+    const res = await fetch(`${API_URL}/ngc/answers/me`, {
+      headers: { Authorization: `Bearer ${authStore.token}` },
+    })
+
+    let answers = {}
+
+    if (res.ok) {
+      const json = await res.json()
+      answers = json.data || {}
+    } else {
+      // Fallback sur le local si l'API échoue (ex: pas de réseau)
+      answers = loadAnswers() || {}
+    }
+
+    const suggestions = derivePreferencesFromAnswers(answers)
+    userPreferences.value = suggestions
+    showOnboardingModal.value = true
+  } catch (e) {
+    console.error('Erreur onboarding', e)
+    // Fallback ultime
+    const suggestions = derivePreferencesFromAnswers(loadAnswers() || {})
+    userPreferences.value = suggestions
+    showOnboardingModal.value = true
+  }
+}
+
+// Sauvegarde les préférences validées par l'utilisateur
+async function savePreferences() {
+  isSubmittingPrefs.value = true
+  try {
+    const payload = {
+      data: userPreferences.value,
+      has_completed_onboarding: true,
+    }
+
+    const res = await fetch(`${API_URL}/users/me/preferences`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authStore.token}`,
+      },
+      body: JSON.stringify(payload),
+    })
+
+    if (res.ok) {
+      showOnboardingModal.value = false
+      // On charge les missions maintenant qu'on a le profil
+      loadCategoryCounts()
+    }
+  } catch (e) {
+    console.error('Erreur sauvegarde prefs', e)
+  } finally {
+    isSubmittingPrefs.value = false
+  }
+}
+
+function openSettings() {
+  fetchPreferencesAndOpenModal(true)
+}
+
+async function resetToQuestionnaire() {
+  if (!isConnected.value) return
+
+  try {
+    // 1. On récupère les réponses brutes sauvegardées en BDD
+    const res = await fetch(`${API_URL}/ngc/answers/me`, {
+      headers: { Authorization: `Bearer ${authStore.token}` },
+    })
+
+    if (res.ok) {
+      const json = await res.json()
+      // L'API renvoie { data: { ... }, updated_at: ... }
+      const dbAnswers = json.data || {}
+
+      // 2. On recalcule les préférences avec ces données
+      const suggestions = derivePreferencesFromAnswers(dbAnswers)
+
+      // 3. On met à jour la modale
+      userPreferences.value = suggestions
+    }
+  } catch (e) {
+    console.error('Erreur lors de la récupération du questionnaire', e)
+  }
+}
 
 const countsByCategory = ref<
   Record<string, { completed: number; total: number; inProgress: number }>
@@ -68,7 +201,7 @@ async function loadCategoryCounts() {
 
 onMounted(() => {
   if (user.value) {
-    loadCategoryCounts()
+    fetchPreferencesAndOpenModal(false)
   }
 })
 
@@ -76,7 +209,7 @@ onMounted(() => {
 import { watch } from 'vue'
 watch(user, (newUser) => {
   if (newUser) {
-    loadCategoryCounts()
+    fetchPreferencesAndOpenModal(false)
   }
 })
 
@@ -141,6 +274,35 @@ function handleCardClick(e: Event) {
           </Card>
         </RouterLink>
       </div>
+
+      <div v-if="isConnected" class="settings-container">
+        <button class="settings-btn-static" @click="openSettings">⚙️ Gérer mes préférences</button>
+      </div>
+    </div>
+
+    <div v-if="showOnboardingModal" class="blur-overlay">
+      <div class="onboarding-card">
+        <h2>🎯 Personnalisons vos missions</h2>
+        <p class="intro-text">Activez ou désactivez les thématiques selon votre profil :</p>
+
+        <button class="reset-link" @click="resetToQuestionnaire">
+          🔄 Réinitialiser selon mon questionnaire
+        </button>
+
+        <div class="prefs-scroll">
+          <div v-for="(label, key) in PREFERENCE_LABELS" :key="key" class="pref-item">
+            <label class="switch-container">
+              <span>{{ label }}</span>
+              <input type="checkbox" v-model="userPreferences[key]" />
+              <span class="checkmark"></span>
+            </label>
+          </div>
+        </div>
+
+        <button class="save-btn" @click="savePreferences" :disabled="isSubmittingPrefs">
+          {{ isSubmittingPrefs ? '...' : 'Enregistrer' }}
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -204,5 +366,175 @@ function handleCardClick(e: Event) {
 .unstyled-link {
   text-decoration: none;
   color: inherit;
+}
+
+/* --- STYLE MODALE ONBOARDING --- */
+.blur-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(5px);
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.onboarding-card {
+  background: white;
+  width: 90%;
+  max-width: 400px;
+  max-height: 85vh;
+  border-radius: 20px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  animation: popIn 0.3s ease-out;
+}
+
+@keyframes popIn {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.onboarding-card h2 {
+  font-size: 1.3rem;
+  color: #2c3e50;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.intro-text {
+  font-size: 0.9rem;
+  color: #666;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.prefs-scroll {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 20px;
+  border-top: 1px solid #eee;
+  border-bottom: 1px solid #eee;
+  padding: 10px 0;
+}
+
+.pref-item {
+  padding: 10px 0;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+/* Switch Custom Style */
+.switch-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  font-size: 0.95rem;
+  color: #333;
+}
+
+.switch-container input {
+  display: none;
+}
+
+.checkmark {
+  width: 44px;
+  height: 24px;
+  background-color: #ddd;
+  border-radius: 24px;
+  position: relative;
+  transition: 0.2s;
+}
+
+.checkmark::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background-color: white;
+  border-radius: 50%;
+  transition: 0.2s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.switch-container input:checked + .checkmark {
+  background-color: #679436;
+}
+
+.switch-container input:checked + .checkmark::after {
+  transform: translateX(20px);
+}
+
+.save-btn {
+  background-color: #679436;
+  color: white;
+  border: none;
+  padding: 14px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.save-btn:disabled {
+  background-color: #ccc;
+}
+
+.settings-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+  padding-bottom: 30px; /* Un peu d'espace en bas pour ne pas coller au bord */
+}
+
+.settings-btn-static {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 20px;
+  background-color: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 20px; /* Forme de pilule */
+  color: #555;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.settings-btn-static:active {
+  background-color: #e0e0e0;
+  transform: scale(0.98);
+}
+
+.reset-link {
+  background: none;
+  border: none;
+  color: #679436;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 0.85rem;
+  margin-bottom: 15px;
+  align-self: center; /* Pour centrer le lien */
+}
+
+.reset-link:hover {
+  color: #4e7a25;
 }
 </style>

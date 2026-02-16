@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from datetime import datetime
 
 # --- USER ---
@@ -8,6 +8,7 @@ class UserBase(BaseModel):
     username: str
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+    xp:Optional[int] = 0
 
 class UserCreate(UserBase):
     password: str
@@ -16,6 +17,11 @@ class User(UserBase):
     id: int
     is_active: bool
     profile_image: Optional[str] = None
+    xp: int = 0
+
+    @property
+    def level(self) -> int:
+        return 1 + (self.xp // 100)
 
     class Config:
         from_attributes = True
@@ -89,6 +95,9 @@ class Question(QuestionBase):
 class MissionBase(BaseModel):
     title: str
     description: Optional[str] = None
+    category_name: str
+    conditions: Optional[List[str]] = []
+    mission_type: Optional[str] = "one_shot"
 
 class Mission(MissionBase):
     id: int
@@ -159,6 +168,27 @@ class LeagueInvite(BaseModel):
 class LeagueDetail(League):
     members: List[LeagueMember] = []
 
+class UserNgcAnswersCreate(BaseModel):
+    data: Dict[str, Any]
+
+class UserNgcAnswersResponse(UserNgcAnswersCreate):
+    updated_at: Optional[str] = None
+    class Config:
+        from_attributes = True
+
+class UserPreferenceBase(BaseModel):
+    data: Dict[str, bool]
+    has_completed_onboarding: bool
+
+class UserPreferenceCreate(UserPreferenceBase):
+    pass
+
+class UserPreferenceResponse(UserPreferenceBase):
+    id: int
+    user_id: int
+
+    class Config:
+        from_attributes = True
 # --- TROPHY ---
 class TrophyBase(BaseModel):
     name: str
@@ -185,6 +215,6 @@ class UserTrophy(UserTrophyBase):
     progress: int = 0
     is_obtained: bool = False
     trophy: Optional[Trophy] = None
-    
+
     class Config:
         from_attributes = True

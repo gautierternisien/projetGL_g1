@@ -1,0 +1,18 @@
+services:
+  backend:
+    build: ./backend
+    container_name: pgl_backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/sql_app.db:/code/sql_app.db
+    restart: always
+
+  frontend:
+    build: ./frontend
+    container_name: pgl_frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    restart: always
