@@ -11,19 +11,6 @@ const authStore = useAuthStore()
 const uiStore = useUiStore()
 const router = useRouter()
 const showLogoutConfirm = ref(false)
-const showEditMenu = ref(false)
-const editMenuRef = ref<HTMLElement | null>(null)
-const showEditModal = ref(false)
-const selectedFieldLabel = ref('')
-const selectedFieldKey = ref('')
-const oldFieldValue = ref('')
-const newFieldValue = ref('')
-const newFieldType = ref<'text' | 'email' | 'password'>('text')
-const currentPassword = ref('')
-const modalErrorMessage = ref('')
-const showProfileImageModal = ref(false)
-const allProfileImages = ref<string[]>([])
-const currentImageIndex = ref(0)
 const selectedProfileImage = ref<string | undefined>(undefined)
 
 const userLevel = computed(() => {
@@ -41,38 +28,12 @@ onMounted(async () => {
       selectedProfileImage.value = authStore.user.profile_image
     }
   }
-  // Charger toutes les images du dossier image_profil
-  try {
-    const imageNames = [
-      'plante1.png',
-      'plante2.png',
-      'plante3.png',
-      'plante4.png',
-      'plante5.png',
-      'plante6.png',
-    ]
-    allProfileImages.value = imageNames.map(
-      (name) => new URL(`../components/image_profil/${name}`, import.meta.url).href,
-    )
-    currentImageIndex.value = 0
-  } catch (e) {
-    console.error('Erreur lors du chargement des images:', e)
-  }
-  // Ajouter un écouteur pour fermer le menu au clic extérieur
-  document.addEventListener('click', handleClickOutside)
 })
 
 onUnmounted(() => {
   // Ensure blur is removed if we leave the page while popup is open
   uiStore.setNavigationBlur(false)
-  document.removeEventListener('click', handleClickOutside)
 })
-
-function handleClickOutside(event: MouseEvent) {
-  if (editMenuRef.value && !editMenuRef.value.contains(event.target as Node)) {
-    showEditMenu.value = false
-  }
-}
 
 function handleLogoutClick() {
   showLogoutConfirm.value = true
@@ -90,209 +51,8 @@ function cancelLogout() {
   uiStore.setNavigationBlur(false)
 }
 
-function openProfileImageModal() {
-  showProfileImageModal.value = true
-  uiStore.setNavigationBlur(true)
-}
-
-function closeProfileImageModal() {
-  showProfileImageModal.value = false
-  uiStore.setNavigationBlur(false)
-}
-
-function saveProfileImage() {
-  if (
-    allProfileImages.value.length > 0 &&
-    currentImageIndex.value < allProfileImages.value.length
-  ) {
-    const imageUrl = allProfileImages.value[currentImageIndex.value]
-    if (imageUrl) {
-      selectedProfileImage.value = imageUrl
-      // Sauvegarder l'image dans la base de données
-      authStore
-        .updateProfileImage(imageUrl)
-        .then(() => {
-          closeProfileImageModal()
-        })
-        .catch((e: unknown) => {
-          console.error("Erreur lors de la sauvegarde de l'image:", e)
-        })
-    }
-  }
-}
-
-function removeProfileImage() {
-  // Si pas d'image, fermer le modal comme si on avait annulé
-  if (!selectedProfileImage.value) {
-    closeProfileImageModal()
-    return
-  }
-
-  // Sinon, supprimer l'image
-  selectedProfileImage.value = undefined
-  authStore
-    .removeProfileImage()
-    .then(() => {
-      closeProfileImageModal()
-    })
-    .catch((e: unknown) => {
-      console.error("Erreur lors de la suppression de l'image:", e)
-    })
-}
-
-function nextImage() {
-  if (allProfileImages.value.length > 0) {
-    currentImageIndex.value = (currentImageIndex.value + 1) % allProfileImages.value.length
-  }
-}
-
-function previousImage() {
-  if (allProfileImages.value.length > 0) {
-    currentImageIndex.value =
-      (currentImageIndex.value - 1 + allProfileImages.value.length) % allProfileImages.value.length
-  }
-}
-
-function toggleEditMenu() {
-  showEditMenu.value = !showEditMenu.value
-}
-
-function handleEditOption(option: string) {
-  // Cas spécial pour l'image de profil
-  if (option === 'image') {
-    showEditMenu.value = false
-    openProfileImageModal()
-    return
-  }
-
-  const fieldMap: Record<
-    string,
-    { label: string; type: 'text' | 'email' | 'password'; old: string }
-  > = {
-    email: {
-      label: 'adresse mail',
-      type: 'email',
-      old: authStore.user?.email ?? '',
-    },
-    username: {
-      label: 'pseudo',
-      type: 'text',
-      old: authStore.user?.username ?? '',
-    },
-    firstname: {
-      label: 'prénom',
-      type: 'text',
-      old: authStore.user?.first_name ?? '',
-    },
-    lastname: {
-      label: 'nom',
-      type: 'text',
-      old: authStore.user?.last_name ?? '',
-    },
-    password: {
-      label: 'mot de passe',
-      type: 'password',
-      old: '',
-    },
-  }
-
-  const field = fieldMap[option]
-  if (!field) return
-
-  selectedFieldLabel.value = field.label
-  selectedFieldKey.value = option
-  newFieldType.value = field.type
-  oldFieldValue.value = field.old
-  newFieldValue.value = ''
-  currentPassword.value = ''
-  modalErrorMessage.value = ''
-
-  showEditMenu.value = false
-  showEditModal.value = true
-}
-
-function closeEditModal() {
-  currentPassword.value = ''
-  newFieldValue.value = ''
-  modalErrorMessage.value = ''
-  showEditModal.value = false
-}
-
-function submitEditModal() {
-  modalErrorMessage.value = ''
-
-  if (selectedFieldKey.value === 'password') {
-    if (!currentPassword.value.trim()) {
-      modalErrorMessage.value = 'Mot de passe actuel requis'
-      return
-    }
-
-    if (!newFieldValue.value.trim()) {
-      modalErrorMessage.value = 'Nouveau mot de passe requis'
-      return
-    }
-
-    if (currentPassword.value === newFieldValue.value) {
-      modalErrorMessage.value = "Le nouveau mot de passe doit être différent de l'ancien"
-      return
-    }
-
-    authStore
-      .updateUserPassword(currentPassword.value, newFieldValue.value)
-      .then(() => {
-        showEditModal.value = false
-      })
-      .catch((e: unknown) => {
-        if (e instanceof Error) {
-          modalErrorMessage.value = e.message
-        } else {
-          modalErrorMessage.value = 'Erreur lors de la mise à jour'
-        }
-      })
-    return
-  }
-
-  // Pour les autres champs (email, username, firstname, lastname)
-  if (!newFieldValue.value.trim()) {
-    modalErrorMessage.value = 'Nouvelle valeur requise'
-    return
-  }
-
-  if (selectedFieldKey.value === 'username' && newFieldValue.value.trim().length < 3) {
-    modalErrorMessage.value = 'Le pseudo doit contenir au minimum 3 caractères'
-    return
-  }
-
-  if (newFieldValue.value === oldFieldValue.value) {
-    modalErrorMessage.value = "La nouvelle valeur est identique à l'ancienne"
-    return
-  }
-
-  let updatePromise: Promise<void> | null = null
-
-  if (selectedFieldKey.value === 'email') {
-    updatePromise = authStore.updateUserEmail(newFieldValue.value)
-  } else if (selectedFieldKey.value === 'username') {
-    updatePromise = authStore.updateUserUsername(newFieldValue.value)
-  } else if (selectedFieldKey.value === 'firstname') {
-    updatePromise = authStore.updateUserFirstName(newFieldValue.value)
-  } else if (selectedFieldKey.value === 'lastname') {
-    updatePromise = authStore.updateUserLastName(newFieldValue.value)
-  }
-
-  if (updatePromise) {
-    updatePromise
-      .then(() => {
-        showEditModal.value = false
-      })
-      .catch((e: unknown) => {
-        if (e instanceof Error) {
-          modalErrorMessage.value = e.message
-        } else {
-          modalErrorMessage.value = 'Erreur lors de la mise à jour'
-        }
-      })
-  }
+function navigateToEditProfile() {
+  router.push('/profile/edit')
 }
 
 const xpProgress = computed(() => {
@@ -308,7 +68,7 @@ const xpProgress = computed(() => {
       <div
         class="profile-content"
         v-if="authStore.user"
-        :class="{ 'blurred-content': showLogoutConfirm || showEditModal }"
+        :class="{ 'blurred-content': showLogoutConfirm }"
       >
         <!-- Message de bienvenue centré -->
         <div class="welcome-message">
@@ -317,15 +77,10 @@ const xpProgress = computed(() => {
 
         <!-- Icône de profil -->
         <div class="profile-icon-container">
-          <div
-            v-if="selectedProfileImage"
-            class="profile-icon"
-            @click="openProfileImageModal"
-            style="cursor: pointer"
-          >
+          <div v-if="selectedProfileImage" class="profile-icon">
             <img :src="selectedProfileImage" :alt="'Image de profil'" class="profile-icon-image" />
           </div>
-          <div v-else class="profile-icon" @click="openProfileImageModal" style="cursor: pointer">
+          <div v-else class="profile-icon">
             {{ authStore.user.username.charAt(0).toUpperCase() }}
           </div>
         </div>
@@ -347,17 +102,7 @@ const xpProgress = computed(() => {
 
         <!-- Boutons sous l'icône -->
         <div class="action-buttons">
-          <div class="edit-menu-container" ref="editMenuRef">
-            <button @click="toggleEditMenu" class="edit-profile-btn">✏️ Modifier profil</button>
-            <div v-if="showEditMenu" class="edit-dropdown">
-              <div @click="handleEditOption('email')" class="dropdown-item">📧 Adresse mail</div>
-              <div @click="handleEditOption('username')" class="dropdown-item">👤 Pseudo</div>
-              <div @click="handleEditOption('firstname')" class="dropdown-item">🖊️ Prénom</div>
-              <div @click="handleEditOption('lastname')" class="dropdown-item">🖊️ Nom</div>
-              <div @click="handleEditOption('image')" class="dropdown-item">🖼️ Image de profil</div>
-              <div @click="handleEditOption('password')" class="dropdown-item">🔒 Mot de passe</div>
-            </div>
-          </div>
+          <button @click="navigateToEditProfile" class="edit-profile-btn">✏️ Modifier profil</button>
           <button @click="handleLogoutClick" class="logout-btn-small">Se déconnecter</button>
         </div>
 
@@ -389,36 +134,6 @@ const xpProgress = computed(() => {
       </div>
     </div>
 
-    <!-- Popup de modification -->
-    <div v-if="showEditModal" class="blur-overlay">
-      <div class="modal-box">
-        <h3>Modifier {{ selectedFieldLabel }}</h3>
-        <div v-if="modalErrorMessage" class="modal-error">{{ modalErrorMessage }}</div>
-        <form class="edit-modal-form" @submit.prevent="submitEditModal">
-          <div v-if="selectedFieldKey !== 'password'" class="field-group">
-            <label>Actuel</label>
-            <input v-if="oldFieldValue" :value="oldFieldValue" disabled />
-            <span v-else class="empty-value">Aucun</span>
-          </div>
-
-          <div v-if="selectedFieldKey === 'password'" class="field-group">
-            <label>Actuel *</label>
-            <input v-model="currentPassword" type="password" required />
-          </div>
-
-          <div class="field-group">
-            <label>Nouveau *</label>
-            <input v-model="newFieldValue" :type="newFieldType" required />
-          </div>
-
-          <div class="modal-actions">
-            <button type="button" class="cancel-btn" @click="closeEditModal">Annuler</button>
-            <button type="submit" class="save-btn">Enregistrer</button>
-          </div>
-        </form>
-      </div>
-    </div>
-
     <!-- Popup de confirmation -->
     <div v-if="showLogoutConfirm" class="blur-overlay">
       <div class="confirm-box">
@@ -427,46 +142,6 @@ const xpProgress = computed(() => {
         <div class="confirm-actions">
           <button @click="cancelLogout" class="cancel-btn">Annuler</button>
           <button @click="confirmLogout" class="confirm-btn">Se déconnecter</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Popup de sélection d'image de profil -->
-    <div v-if="showProfileImageModal" class="blur-overlay">
-      <div class="modal-box">
-        <h3>Modifier l'image de profil</h3>
-        <div class="carousel-container">
-          <button
-            v-if="allProfileImages.length > 0"
-            class="carousel-arrow carousel-arrow-left"
-            @click="previousImage"
-          >
-            ❮
-          </button>
-          <div class="profile-image-placeholder">
-            <img
-              v-if="allProfileImages.length > 0"
-              :src="allProfileImages[currentImageIndex]"
-              :alt="'Image de profil'"
-              class="gallery-image"
-            />
-            <span v-else>Aucune image disponible</span>
-          </div>
-          <button
-            v-if="allProfileImages.length > 0"
-            class="carousel-arrow carousel-arrow-right"
-            @click="nextImage"
-          >
-            ❯
-          </button>
-        </div>
-        <div v-if="allProfileImages.length > 0" class="image-counter">
-          {{ currentImageIndex + 1 }} / {{ allProfileImages.length }}
-        </div>
-        <div class="remove-link" @click="removeProfileImage">Retirer</div>
-        <div class="modal-actions">
-          <button type="button" class="cancel-btn" @click="closeProfileImageModal">Annuler</button>
-          <button type="button" class="save-btn" @click="saveProfileImage">Enregistrer</button>
         </div>
       </div>
     </div>
@@ -533,10 +208,6 @@ const xpProgress = computed(() => {
   flex-wrap: wrap;
 }
 
-.edit-menu-container {
-  position: relative;
-}
-
 .edit-profile-btn {
   background-color: #679436;
   color: white;
@@ -545,96 +216,6 @@ const xpProgress = computed(() => {
   border-radius: 6px;
   font-size: 0.9rem;
   cursor: pointer;
-}
-
-.edit-dropdown {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  margin-top: 0.5rem;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  min-width: 180px;
-  z-index: 10;
-  overflow: hidden;
-}
-
-.dropdown-item {
-  padding: 0.75rem 1rem;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  font-size: 0.9rem;
-}
-
-.dropdown-item:hover {
-  background-color: #f5f5f5;
-}
-
-.dropdown-item:not(:last-child) {
-  border-bottom: 1px solid #eee;
-}
-
-.modal-box {
-  background: white;
-  padding: 2rem;
-  border-radius: 16px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  width: 85%;
-  max-width: 360px;
-  animation: popIn 0.2s ease-out;
-}
-
-.modal-box h3 {
-  text-align: center;
-  margin-top: 0;
-  margin-bottom: 1rem;
-}
-
-.modal-error {
-  color: #ff4d4d;
-  background: #ffe6e6;
-  padding: 0.6rem 0.75rem;
-  border-radius: 10px;
-  text-align: center;
-  margin-bottom: 0.5rem;
-  font-weight: 600;
-}
-
-.edit-modal-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.edit-modal-form label {
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-
-.edit-modal-form input {
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 10px;
-  font-size: 1rem;
-  font-family: inherit;
-}
-
-.modal-actions {
-  display: flex;
-  gap: 0.75rem;
-  margin-top: 0.5rem;
-}
-
-.save-btn {
-  background-color: #679436;
-  color: white;
-  border: none;
-  padding: 0.75rem 1rem;
-  border-radius: 10px;
-  cursor: pointer;
-  font-weight: 600;
-  flex: 1;
 }
 
 .logout-btn-small {
@@ -756,89 +337,6 @@ const xpProgress = computed(() => {
   cursor: pointer;
   font-weight: 600;
   flex: 1;
-}
-
-.profile-image-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 200px;
-  background: #ffffff;
-  border-radius: 12px;
-  color: #999;
-  margin-bottom: 1rem;
-  font-size: 0.95rem;
-  overflow: hidden;
-}
-
-.gallery-image {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.carousel-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  width: 100%;
-}
-
-.carousel-arrow {
-  background-color: #679436;
-  color: white;
-  border: none;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 1.2rem;
-  flex-shrink: 0;
-  transition: background-color 0.2s;
-}
-
-.carousel-arrow:hover {
-  background-color: #8ab858;
-}
-
-.image-counter {
-  text-align: center;
-  color: #666;
-  font-size: 0.85rem;
-  margin-top: 0.5rem;
-}
-
-.remove-link {
-  text-align: center;
-  color: #ff9800;
-  cursor: pointer;
-  font-size: 0.9rem;
-  margin: 0.75rem 0;
-  text-decoration: underline;
-  transition: color 0.2s;
-}
-
-.remove-link:hover {
-  color: #f57c00;
-}
-
-.field-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.empty-value {
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 10px;
-  font-size: 1rem;
-  color: #999;
 }
 
 /* --- Styles pour l'XP --- */

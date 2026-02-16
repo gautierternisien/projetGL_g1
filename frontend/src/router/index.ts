@@ -3,12 +3,12 @@ import HomeView from '../views/HomeView.vue'
 import SurveyView from '@/views/SurveyView.vue'
 import MissionsView from '@/views/MissionsView.vue'
 import CommunauteView from '@/views/CommunauteView.vue'
-import FriendProfileView from '@/views/FriendProfileView.vue'
 import ConseilsView from '@/views/ConseilsView.vue'
 import ProfileView from '@/views/ProfileView.vue'
 import LoginView from '@/views/LoginView.vue'
 import RegisterView from '@/views/RegisterView.vue'
 import TrophiesView from '@/views/TrophiesView.vue'
+import EditProfileView from '@/views/EditProfileView.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
@@ -117,6 +117,12 @@ const router = createRouter({
       path: '/profile',
       name: 'profile',
       component: ProfileView,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/profile/edit',
+      name: 'edit-profile',
+      component: EditProfileView,
       meta: { requiresAuth: true },
     },
     {
