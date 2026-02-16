@@ -3,6 +3,27 @@
     <RouterView />
   </div>
 
+  <!-- Popup de notification pour nouveau trophée -->
+  <Transition name="trophy-popup">
+    <div v-if="showTrophyNotification" class="trophy-popup-overlay" @click="dismissTrophyNotification">
+      <div class="trophy-popup" @click.stop>
+        <div class="trophy-popup-header">
+          <span class="trophy-popup-icon">🎉</span>
+          <h3>Nouvelle récompense !</h3>
+        </div>
+        <div class="trophy-popup-content">
+          <div class="trophy-popup-reward-icon">{{ trophiesStore.newTrophyNotification?.milestoneIcon }}</div>
+          <p class="trophy-popup-title">{{ trophiesStore.newTrophyNotification?.trophy.title }}</p>
+          <p class="trophy-popup-milestone">{{ trophiesStore.newTrophyNotification?.milestone }} obtenue</p>
+        </div>
+        <div class="trophy-popup-actions">
+          <button @click="dismissTrophyNotification" class="trophy-popup-btn trophy-popup-btn-secondary">Plus tard</button>
+          <button @click="goToTrophies" class="trophy-popup-btn trophy-popup-btn-primary">Voir</button>
+        </div>
+      </div>
+    </div>
+  </Transition>
+
   <nav class="bottom-nav" :class="{ 'nav-blurred': uiStore.isNavigationBlurred }">
     <RouterLink to="/" class="nav-item">
       <span>📊</span>
@@ -30,21 +51,28 @@
 </template>
 
 <script setup lang="ts">
-import { RouterView, RouterLink, useRoute } from 'vue-router'
+import { RouterView, RouterLink, useRoute, useRouter } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
 import { useFriendsStore } from '@/stores/friends'
 import { useLeaguesStore } from '@/stores/leagues'
 import { useAuthStore } from '@/stores/auth'
+import { useTrophiesStore } from '@/stores/trophies'
 import { computed, watch, onMounted } from 'vue'
 
 const uiStore = useUiStore()
 const friendsStore = useFriendsStore()
 const leaguesStore = useLeaguesStore()
 const authStore = useAuthStore()
+const trophiesStore = useTrophiesStore()
 const route = useRoute()
+const router = useRouter()
 
 const hasIncomingRequests = computed(() => {
   return friendsStore.incomingRequests.length > 0 || leaguesStore.invitations.length > 0
+})
+
+const showTrophyNotification = computed(() => {
+  return trophiesStore.newTrophyNotification !== null
 })
 
 async function checkRequests() {
@@ -60,6 +88,25 @@ async function checkRequests() {
   }
 }
 
+async function checkTrophies() {
+  if (authStore.isConnected && authStore.token) {
+    try {
+      await trophiesStore.checkNewTrophies(authStore.token)
+    } catch {
+      // ignore
+    }
+  }
+}
+
+function dismissTrophyNotification() {
+  trophiesStore.dismissNotification()
+}
+
+function goToTrophies() {
+  trophiesStore.dismissNotification()
+  router.push({ name: 'trophees', query: { tab: 'obtained' } })
+}
+
 onMounted(() => {
   if (authStore.isConnected && !authStore.user) {
     authStore.fetchUser().catch(() => {
@@ -67,17 +114,20 @@ onMounted(() => {
     })
   }
   checkRequests()
+  checkTrophies()
 })
 
 watch(() => authStore.isConnected, (connected) => {
   if (connected) {
     checkRequests()
+    checkTrophies()
   }
 })
 
 // Check for notifications on every route change
 watch(() => route.path, () => {
   checkRequests()
+  checkTrophies()
 })
 </script>
 
@@ -159,5 +209,155 @@ watch(() => route.path, () => {
   background-color: #ff0000;
   border-radius: 50%;
   box-shadow: 0 0 0 1px #5e5e5e; /* Petit contour pour séparer */
+}
+
+/* Popup de notification pour nouveau trophée */
+.trophy-popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  backdrop-filter: blur(2px);
+}
+
+.trophy-popup {
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+  border-radius: 20px;
+  padding: 24px;
+  width: 85%;
+  max-width: 320px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  font-family: 'Instrument Sans', sans-serif;
+}
+
+.trophy-popup-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.trophy-popup-icon {
+  font-size: 2.5rem;
+  animation: bounce 0.6s ease-in-out;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.trophy-popup-header h3 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #333;
+  font-weight: 700;
+}
+
+.trophy-popup-content {
+  margin: 20px 0;
+}
+
+.trophy-popup-reward-icon {
+  font-size: 4rem;
+  margin-bottom: 12px;
+  animation: scale-in 0.5s ease-out;
+}
+
+@keyframes scale-in {
+  0% { transform: scale(0); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.trophy-popup-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #333;
+  margin: 8px 0;
+}
+
+.trophy-popup-milestone {
+  font-size: 1rem;
+  color: #555;
+  margin: 4px 0;
+  font-weight: 500;
+}
+
+.trophy-popup-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.trophy-popup-btn {
+  border: none;
+  padding: 12px 24px;
+  border-radius: 25px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'Instrument Sans', sans-serif;
+  flex: 1;
+}
+
+.trophy-popup-btn-secondary {
+  background-color: rgba(255, 255, 255, 0.3);
+  color: #333;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+}
+
+.trophy-popup-btn-secondary:hover {
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+.trophy-popup-btn-primary {
+  background-color: #679436;
+  color: white;
+}
+
+.trophy-popup-btn-primary:hover {
+  background-color: #577a2e;
+  transform: scale(1.05);
+}
+
+/* Transitions */
+.trophy-popup-enter-active {
+  animation: popup-in 0.4s ease-out;
+}
+
+.trophy-popup-leave-active {
+  animation: popup-out 0.3s ease-in;
+}
+
+@keyframes popup-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes popup-out {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
 }
 </style>

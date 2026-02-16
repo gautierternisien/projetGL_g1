@@ -2,11 +2,12 @@
 import Header from '@/components/AppHeader.vue'
 import Card from '@/components/AppCard.vue'
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { type Trophy } from '@/stores/trophies'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const API_URL = 'http://localhost:8000'
 
@@ -80,6 +81,12 @@ onMounted(async () => {
     router.push('/login')
     return
   }
+  
+  // Vérifier si on doit ouvrir l'onglet "Obtenus" via query parameter
+  if (route.query.tab === 'obtained') {
+    activeTab.value = 1
+  }
+  
   // Charger les trophées pour l'affichage
   await loadTrophies()
 })
@@ -197,8 +204,10 @@ function getDescription(progress: number, milestones: { value: number; label: st
     if (next) {
       if (requirementType === 'mission_count') {
         return `Terminez au moins ${next.value} missions`
-      } else {
+      } else if (requirementType === 'login_count') {
         return `Connectez-vous au moins ${next.value} fois`
+      } else {
+        return `Objectif : ${next.value}`
       }
     }
     return "Objectif atteint"
@@ -207,9 +216,11 @@ function getDescription(progress: number, milestones: { value: number; label: st
     const obtained = getLastObtainedMilestone(progress, milestones, finalValue)
     if (obtained) {
       if (requirementType === 'mission_count') {
-        return `Terminez au moins ${obtained.value} missions`
+        return `Terminé au moins ${obtained.value} missions`
+      } else if (requirementType === 'login_count') {
+        return `Connecté au moins ${obtained.value} fois`
       } else {
-        return `Connectez-vous au moins ${obtained.value} fois`
+        return `Objectif atteint : ${obtained.value}`
       }
     }
     return "Trophée obtenu"
@@ -278,7 +289,7 @@ function getDescription(progress: number, milestones: { value: number; label: st
               </div>
               <div class="trophy-info">
                 <p class="trophy-description">
-                  {{ getDescription(trophy.progress || 0, trophy.milestones || [], trophy.requirement_value || 5, trophy.requirement_type || 'login_count', activeTab !== 0) }}
+                  {{ getDescription(trophy.progress || 0, trophy.milestones || [], trophy.requirement_value || 5, trophy.requirement_type || 'login_count', activeTab === 0) }}
                 </p>
                 
                 <!-- En cours : afficher la progression -->
