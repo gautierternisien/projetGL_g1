@@ -1,4 +1,5 @@
-// Type pour nos préférences déduites
+// src/utils/profileMapping.ts
+
 export interface DerivedPreferences {
   possession_voiture: boolean
   possession_velo: boolean
@@ -26,7 +27,6 @@ function flattenAnswers(answers: Record<string, any>): Record<string, any> {
   const flat: Record<string, any> = {}
   for (const [key, value] of Object.entries(answers)) {
     if (value && typeof value === 'object' && !Array.isArray(value)) {
-      // C'est un objet (Mosaïque), on extrait ses sous-clés
       for (const [subKey, subValue] of Object.entries(value)) {
         flat[subKey] = subValue
       }
@@ -38,97 +38,99 @@ function flattenAnswers(answers: Record<string, any>): Record<string, any> {
 }
 
 /**
- * Analyse les réponses brutes du questionnaire pour en déduire le profil.
- * @param answers L'objet contenant toutes les réponses (clés Publicodes)
+ * Analyse les réponses.
+ * LOGIQUE : "Opt-out". Par défaut (si pas de réponse), on renvoie TRUE.
+ * On ne renvoie FALSE que si la réponse explicite indique que ce n'est pas le cas.
  */
 export function derivePreferencesFromAnswers(rawAnswers: Record<string, any>): DerivedPreferences {
-  // 1. On aplatit les réponses pour trouver les clés des Mosaïques
   const answers = flattenAnswers(rawAnswers)
 
-  // Nettoie la valeur
-  const clean = (val: any) => {
-    if (typeof val === 'string') {
-      return val.replace(/['"]+/g, '').trim()
-    }
-    return val
+  // Récupère la valeur brute, undefined si absente
+  const val = (key: string) => {
+    const v = answers[key]
+    if (typeof v === 'string') return v.replace(/['"]+/g, '').trim()
+    return v
   }
 
-  const val = (key: string) => clean(answers[key])
-
-  const isOui = (key: string) => {
+  // Si "non" ou false -> on désactive. Sinon (oui, undefined, autre) -> on active.
+  const isNotNo = (key: string) => {
     const v = val(key)
-    return v === 'oui' || v === true
+    return v !== 'non' && v !== false
   }
 
-  const num = (key: string) => {
+  // Pour les nombres : Si la valeur existe ET qu'elle est sous le seuil -> on désactive.
+  // Si la valeur n'existe pas (undefined), on garde activé (par défaut).
+  const numCheck = (key: string, threshold: number) => {
     const v = val(key)
-    return v ? Number(v) : 0
+    if (v === undefined || v === null || v === '') return true // Pas répondu -> Activé
+    return Number(v) > threshold // Répondu -> Activé seulement si > seuil
   }
 
-  const isDefinedAndNot = (key: string, target: string) => {
+  // Pour les sélecteurs type "local", "saison", "déchets"
+  // Si on répond "oui toujours" ou "zéro déchet", on désactive la mission d'amélioration.
+  // Sinon (pas répondu ou autre réponse), on active.
+  const isNotPerfect = (key: string, perfectValue: string) => {
     const v = val(key)
-    return v !== undefined && v !== target
+    if (v === undefined || v === null) return true // Pas répondu -> Activé
+    return v !== perfectValue
   }
 
   return {
     // --- TRANSPORT ---
+    // Activé sauf si on dit explicitement qu'on n'a pas de voiture
     possession_voiture:
-      val('transport . voiture . utilisateur') === 'propriétaire' ||
-      val('transport . voiture . utilisateur') === 'régulier non propriétaire',
+      val('transport . voiture . utilisateur') !== 'non' &&
+      val('transport . voiture . utilisateur') !== 'aucun',
 
-    // Ajout du VAE (Vélo à assistance électrique)
-    possession_velo:
-      isOui('transport . mobilité douce . vélo . présent') ||
-      isOui('transport . mobilité douce . vae . présent'),
+    possession_velo: isNotNo('transport . mobilité douce . vélo . présent'),
 
-    prend_avion:
-      val('transport . avion . usager') !== 'jamais' &&
-      val('transport . avion . usager') !== undefined,
+    // Activé sauf si on dit "jamais"
+    prend_avion: val('transport . avion . usager') !== 'jamais',
 
     // --- LOGEMENT ---
-    est_proprietaire: val('logement . propriétaire') === 'propriétaire',
-    vit_en_maison: val('logement . type') === 'maison',
-    vit_en_appartement: val('logement . type') === 'appartement',
+    // Ici c'est particulier, c'est mutuellement exclusif.
+    // Si pas de réponse, on active tout pour laisser le choix.
+    est_proprietaire:
+      val('logement . propriétaire') !== 'locataire' &&
+      val('logement . propriétaire') !== 'hébergé',
 
-    passoire_thermique:
-      val('logement . chauffage . précision consommation . ressenti') === 'passoire thermique' ||
-      ['F', 'G'].includes(val('logement . DPE')),
+    vit_en_maison: val('logement . type') !== 'appartement',
+    vit_en_appartement: val('logement . type') !== 'maison',
+
+    // Activé par défaut, sauf si DPE A/B/C
+    passoire_thermique: !['A', 'B', 'C'].includes(val('logement . DPE')),
 
     // --- ALIMENTATION ---
-    // Seuil > 0 : Si on en mange, on peut réduire
-    viande_rouge_importante: num('alimentation . plats . viande rouge . nombre') > 0,
+    viande_rouge_importante: numCheck('alimentation . plats . viande rouge . nombre', 1),
 
-    eau_bouteille: isOui('alimentation . boisson . eau en bouteille . consommateur'),
+    eau_bouteille: isNotNo('alimentation . boisson . eau en bouteille . consommateur'),
 
-    conso_pas_locaux: isDefinedAndNot('alimentation . local . consommation', 'oui toujours'),
-    conso_pas_saison: isDefinedAndNot('alimentation . de saison . consommation', 'oui toujours'),
+    conso_pas_locaux: isNotPerfect('alimentation . local . consommation', 'oui toujours'),
+    conso_pas_saison: isNotPerfect('alimentation . de saison . consommation', 'oui toujours'),
 
     // --- BOISSONS ---
+    // On checke chaque sous-élément. Si on a répondu 0 à tout, ça désactive.
+    // Si on n'a pas répondu, ça reste True.
     boissons_chaudes:
-      num('alimentation . boisson . chaude . café . nombre') +
-        num('alimentation . boisson . chaude . thé . nombre') +
-        num('alimentation . boisson . chaude . chocolat chaud . nombre') >
-      0,
+      val('alimentation . boisson . chaude . café . nombre') === undefined ||
+      Number(val('alimentation . boisson . chaude . café . nombre')) > 0 ||
+      val('alimentation . boisson . chaude . thé . nombre') === undefined ||
+      Number(val('alimentation . boisson . chaude . thé . nombre')) > 0,
 
-    soda: num('alimentation . boisson . sucrées . litres') > 0,
-    alcool: num('alimentation . boisson . alcool . litres') > 0,
+    soda: numCheck('alimentation . boisson . sucrées . litres', 0),
+    alcool: numCheck('alimentation . boisson . alcool . litres', 0),
 
     // --- DIVERS ---
-    dechets_importants: isDefinedAndNot('alimentation . déchets . quantité jetée', 'zéro déchet'),
+    dechets_importants: isNotPerfect('alimentation . déchets . quantité jetée', 'zéro déchet'),
 
-    shopping_important: ['accro au shopping', 'renouvellement occasionnel'].includes(
-      val('divers . textile . volume'),
-    ),
+    // Activé sauf si on dit "minimum"
+    shopping_important: val('divers . textile . volume') !== 'minimum',
 
-    // Tabac : C'est une consommation en cigarettes/semaine ou paquets/semaine selon le modèle
-    // Si la valeur existe et est > 0, c'est fumeur.
-    // La clé exacte peut être 'divers . tabac . consommation par semaine' ou juste une réponse liée à la présence.
-    // Dans le doute, on check la présence d'une valeur positive.
-    fumeur: num('divers . tabac . consommation par semaine') > 0,
+    // Activé par défaut (pour proposer d'arrêter), sauf si conso = 0
+    fumeur: numCheck('divers . tabac . consommation par semaine', 0),
   }
 }
 
-// Labels pour l'affichage dans la modale (plus jolis)
 export const PREFERENCE_LABELS: Record<keyof DerivedPreferences, string> = {
   possession_voiture: "J'utilise une voiture",
   possession_velo: "J'ai un vélo",
@@ -145,6 +147,6 @@ export const PREFERENCE_LABELS: Record<keyof DerivedPreferences, string> = {
   soda: 'Je bois des sodas',
   alcool: "Je bois de l'alcool",
   dechets_importants: 'Je veux réduire mes déchets',
-  shopping_important: "J'achète souvent des vêtements/objets",
+  shopping_important: "J'achète des vêtements neufs",
   fumeur: 'Je fume',
 }

@@ -26,7 +26,7 @@ const showOnboardingModal = ref(false)
 const userPreferences = ref<Partial<DerivedPreferences>>({})
 const isSubmittingPrefs = ref(false)
 
-async function fetchPreferencesAndOpenModal(forceOpen = false) {
+async function fetchPreferences() {
   if (!isConnected.value || !user.value) return
 
   try {
@@ -36,53 +36,17 @@ async function fetchPreferencesAndOpenModal(forceOpen = false) {
 
     if (res.ok) {
       const prefsData = await res.json()
-
-      // Si on force l'ouverture (clic bouton) OU si jamais fait (onboarding)
-      if (forceOpen || !prefsData.has_completed_onboarding) {
-        // Si les données existent en base, on les prend
-        if (Object.keys(prefsData.data || {}).length > 0) {
-          userPreferences.value = prefsData.data
-          showOnboardingModal.value = true
-        } else {
-          // Sinon on déduit du questionnaire
-          launchOnboarding()
-        }
+      if (prefsData.data && Object.keys(prefsData.data).length > 0) {
+        userPreferences.value = prefsData.data
       } else {
-        loadCategoryCounts()
+        const defaults = derivePreferencesFromAnswers(loadAnswers() || {})
+        userPreferences.value = defaults
       }
+      // On charge les missions une fois qu'on a les prefs
+      loadCategoryCounts()
     }
   } catch (e) {
-    console.error('Erreur check preferences', e)
-  }
-}
-
-// Lance le calcul automatique et ouvre la modale
-async function launchOnboarding() {
-  try {
-    // On tente d'abord de récupérer depuis la BDD
-    const res = await fetch(`${API_URL}/ngc/answers/me`, {
-      headers: { Authorization: `Bearer ${authStore.token}` },
-    })
-
-    let answers = {}
-
-    if (res.ok) {
-      const json = await res.json()
-      answers = json.data || {}
-    } else {
-      // Fallback sur le local si l'API échoue (ex: pas de réseau)
-      answers = loadAnswers() || {}
-    }
-
-    const suggestions = derivePreferencesFromAnswers(answers)
-    userPreferences.value = suggestions
-    showOnboardingModal.value = true
-  } catch (e) {
-    console.error('Erreur onboarding', e)
-    // Fallback ultime
-    const suggestions = derivePreferencesFromAnswers(loadAnswers() || {})
-    userPreferences.value = suggestions
-    showOnboardingModal.value = true
+    console.error('Erreur fetch preferences', e)
   }
 }
 
@@ -116,8 +80,9 @@ async function savePreferences() {
   }
 }
 
-function openSettings() {
-  fetchPreferencesAndOpenModal(true)
+async function openSettings() {
+    await fetchPreferences()
+    showOnboardingModal.value = true
 }
 
 async function resetToQuestionnaire() {
@@ -201,7 +166,7 @@ async function loadCategoryCounts() {
 
 onMounted(() => {
   if (user.value) {
-    fetchPreferencesAndOpenModal(false)
+    fetchPreferences()
   }
 })
 
@@ -209,7 +174,7 @@ onMounted(() => {
 import { watch } from 'vue'
 watch(user, (newUser) => {
   if (newUser) {
-    fetchPreferencesAndOpenModal(false)
+    fetchPreferences()
   }
 })
 

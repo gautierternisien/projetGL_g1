@@ -6,6 +6,7 @@ import { VCheckbox, VRadio, VRadioGroup, VTextField } from 'vuetify/components'
 
 import Header from '@/components/AppHeader.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
+import { derivePreferencesFromAnswers } from '@/utils/profileMapping'
 import { API_URL } from '@/config'
 import { useProgressStore } from '@/stores/progress'
 import { useAuthStore } from '@/stores/auth'
@@ -679,6 +680,21 @@ async function finishQuestionnaire() {
       await fetch(`${API_URL}/ngc/category/${currentCategory.value}/complete`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${authStore.token}` },
+      })
+
+      const newPrefs = derivePreferencesFromAnswers(answers.value)
+
+      await fetch(`${API_URL}/users/me/preferences`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authStore.token}`,
+        },
+        // On envoie les nouvelles data et on marque l'onboarding comme fait (même si invisible mnt)
+        body: JSON.stringify({
+          data: newPrefs,
+          has_completed_onboarding: true,
+        }),
       })
 
       // 2. On rafraîchit le user localement pour voir la barre d'XP augmenter
