@@ -25,6 +25,7 @@ const allProfileImages = ref<string[]>([])
 const currentImageIndex = ref(0)
 const selectedProfileImage = ref<string | undefined>(undefined)
 const initialProfileImage = ref<string | undefined>(undefined)
+const tempSelectedImage = ref<string | undefined>(undefined)
 
 onMounted(async () => {
   if (!authStore.isConnected) {
@@ -43,6 +44,7 @@ onMounted(async () => {
     if (authStore.user.profile_image) {
       selectedProfileImage.value = authStore.user.profile_image
       initialProfileImage.value = authStore.user.profile_image
+      tempSelectedImage.value = authStore.user.profile_image
     }
   }
   
@@ -74,11 +76,24 @@ function goBack() {
 }
 
 function openProfileImageModal() {
+  // Sauvegarder l'image actuelle pour pouvoir la restaurer en cas d'annulation
+  tempSelectedImage.value = selectedProfileImage.value
+  
+  // Si une image est déjà sélectionnée, positionner le carousel sur cette image
+  if (selectedProfileImage.value && allProfileImages.value.length > 0) {
+    const index = allProfileImages.value.findIndex(img => img === selectedProfileImage.value)
+    if (index !== -1) {
+      currentImageIndex.value = index
+    }
+  }
+  
   showProfileImageModal.value = true
   uiStore.setNavigationBlur(true)
 }
 
 function closeProfileImageModal() {
+  // Restaurer l'image d'origine en cas d'annulation
+  selectedProfileImage.value = tempSelectedImage.value
   showProfileImageModal.value = false
   uiStore.setNavigationBlur(false)
 }
@@ -91,36 +106,24 @@ function saveProfileImage() {
     const imageUrl = allProfileImages.value[currentImageIndex.value]
     if (imageUrl) {
       selectedProfileImage.value = imageUrl
-      // Sauvegarder l'image dans la base de données
-      authStore
-        .updateProfileImage(imageUrl)
-        .then(() => {
-          closeProfileImageModal()
-        })
-        .catch((e: unknown) => {
-          console.error("Erreur lors de la sauvegarde de l'image:", e)
-        })
+      tempSelectedImage.value = imageUrl
+      // Ne pas sauvegarder maintenant, juste sélectionner
+      // La sauvegarde se fera lors du clic sur "Enregistrer" du formulaire principal
+      // Fermer la modal sans restaurer (on garde la sélection)
+      showProfileImageModal.value = false
+      uiStore.setNavigationBlur(false)
     }
   }
 }
 
 function removeProfileImage() {
-  // Si pas d'image, fermer le modal comme si on avait annulé
-  if (!selectedProfileImage.value) {
-    closeProfileImageModal()
-    return
-  }
-
-  // Sinon, supprimer l'image
+  // Juste désélectionner l'image sans sauvegarder
+  // La suppression réelle se fera lors du clic sur "Enregistrer" du formulaire principal
   selectedProfileImage.value = undefined
-  authStore
-    .removeProfileImage()
-    .then(() => {
-      closeProfileImageModal()
-    })
-    .catch((e: unknown) => {
-      console.error("Erreur lors de la suppression de l'image:", e)
-    })
+  tempSelectedImage.value = undefined
+  // Fermer la modal sans restaurer (on garde la désélection)
+  showProfileImageModal.value = false
+  uiStore.setNavigationBlur(false)
 }
 
 function nextImage() {
@@ -144,9 +147,15 @@ async function saveChanges() {
     const promises: Promise<void>[] = []
     let hasImageChanged = false
 
-    // Image de profil (déjà sauvegardée via saveProfileImage, mais on détecte le changement)
+    // Image de profil - sauvegarder maintenant si elle a changé
     if (selectedProfileImage.value !== initialProfileImage.value) {
       hasImageChanged = true
+      // Sauvegarder l'image en base de données
+      if (selectedProfileImage.value === undefined) {
+        promises.push(authStore.removeProfileImage())
+      } else {
+        promises.push(authStore.updateProfileImage(selectedProfileImage.value))
+      }
     }
 
     // Email
@@ -199,9 +208,10 @@ async function saveChanges() {
     
     successMessage.value = 'Profil mis à jour avec succès !'
     
-    // Mettre à jour l'image initiale si elle a changé
+    // Mettre à jour l'image initiale et temporaire si elle a changé
     if (hasImageChanged) {
       initialProfileImage.value = selectedProfileImage.value
+      tempSelectedImage.value = selectedProfileImage.value
     }
     
     // Réinitialiser les champs de mot de passe
@@ -386,7 +396,7 @@ async function saveChanges() {
         <div class="remove-link" @click="removeProfileImage">Retirer</div>
         <div class="modal-actions">
           <button type="button" class="cancel-btn-modal" @click="closeProfileImageModal">Annuler</button>
-          <button type="button" class="save-btn-modal" @click="saveProfileImage">Enregistrer</button>
+          <button type="button" class="save-btn-modal" @click="saveProfileImage">Sélectionner</button>
         </div>
       </div>
     </div>
