@@ -289,7 +289,7 @@ function getDescription(progress: number, milestones: { value: number; label: st
               </div>
               <div class="trophy-info">
                 <p class="trophy-description">
-                  {{ getDescription(trophy.progress || 0, trophy.milestones || [], trophy.requirement_value || 5, trophy.requirement_type || 'login_count', activeTab === 0) }}
+                  {{ getDescription(trophy.progress || 0, trophy.milestones || [], trophy.requirement_value || 5, trophy.requirement_type || 'login_count', activeTab === 0 || activeTab === 2) }}
                 </p>
                 
                 <!-- En cours : afficher la progression -->
