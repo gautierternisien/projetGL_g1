@@ -66,9 +66,14 @@ class Mission(Base):
     mission_type = Column(String, default="one_shot")
 
     conditions = Column(JSON, nullable=True, default=list)
+    duplicable = Column(Boolean, default=False)
+    base_mission_id = Column(Integer, nullable=True)  # ID de la mission originale si c'est une duplication
+    duplicate_count = Column(Integer, default=0)  # Compteur pour générer "Vélotaf 2", "Vélotaf 3", etc.
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # NULL = mission partagée, sinon mission personnelle
 
     category = relationship("Category", back_populates="missions")
     user_statuses = relationship("UserMissionStatus", back_populates="mission")
+    owner = relationship("User", foreign_keys=[user_id])
 
 class UserPreference(Base):
     """

@@ -98,6 +98,9 @@ class MissionBase(BaseModel):
     category_name: str
     conditions: Optional[List[str]] = []
     mission_type: Optional[str] = "one_shot"
+    duplicable: Optional[bool] = False
+    base_mission_id: Optional[int] = None
+    duplicate_count: Optional[int] = 0
 
 class Mission(MissionBase):
     id: int
