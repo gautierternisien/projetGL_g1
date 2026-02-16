@@ -5,7 +5,6 @@ import ProgressBar from '@/components/ProgressBar.vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { computed, ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { useProgressStore } from '@/stores/progress'
 import {
   derivePreferencesFromAnswers,
   PREFERENCE_LABELS,
@@ -15,7 +14,6 @@ import { loadAnswers } from '@/lib/ngc/answersStorage.ts'
 
 const API_URL = 'http://localhost:8000'
 const authStore = useAuthStore()
-const progressStore = useProgressStore()
 const router = useRouter()
 
 const isConnected = computed(() => authStore.isConnected)
