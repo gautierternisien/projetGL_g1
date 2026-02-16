@@ -225,14 +225,14 @@ function syncCategoryProgress(nextAnswers: Record<string, unknown>) {
   progressStore.setScore('divers', map.divers)
 }
 
-function flushLocalPersistence() {
+async function flushLocalPersistence() {
   if (saveAnswersTimer) {
     clearTimeout(saveAnswersTimer)
     saveAnswersTimer = null
   }
   saveAnswers(answers.value)
   if (authStore.isConnected && authStore.token) {
-    void pushRemoteAnswers(authStore.token, answers.value)
+    await pushRemoteAnswers(authStore.token, answers.value)
   }
   syncCategoryProgress(answers.value)
 }
@@ -551,8 +551,8 @@ watch(
   { immediate: true },
 )
 
-function saveAndExit() {
-  flushLocalPersistence()
+async function saveAndExit() {
+  await flushLocalPersistence()
   router.push('/questionnaires')
 }
 
@@ -672,7 +672,7 @@ async function finishQuestionnaire() {
     answers.value = { ...answers.value, [flag]: true }
 
     isCompletedMode.value = true
-    flushLocalPersistence()
+    await flushLocalPersistence()
 
     if (authStore.isConnected && authStore.token) {
       // 1. On prévient le backend que c'est fini pour gagner l'XP
@@ -684,6 +684,13 @@ async function finishQuestionnaire() {
       // 2. On rafraîchit le user localement pour voir la barre d'XP augmenter
       await authStore.fetchUser()
     }
+
+    // PGL Fix: Force sync stats to backend before showing recap
+    if (backendStatsSyncTimer) {
+      clearTimeout(backendStatsSyncTimer)
+      backendStatsSyncTimer = null
+    }
+    await pushNgcStatsToBackend()
 
     window.scrollTo({ top: 0, behavior: 'smooth' })
   } catch (e) {

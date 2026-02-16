@@ -291,6 +291,8 @@ async function computeLocalNgcStats() {
     let answers = loadAnswers() ?? {}
 
     if (authStore.isConnected && authStore.token) {
+      // PGL Fix: Toujours récupérer les réponses du backend pour être à jour
+      // car le localStorage est désactivé.
       const remote = await fetchRemoteAnswers(authStore.token)
       if (remote) {
         answers = { ...answers, ...remote }
@@ -302,6 +304,7 @@ async function computeLocalNgcStats() {
 
     const situation = Object.fromEntries(
       Object.entries(flat)
+        .filter(([k]) => !k.startsWith('__'))
         .map(([k, v]) => [k, toPublicodesValue(v)] as const)
         .filter(([, v]) => v !== undefined),
     )
