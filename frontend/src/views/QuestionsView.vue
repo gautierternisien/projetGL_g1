@@ -1218,6 +1218,7 @@ onUnmounted(() => {
   background-color: #fff;
   color: #e74c3c;
   border: 1px solid #e74c3c;
+  margin-left :10px
 }
 
 .progress-section {
