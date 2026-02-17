@@ -337,7 +337,7 @@ function handleCardClick(e: Event) {
 
 /* --- STYLE MODALE ONBOARDING --- */
 .blur-overlay {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   width: 100%;
@@ -354,7 +354,7 @@ function handleCardClick(e: Event) {
   background: white;
   width: 90%;
   max-width: 400px;
-  max-height: 85vh;
+  max-height: 75vh;
   border-radius: 20px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
   padding: 24px;
