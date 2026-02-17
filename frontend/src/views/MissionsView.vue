@@ -34,13 +34,17 @@ async function fetchPreferences() {
 
     if (res.ok) {
       const prefsData = await res.json()
-      if (prefsData.data && Object.keys(prefsData.data).length > 0) {
-        userPreferences.value = prefsData.data
-      } else {
-        const defaults = derivePreferencesFromAnswers(loadAnswers() || {})
-        userPreferences.value = defaults
+      if (prefsData.has_completed_onboarding) {
+        userPreferences.value = prefsData.data || {}
       }
-      // On charge les missions une fois qu'on a les prefs
+      // CAS 2 : Première visite (ou pas encore d'association)
+      else {
+        const defaults = derivePreferencesFromAnswers({})
+        userPreferences.value = defaults
+        await savePreferences(true)
+      }
+
+      // On charge les missions maintenant qu'on a les bonnes prefs (locales ou distantes)
       loadCategoryCounts()
     }
   } catch (e) {
@@ -49,8 +53,8 @@ async function fetchPreferences() {
 }
 
 // Sauvegarde les préférences validées par l'utilisateur
-async function savePreferences() {
-  isSubmittingPrefs.value = true
+async function savePreferences(silent = false) {
+  if (!silent) isSubmittingPrefs.value = true
   try {
     const payload = {
       data: userPreferences.value,
@@ -79,8 +83,8 @@ async function savePreferences() {
 }
 
 async function openSettings() {
-    await fetchPreferences()
-    showOnboardingModal.value = true
+  await fetchPreferences()
+  showOnboardingModal.value = true
 }
 
 async function resetToQuestionnaire() {
