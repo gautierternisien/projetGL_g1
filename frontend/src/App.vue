@@ -128,7 +128,7 @@ function launchConfetti() {
   const end = Date.now() + duration
 
   const colors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DFE6E9', '#A29BFE', '#FD79A8', '#FDCB6E']
-  
+
   const frame = () => {
     confetti({
       particleCount: 4,
@@ -155,7 +155,7 @@ function launchConfetti() {
       requestAnimationFrame(frame)
     }
   }
-  
+
   frame()
 }
 
@@ -277,14 +277,16 @@ watch(() => showTrophyNotification.value, (isVisible) => {
   left: 0;
   width: 100%;
   height: 100%;
-  z-index: 1000;
+  z-index: 10000;
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: rgba(255, 255, 255, 0.6);
+  //background-color: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(5px);
 }
 
 .trophy-popup {
+  position: relative;
   background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
   border-radius: 20px;
   padding: 24px;
@@ -293,6 +295,7 @@ watch(() => showTrophyNotification.value, (isVisible) => {
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
   text-align: center;
   font-family: 'Instrument Sans', sans-serif;
+  z-index: 10001;
 }
 
 .trophy-popup-header {

@@ -68,7 +68,7 @@ defineEmits(['resumeLater'])
   left: 0;
   width: 100%;
   background-color: #679436;
-  z-index: 1000;
+  z-index: 10001;
   border-bottom-left-radius: 20px;
   border-bottom-right-radius: 20px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
