@@ -52,44 +52,48 @@ export function derivePreferencesFromAnswers(rawAnswers: Record<string, any>): D
     return v
   }
 
-  // Si "non" ou false -> on désactive. Sinon (oui, undefined, autre) -> on active.
-  const isNotNo = (key: string) => {
+  const num = (key: string) => {
     const v = val(key)
-    return v !== 'non' && v !== false
+    if (v === undefined || v === null || v === '') return undefined
+    return Number(v)
   }
 
-  // Pour les nombres : Si la valeur existe ET qu'elle est sous le seuil -> on désactive.
-  // Si la valeur n'existe pas (undefined), on garde activé (par défaut).
-  const numCheck = (key: string, threshold: number) => {
+  // Si "non" ou false -> on désactive. Sinon (oui, undefined, autre) -> on active.
+  const isExplicitlyNo = (key: string) => {
     const v = val(key)
-    if (v === undefined || v === null || v === '') return true // Pas répondu -> Activé
-    return Number(v) > threshold // Répondu -> Activé seulement si > seuil
+    if (v === undefined || v === null) return false
+
+    // On compare en minuscule pour être sûr
+    const s = String(v).toLowerCase()
+    return s === 'non' || s === 'false' || s === 'aucun' || s === 'jamais' || v === false
+  }
+
+  const isExplicitlyZero = (key: string) => {
+    const n = num(key)
+    return n !== undefined && n === 0
   }
 
   // Pour les sélecteurs type "local", "saison", "déchets"
   // Si on répond "oui toujours" ou "zéro déchet", on désactive la mission d'amélioration.
   // Sinon (pas répondu ou autre réponse), on active.
-  const isNotPerfect = (key: string, perfectValue: string) => {
+  const isExplicitlyPerfect = (key: string, perfectValue: string) => {
     const v = val(key)
-    if (v === undefined || v === null) return true // Pas répondu -> Activé
-    return v !== perfectValue
+    return v === perfectValue
   }
 
   return {
     // --- TRANSPORT ---
     // Activé sauf si on dit explicitement qu'on n'a pas de voiture
-    possession_voiture:
-      val('transport . voiture . utilisateur') !== 'non' &&
-      val('transport . voiture . utilisateur') !== 'aucun',
+    possession_voiture: !isExplicitlyNo('transport . voiture . utilisateur'),
 
-    possession_velo: isNotNo('transport . mobilité douce . vélo . présent'),
+    // Pour le vélo, c'est l'inverse : on veut savoir s'il en a un pour proposer le vélotaf.
+    // Mais en logique opt-out, on suppose qu'il peut en faire, sauf s'il dit "non".
+    // Disons : Activé par défaut (pour encourager), désactivé si 'non'.
+    possession_velo: !isExplicitlyNo('transport . mobilité douce . vélo . présent'),
 
-    // Activé sauf si on dit "jamais"
     prend_avion: val('transport . avion . usager') !== 'jamais',
 
     // --- LOGEMENT ---
-    // Ici c'est particulier, c'est mutuellement exclusif.
-    // Si pas de réponse, on active tout pour laisser le choix.
     est_proprietaire:
       val('logement . propriétaire') !== 'locataire' &&
       val('logement . propriétaire') !== 'hébergé',
@@ -97,37 +101,51 @@ export function derivePreferencesFromAnswers(rawAnswers: Record<string, any>): D
     vit_en_maison: val('logement . type') !== 'appartement',
     vit_en_appartement: val('logement . type') !== 'maison',
 
-    // Activé par défaut, sauf si DPE A/B/C
-    passoire_thermique: !['A', 'B', 'C'].includes(val('logement . DPE')),
+    // Isolation :
+    // On désactive SI le DPE est bon (A/B/C) OU si le ressenti est bon.
+    // Sinon (pas de réponse ou mauvais), on laisse activé.
+    passoire_thermique: !(
+      ['A', 'B', 'C'].includes(val('logement . DPE')) ||
+      ['confortable', 'chaud'].includes(
+        val('logement . chauffage . précision consommation . ressenti'),
+      )
+    ),
 
     // --- ALIMENTATION ---
-    viande_rouge_importante: numCheck('alimentation . plats . viande rouge . nombre', 1),
+    // Activé par défaut. Désactivé si on répond 0 ou 1 repas.
+    viande_rouge_importante: !(
+      num('alimentation . plats . viande rouge . nombre') !== undefined &&
+      num('alimentation . plats . viande rouge . nombre')! <= 1
+    ),
 
-    eau_bouteille: isNotNo('alimentation . boisson . eau en bouteille . consommateur'),
+    eau_bouteille: !isExplicitlyNo('alimentation . boisson . eau en bouteille . consommateur'),
 
-    conso_pas_locaux: isNotPerfect('alimentation . local . consommation', 'oui toujours'),
-    conso_pas_saison: isNotPerfect('alimentation . de saison . consommation', 'oui toujours'),
+    conso_pas_locaux: !isExplicitlyPerfect('alimentation . local . consommation', 'oui toujours'),
+    conso_pas_saison: !isExplicitlyPerfect(
+      'alimentation . de saison . consommation',
+      'oui toujours',
+    ),
 
     // --- BOISSONS ---
-    // On checke chaque sous-élément. Si on a répondu 0 à tout, ça désactive.
-    // Si on n'a pas répondu, ça reste True.
-    boissons_chaudes:
-      val('alimentation . boisson . chaude . café . nombre') === undefined ||
-      Number(val('alimentation . boisson . chaude . café . nombre')) > 0 ||
-      val('alimentation . boisson . chaude . thé . nombre') === undefined ||
-      Number(val('alimentation . boisson . chaude . thé . nombre')) > 0,
+    // Désactivé si la somme est explicitement 0
+    boissons_chaudes: !(
+      isExplicitlyZero('alimentation . boisson . chaude . café . nombre') &&
+      isExplicitlyZero('alimentation . boisson . chaude . thé . nombre') &&
+      isExplicitlyZero('alimentation . boisson . chaude . chocolat chaud . nombre')
+    ),
 
-    soda: numCheck('alimentation . boisson . sucrées . litres', 0),
-    alcool: numCheck('alimentation . boisson . alcool . litres', 0),
+    soda: !isExplicitlyZero('alimentation . boisson . sucrées . litres'),
+    alcool: !isExplicitlyZero('alimentation . boisson . alcool . litres'),
 
     // --- DIVERS ---
-    dechets_importants: isNotPerfect('alimentation . déchets . quantité jetée', 'zéro déchet'),
+    dechets_importants: !isExplicitlyPerfect(
+      'alimentation . déchets . quantité jetée',
+      'zéro déchet',
+    ),
 
-    // Activé sauf si on dit "minimum"
     shopping_important: val('divers . textile . volume') !== 'minimum',
 
-    // Activé par défaut (pour proposer d'arrêter), sauf si conso = 0
-    fumeur: numCheck('divers . tabac . consommation par semaine', 0),
+    fumeur: !isExplicitlyZero('divers . tabac . consommation par semaine'),
   }
 }
 
