@@ -719,8 +719,7 @@ async def get_global_stats(db: Session = Depends(get_db)):
         except: pass
 
         try:
-            stats["total_missions_completed"] = db.query(models.UserMissionStatus).join(models.User).filter(
-                models.User.is_deleted == False,
+            stats["total_missions_completed"] = db.query(models.UserMissionStatus).filter(
                 or_(
                     models.UserMissionStatus.status == 'termine',
                     models.UserMissionStatus.status == 'terminee',
