@@ -11,6 +11,7 @@ const authStore = useAuthStore()
 const uiStore = useUiStore()
 const router = useRouter()
 const showLogoutConfirm = ref(false)
+const showDeleteConfirm = ref(false)
 const selectedProfileImage = ref<string | undefined>(undefined)
 
 const userLevel = computed(() => {
@@ -51,6 +52,27 @@ function cancelLogout() {
   uiStore.setNavigationBlur(false)
 }
 
+function handleDeleteClick() {
+  showDeleteConfirm.value = true
+  uiStore.setNavigationBlur(true)
+}
+
+async function confirmDelete() {
+  try {
+    await authStore.deleteUser()
+    uiStore.setNavigationBlur(false)
+    router.push('/')
+  } catch (error) {
+    console.error('Erreur lors de la suppression:', error)
+    // Gérer l'erreur, peut-être afficher un message
+  }
+}
+
+function cancelDelete() {
+  showDeleteConfirm.value = false
+  uiStore.setNavigationBlur(false)
+}
+
 function navigateToEditProfile() {
   router.push('/profile/edit')
 }
@@ -68,7 +90,7 @@ const xpProgress = computed(() => {
       <div
         class="profile-content"
         v-if="authStore.user"
-        :class="{ 'blurred-content': showLogoutConfirm }"
+        :class="{ 'blurred-content': showLogoutConfirm || showDeleteConfirm }"
       >
         <!-- Message de bienvenue centré -->
         <div class="welcome-message">
@@ -103,6 +125,7 @@ const xpProgress = computed(() => {
         <!-- Boutons sous l'icône -->
         <div class="action-buttons">
           <button @click="navigateToEditProfile" class="edit-profile-btn">✏️ Modifier profil</button>
+          <button @click="handleDeleteClick" class="delete-btn">🗑️ Supprimer mon compte</button>
           <button @click="handleLogoutClick" class="logout-btn-small">Se déconnecter</button>
         </div>
 
@@ -142,6 +165,18 @@ const xpProgress = computed(() => {
         <div class="confirm-actions">
           <button @click="cancelLogout" class="cancel-btn">Annuler</button>
           <button @click="confirmLogout" class="confirm-btn">Se déconnecter</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Popup de confirmation suppression -->
+    <div v-if="showDeleteConfirm" class="blur-overlay">
+      <div class="confirm-box">
+        <h3>Supprimer mon compte ?</h3>
+        <p>Cette action est irréversible. Votre compte sera marqué comme supprimé et vous ne pourrez plus vous connecter.</p>
+        <div class="confirm-actions">
+          <button @click="cancelDelete" class="cancel-btn">Annuler</button>
+          <button @click="confirmDelete" class="delete-confirm-btn">Supprimer</button>
         </div>
       </div>
     </div>
@@ -210,6 +245,16 @@ const xpProgress = computed(() => {
 
 .edit-profile-btn {
   background-color: #679436;
+  color: white;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.delete-btn {
+  background-color: #dc3545;
   color: white;
   padding: 0.5rem 1rem;
   border: none;
@@ -330,6 +375,17 @@ const xpProgress = computed(() => {
 
 .confirm-btn {
   background-color: #ff4d4d;
+  color: white;
+  border: none;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  flex: 1;
+}
+
+.delete-confirm-btn {
+  background-color: #dc3545;
   color: white;
   border: none;
   padding: 0.75rem 1rem;

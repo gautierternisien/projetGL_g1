@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, validator
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
@@ -35,11 +35,18 @@ class TokenData(BaseModel):
 
 class UserPublic(BaseModel):
     id: int
-    username: str
+    username: str = Field(default="")
     profile_image: Optional[str] = None
+    is_deleted: bool = False
 
     class Config:
         from_attributes = True
+
+    @validator('username', pre=True, always=True)
+    def compute_username(cls, v, values):
+        if values.get('is_deleted'):
+            return "utilisateur_supprimé"
+        return v
 
 class FriendProfile(BaseModel):
     id: int

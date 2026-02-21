@@ -239,6 +239,11 @@ async def update_user_password(current_password: str, new_password: str, current
         raise HTTPException(status_code=400, detail="Mot de passe actuel incorrect")
     return crud.update_user_password(db, current_user.id, new_password)
 
+@router.delete("/users/me", tags=["Users"])
+async def delete_user(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    crud.delete_user(db, current_user.id)
+    return {"message": "Utilisateur supprimé"}
+
 @router.get("/users", response_model=List[schemas.UserPublic], tags=["Users"])
 async def search_users(prefix: str = "", current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     if len(prefix) < 3: return []
@@ -263,16 +268,21 @@ def update_profile_image(profile_image: str, current_user: schemas.User = Depend
 async def list_friends(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     friend_ids = crud.get_accepted_friends(db, current_user.id)
     if not friend_ids: return []
-    return crud.get_users_by_ids(db, friend_ids)
+    users = crud.get_users_by_ids(db, friend_ids)
+    user_publics = [schemas.UserPublic(id=u.id, username="utilisateur_supprimé" if u.is_deleted else u.username, profile_image=u.profile_image, is_deleted=u.is_deleted) for u in users]
+    # Filtrer les utilisateurs supprimés
+    return [up for up in user_publics if not up.is_deleted]
 
 @router.get("/friends/activity", response_model=List[schemas.FriendActivity], tags=["Friends"])
 async def get_friends_activity(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     my_feed = user_feed_db.get(current_user.username, [])
     response_activities = []
     for activity in reversed(my_feed):
+        sender = crud.get_user(db, activity["sender_id"])
+        sender_username = "utilisateur_supprimé" if sender and sender.is_deleted else activity["sender_username"]
         response_activities.append(schemas.FriendActivity(
             friend_id=activity["sender_id"],
-            friend_username=activity["sender_username"],
+            friend_username=sender_username,
             mission_title=activity["mission_title"],
             mission_id=activity["mission_id"],
             status=activity["status"],
@@ -701,7 +711,7 @@ async def get_global_stats(db: Session = Depends(get_db)):
             if stats["global_score"] == 0:
                 stats["global_score"] = NGC_DEFAULT_SCORE
         else:
-            count_users = db.query(models.User).count()
+            count_users = db.query(models.User).filter(models.User.is_deleted == False).count()
             stats["user_count"] = count_users
 
         try:
@@ -709,7 +719,8 @@ async def get_global_stats(db: Session = Depends(get_db)):
         except: pass
 
         try:
-            stats["total_missions_completed"] = db.query(models.UserMissionStatus).filter(
+            stats["total_missions_completed"] = db.query(models.UserMissionStatus).join(models.User).filter(
+                models.User.is_deleted == False,
                 or_(
                     models.UserMissionStatus.status == 'termine',
                     models.UserMissionStatus.status == 'terminee',
@@ -721,7 +732,8 @@ async def get_global_stats(db: Session = Depends(get_db)):
             print(f"Erreur stats missions: {e}")
 
         try:
-            stats["total_trophies"] = db.query(models.UserTrophy).filter(
+            stats["total_trophies"] = db.query(models.UserTrophy).join(models.User).filter(
+                models.User.is_deleted == False,
                 models.UserTrophy.is_obtained == True
             ).count()
         except Exception as e:

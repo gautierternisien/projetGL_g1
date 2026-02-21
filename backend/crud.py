@@ -39,7 +39,7 @@ def search_users_by_prefix(db: Session, prefix: str, limit: int = 20):
     if not prefix:
         return []
     pattern = f"{prefix}%"
-    return db.query(models.User).filter(models.User.username.ilike(pattern)).limit(limit).all()
+    return db.query(models.User).filter(models.User.username.ilike(pattern), models.User.is_deleted == False).limit(limit).all()
 
 def create_user(db: Session, user: schemas.UserCreate):
     hashed_password = get_password_hash(user.password)
@@ -91,6 +91,27 @@ def update_user_password(db: Session, user_id: int, new_password: str):
     db_user = db.query(models.User).filter(models.User.id == user_id).first()
     if db_user:
         db_user.hashed_password = get_password_hash(new_password)
+        db.commit()
+        db.refresh(db_user)
+    return db_user
+
+def delete_user(db: Session, user_id: int):
+    import random
+    import string
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if db_user:
+        # Générer un code aléatoire de 5 caractères
+        code = ''.join(random.choices(string.ascii_letters + string.digits, k=5))
+        # Modifier le username
+        db_user.username = f"utilisateur_supprimé_{user_id}_{code}"
+        # Supprimer les informations sensibles
+        db_user.email = None
+        db_user.hashed_password = None
+        db_user.first_name = None
+        db_user.last_name = None
+        db_user.profile_image = None
+        db_user.is_active = False
+        db_user.is_deleted = True
         db.commit()
         db.refresh(db_user)
     return db_user
@@ -303,7 +324,7 @@ def upsert_user_ngc_stats(db: Session, user_id: int, payload: schemas.NgcStatsPa
 
 
 def get_ngc_stats_aggregate(db: Session):
-    all_users = db.query(models.User.id).all()
+    all_users = db.query(models.User.id).filter(models.User.is_deleted == False).all()
     if not all_users:
         return None
 
@@ -659,7 +680,7 @@ def get_league_members_with_stats(db: Session, league_id: int):
         result.append({
             "id": m.id,
             "user_id": m.user_id,
-            "username": user.username,
+            "username": "utilisateur_supprimé" if user.is_deleted else user.username,
             "joined_at": m.joined_at,
             "missions_completed": completed_count
         })

@@ -12,6 +12,7 @@ class User(Base):
     last_name = Column(String)
     hashed_password = Column(String)
     is_active = Column(Boolean, default=True)
+    is_deleted = Column(Boolean, default=False)
     profile_image = Column(String, nullable=True)
     xp = Column(Integer, default=0)
 

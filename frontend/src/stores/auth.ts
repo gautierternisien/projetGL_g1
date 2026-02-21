@@ -200,6 +200,21 @@ export const useAuthStore = defineStore('auth', () => {
     await fetchUser()
   }
 
+  async function deleteUser() {
+    if (!token.value) throw new Error('Not authenticated')
+    const response = await fetch(`${API_URL}/users/me`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token.value}`,
+      },
+    })
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.detail || 'User deletion failed')
+    }
+    logout()
+  }
+
   function logout() {
     token.value = null
     user.value = null
@@ -220,6 +235,7 @@ export const useAuthStore = defineStore('auth', () => {
     updateUserPassword,
     updateProfileImage,
     removeProfileImage,
+    deleteUser,
     logout,
   }
 })
