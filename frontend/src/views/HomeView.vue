@@ -1052,6 +1052,14 @@ watch(isConnected, () => {
   object-fit: cover;
 }
 
+.card-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .card-texts {
   display: flex;
   flex-direction: column;
