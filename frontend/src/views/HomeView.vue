@@ -781,14 +781,25 @@ watch(isConnected, () => {
             <div v-for="(event, i) in events" :key="i" class="mission-card">
               <RouterLink to="/communaute/evenements" class="unstyled-link inner-mission-link">
                 <div class="card-content">
-                  <span class="card-icon">👥</span>
+                  <div class="card-avatar">
+                    <img v-if="event.profile_image" :src="event.profile_image" alt="Profil" class="avatar-image" />
+                    <span v-else>{{ event.friend_username.charAt(0).toUpperCase() }}</span>
+                  </div>
                   <div class="card-texts">
                     <span class="card-title">{{ event.friend_username }}</span>
-                    <span v-if="event.activity_type === 'mission'" class="card-subtitle">
-                      a terminé : {{ event.mission_title }}
+                    <span v-if="event.activity_type === 'mission'" class="card-subtitle-text">
+                      a terminé la mission
                     </span>
-                    <span v-if="event.activity_type === 'trophy'" class="card-subtitle">
-                      a obtenu le trophée: {{ event.trophy_icon }} {{ event.trophy_title }}
+                    <span v-if="event.activity_type === 'mission'" class="card-mission-badge">
+                      <span class="badge-icon">🎯</span>
+                      <span class="badge-title">{{ event.mission_title }}</span>
+                    </span>
+                    <span v-if="event.activity_type === 'trophy'" class="card-subtitle-text">
+                      a obtenu le trophée
+                    </span>
+                    <span v-if="event.activity_type === 'trophy'" class="card-trophy-badge">
+                      <span class="badge-icon">{{ event.trophy_icon }}</span>
+                      <span class="badge-title">{{ event.trophy_title }}</span>
                     </span>
                   </div>
                 </div>
@@ -983,17 +994,17 @@ watch(isConnected, () => {
 
 .mission-card {
   /* Dimensions réduites pour voir les cartes adjacentes */
-  width: 230px;
-  height: 110px;
+  width: 240px;
+  min-height: 120px;
 
   /* Apparence : Fond blanc + Ombre */
-  background-color: white;
+  background-color: #f7f9f5;
   border-radius: 16px;
-  border: 1px solid #f0f0f0; /* Bordure très subtile */
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* L'effet "pop" */
+  border: 1px solid #dbe5d3;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 
   /* Positionnement */
-  position: relative; /* Indispensable pour placer les flèches */
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1013,39 +1024,94 @@ watch(isConnected, () => {
 .card-content {
   display: flex;
   flex-direction: row;
-  align-items: center;
-  gap: 12px; /* Espace entre icône et textes */
+  align-items: flex-start;
+  gap: 10px;
   justify-content: flex-start;
-  padding: 6px 8px;
+  padding: 12px;
+  width: 100%;
 }
 
-.card-icon {
-  font-size: 1.8rem;
-  flex-shrink: 0;
+.card-avatar {
   width: 36px;
   height: 36px;
+  border-radius: 50%;
+  background: #e3eddd;
+  color: #2f3b2f;
   display: flex;
   align-items: center;
   justify-content: center;
+  font-weight: 600;
+  font-size: 1rem;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.card-avatar .avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .card-texts {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  gap: 2px;
+  flex: 1;
 }
 
 .card-title {
   font-size: 0.95rem;
-  color: #333;
+  color: #1f2a2c;
   font-weight: 600;
   text-align: left;
 }
 
-.card-subtitle {
-  font-size: 0.8rem;
-  color: #679436; /* app green */
+.card-subtitle-text {
+  font-size: 0.75rem;
+  color: #666;
+  font-weight: 400;
+}
+
+.card-mission-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: linear-gradient(135deg, #b7e3b7 0%, #b7e3b7 100%);
+  padding: 0.2rem 0.6rem;
+  border-radius: 16px;
   font-weight: 600;
+  color: #333;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-top: 2px;
+  max-width: 100%;
+}
+
+.card-trophy-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: linear-gradient(135deg, #e5cd48 0%, #e5cd48 100%);
+  padding: 0.2rem 0.6rem;
+  border-radius: 16px;
+  font-weight: 600;
+  color: #333;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-top: 2px;
+  max-width: 100%;
+}
+
+.badge-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.badge-title {
+  font-size: 0.75rem;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .unstyled-link {

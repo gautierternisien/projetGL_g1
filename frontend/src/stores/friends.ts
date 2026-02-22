@@ -20,6 +20,7 @@ export interface FriendRequest {
 
 export interface FriendActivity {
   friend_username: string
+  profile_image?: string
   activity_type: 'mission' | 'trophy'
   mission_title?: string
   mission_id?: number

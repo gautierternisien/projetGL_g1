@@ -37,7 +37,10 @@ onMounted(async () => {
         <div v-for="(act, index) in store.activities" :key="index" class="activity-item">
           <span class="activity-date" v-if="act.timestamp">{{ formatDate(act.timestamp) }}</span>
           <div class="activity-content-row">
-            <div class="avatar">{{ act.friend_username.charAt(0).toUpperCase() }}</div>
+            <div class="avatar">
+              <img v-if="act.profile_image" :src="act.profile_image" alt="Profil" class="avatar-image" />
+              <span v-else>{{ act.friend_username.charAt(0).toUpperCase() }}</span>
+            </div>
             <div class="activity-info">
               <span class="friend-name">{{ act.friend_username }}</span>
               <span v-if="act.activity_type === 'mission'" class="activity-text">a terminé la mission</span>
@@ -115,6 +118,13 @@ onMounted(async () => {
   justify-content: center;
   font-weight: 600;
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.avatar .avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .activity-info {

@@ -281,9 +281,11 @@ async def get_friends_activity(current_user: models.User = Depends(get_current_u
     for activity in activities:
         sender = crud.get_user(db, activity.sender_id)
         sender_username = "utilisateur_supprimé" if sender and sender.is_deleted else (sender.username if sender else "Inconnu")
+        profile_image = sender.profile_image if sender and not sender.is_deleted else None
         response_activities.append(schemas.FriendActivity(
             friend_id=activity.sender_id,
             friend_username=sender_username,
+            profile_image=profile_image,
             activity_type=activity.activity_type,
             mission_title=activity.mission_title,
             mission_id=activity.mission_id,
