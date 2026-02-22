@@ -1007,7 +1007,7 @@ watch(isConnected, () => {
   position: relative;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
 
   /* Comportement scroll : centré pour voir avant/après */
   flex-shrink: 0;
