@@ -41,7 +41,10 @@ onMounted(async () => {
             <div class="activity-info">
               <span class="friend-name">{{ act.friend_username }}</span>
               <span v-if="act.activity_type === 'mission'" class="activity-text">a terminé la mission</span>
-              <span v-if="act.activity_type === 'mission'" class="mission-title">"{{ act.mission_title }}"</span>
+              <span v-if="act.activity_type === 'mission'" class="mission-badge">
+                <span class="mission-icon">🎯</span>
+                <span class="mission-title">{{ act.mission_title }}</span>
+              </span>
               <span v-if="act.activity_type === 'trophy'" class="activity-text">a obtenu le trophée</span>
               <span v-if="act.activity_type === 'trophy'" class="trophy-badge">
                 <span class="trophy-icon">{{ act.trophy_icon }}</span>
@@ -129,17 +132,32 @@ onMounted(async () => {
   color: #666;
 }
 
-.mission-title {
-  font-style: italic;
-  font-weight: 500;
+.mission-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: linear-gradient(135deg, #b7e3b7 0%, #b7e3b7 100%);
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-weight: 600;
+  color: #333;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.mission-icon {
+  font-size: 1.2rem;
   color: #679436;
+}
+
+.mission-title {
+  font-size: 0.9rem;
 }
 
 .trophy-badge {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+  background: linear-gradient(135deg, #e5cd48 0%, #e5cd48 100%);
   padding: 0.25rem 0.75rem;
   border-radius: 20px;
   font-weight: 600;
