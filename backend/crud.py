@@ -788,27 +788,37 @@ def create_mission(db: Session, mission_data: dict, category_name: str):
     m = db.query(models.Mission).filter(models.Mission.id == mission_data['id']).first()
 
     m_type = mission_data.get('mission_type', 'one_shot')
+    is_duplicable = mission_data.get('duplicable', False)
+    title = mission_data['title']
+    duplicate_count = mission_data.get('duplicate_count', 0)
+    
+    # Les missions de base n'ont PAS de numéro (on commence à 0)
+    # Le numéro sera ajouté seulement lors des duplications
 
     # Si la mission n'existe pas, on la crée
     if not m:
         m = models.Mission(
             id=mission_data['id'],
-            title=mission_data['title'],
+            title=title,
             description=mission_data.get('description', ""),
             category_name=category_name,
-            # AJOUT ICI : On enregistre les conditions
             conditions=mission_data.get('conditions', []),
-            mission_type=m_type
+            mission_type=m_type,
+            duplicable=is_duplicable,
+            base_mission_id=mission_data.get('base_mission_id', None),
+            duplicate_count=duplicate_count
         )
         db.add(m)
     else:
-        # AJOUT ICI : Si elle existe déjà, on met à jour ses infos (titre, desc, conditions)
-        # Cela permet d'appliquer vos changements sans supprimer la BDD
-        m.title = mission_data['title']
+        # Si elle existe déjà, on met à jour ses infos (titre, desc, conditions)
+        m.title = title
         m.description = mission_data.get('description', "")
         m.conditions = mission_data.get('conditions', [])
         m.category_name = category_name
-        m.mission_type=m_type
+        m.mission_type = m_type
+        m.duplicable = is_duplicable
+        m.base_mission_id = mission_data.get('base_mission_id', None)
+        m.duplicate_count = duplicate_count
 
     db.commit()
     db.refresh(m)

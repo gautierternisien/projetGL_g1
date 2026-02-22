@@ -7,6 +7,7 @@ from typing import List, Optional, Dict
 from pathlib import Path
 from datetime import timedelta, datetime
 import json
+import re
 from jose import JWTError, jwt
 
 import crud, models, schemas, utils
@@ -20,47 +21,47 @@ NGC_DEFAULT_SCORE = 8559
 
 MISSIONS_DB = {
     "transport": [
-        {"id": 100, "title": 'Vélotaf', "description": 'Remplacez un trajet voiture par le vélo pour aller au travail ou faire une course.', "conditions": ["possession_voiture", "possession_velo"], "mission_type": "one_shot"},
+        {"id": 100, "title": 'Vélotaf', "description": 'Remplacez un trajet voiture par le vélo pour aller au travail ou faire une course.', "conditions": ["possession_voiture", "possession_velo"], "mission_type": "one_shot", "duplicable": True},
         {"id": 101, "title": 'Pression des pneus', "description": 'Vérifiez la pression de vos pneus. Des pneus sous-gonflés augmentent la consommation de carburant de 5% !', "conditions": ["possession_voiture"], "mission_type": "one_shot"},
-        {"id": 102, "title": 'Covoiturage malin', "description": 'Proposez ou cherchez un covoiturage pour votre prochain trajet moyen/longue distance.', "conditions": ["possession_voiture"], "mission_type": "one_shot"},
+        {"id": 102, "title": 'Covoiturage malin', "description": 'Proposez ou cherchez un covoiturage pour votre prochain trajet moyen/longue distance.', "conditions": ["possession_voiture"], "mission_type": "one_shot", "duplicable": True},
         {"id": 103, "title": 'Vacances sur rails', "description": 'Planifiez vos prochaines vacances en train plutôt qu\'en avion.', "conditions": ["prend_avion"], "mission_type": "one_shot"},
-        {"id": 105, "title": 'Transport en commun', "description": 'Utilisez les transports en commun au moins 3 jours cette semaine.', "conditions": ["possession_voiture"], "mission_type": "long_term"},
-        {"id": 104, "title": 'Journée sans voiture', "description": 'Utilisez les transports en commun, la marche ou le vélo pour tous vos déplacements aujourd\'hui.', "conditions": [], "mission_type": "one_shot"}
+        {"id": 105, "title": 'Transport en commun', "description": 'Utilisez les transports en commun au moins 3 jours cette semaine.', "conditions": ["possession_voiture"], "mission_type": "long_term", "duplicable": True},
+        {"id": 104, "title": 'Journée sans voiture', "description": 'Utilisez les transports en commun, la marche ou le vélo pour tous vos déplacements aujourd\'hui.', "conditions": [], "mission_type": "one_shot", "duplicable": True}
     ],
     "logement": [
         {"id": 200, "title": 'Chasse aux fuites', "description": 'Vérifiez les joints des fenêtres et portes. Une mauvaise isolation, c\'est chauffer le jardin !', "conditions": ["passoire_thermique"], "mission_type": "one_shot"},
         {"id": 201, "title": 'Thermostat intelligent', "description": 'Installez un thermostat programmable pour ne pas chauffer quand vous n\'êtes pas là.', "conditions": ["est_proprietaire"], "mission_type": "one_shot"},
         {"id": 202, "title": 'Récupérateur d\'eau', "description": 'Installez un système simple pour récupérer l\'eau de pluie pour arroser vos plantes.', "conditions": ["vit_en_maison"], "mission_type": "one_shot"},
-        {"id": 203, "title": 'Pull over chauffage', "description": 'Réduisez la température de 1°C pendant 1 semaine (ex: 19°C au lieu de 20°C). C\'est -7% sur la facture !', "conditions": [], "mission_type": "long_term"},
-        {"id": 204, "title": 'Douche express', "description": 'Essayez de limiter votre douche à 5 minutes pendant une semaine (le temps d\'une chanson).', "conditions": [], "mission_type": "long_term"},
+        {"id": 203, "title": 'Pull over chauffage', "description": 'Réduisez la température de 1°C pendant 1 semaine (ex: 19°C au lieu de 20°C). C\'est -7% sur la facture !', "conditions": [], "mission_type": "long_term", "duplicable": True},
+        {"id": 204, "title": 'Douche express', "description": 'Essayez de limiter votre douche à 5 minutes pendant une semaine (le temps d\'une chanson).', "conditions": [], "mission_type": "long_term", "duplicable": True},
         {"id": 205, "title": 'Multiprise à interrupteur', "description": 'Éteignez complètement vos appareils en veille (TV, Ordi) la nuit.', "conditions": [], "mission_type": "one_shot"},
-        {"id": 206, "title": 'Lavage efficace', "description": 'Laver le linge à 30°C pendant 5 lessives.', "conditions": [], "mission_type": "long_term"},
+        {"id": 206, "title": 'Lavage efficace', "description": 'Laver le linge à 30°C pendant 5 lessives.', "conditions": [], "mission_type": "long_term", "duplicable": True},
         {"id": 207, "title": 'Séchage à l\'air', "description": 'Sécher le linge à l\'air libre.', "conditions": [], "mission_type": "one_shot"}
     ],
     "alimentation": [
-        {"id": 300, "title": 'Journée Verte', "description": 'Remplacez la viande rouge par des légumineuses pour vos repas d\'aujourd\'hui.', "conditions": ["viande_rouge_importante"], "mission_type": "one_shot"},
-        {"id": 301, "title": 'Acheter local', "description": 'Achetez vos fruits et légumes au marché ou chez un producteur local cette semaine.', "conditions": ["conso_pas_locaux"], "mission_type": "long_term"},
+        {"id": 300, "title": 'Journée Verte', "description": 'Remplacez la viande rouge par des légumineuses pour vos repas d\'aujourd\'hui.', "conditions": ["viande_rouge_importante"], "mission_type": "one_shot", "duplicable": True},
+        {"id": 301, "title": 'Acheter local', "description": 'Achetez vos fruits et légumes au marché ou chez un producteur local cette semaine.', "conditions": ["conso_pas_locaux"], "mission_type": "long_term", "duplicable": True},
         {"id": 302, "title": 'Calendrier de saison', "description": 'Vérifiez si les produits de votre panier sont de saison. Pas de tomates en hiver !', "conditions": ["conso_pas_saison"], "mission_type": "one_shot"},
-        {"id": 303, "title": 'Gourde attitude', "description": 'Adoptez une gourde et bannissez les bouteilles en plastique pendant une semaine.', "conditions": ["eau_bouteille"], "mission_type": "long_term"},
+        {"id": 303, "title": 'Gourde attitude', "description": 'Adoptez une gourde et bannissez les bouteilles en plastique pendant une semaine.', "conditions": ["eau_bouteille"], "mission_type": "long_term", "duplicable": True},
         {"id": 304, "title": 'Pause café zéro déchet', "description": 'Amenez votre propre tasse au travail pour éviter les gobelets jetables.', "conditions": ["boissons_chaudes", "dechets_importants"], "mission_type": "one_shot"},
-        {"id": 305, "title": 'Semaine sans soda', "description": 'Remplacez les sodas par de l\'eau ou des tisanes maison.', "conditions": ["soda"], "mission_type": "long_term"},
-        {"id": 309, "title": 'Semaine sans déchet alimentaire', "description": 'Éviter le gaspillage alimentaire pendant une semaine.', "conditions": ["dechets_importants"], "mission_type": "long_term"},
-        {"id": 306, "title": 'Cuisine des restes', "description": 'Faites un repas "touski" (tout ce qu\'il reste) pour éviter le gaspillage.', "conditions": [], "mission_type": "one_shot"},
-        {"id": 307, "title": 'Semaine végétarienne', "description": 'Faire 3 jours végétarien cette semaine.', "conditions": [], "mission_type": "long_term"},
+        {"id": 305, "title": 'Semaine sans soda', "description": 'Remplacez les sodas par de l\'eau ou des tisanes maison.', "conditions": ["soda"], "mission_type": "long_term", "duplicable": True},
+        {"id": 309, "title": 'Semaine sans déchet alimentaire', "description": 'Éviter le gaspillage alimentaire pendant une semaine.', "conditions": ["dechets_importants"], "mission_type": "long_term", "duplicable": True},
+        {"id": 306, "title": 'Cuisine des restes', "description": 'Faites un repas "touski" (tout ce qu\'il reste) pour éviter le gaspillage.', "conditions": [], "mission_type": "one_shot", "duplicable": True},
+        {"id": 307, "title": 'Semaine végétarienne', "description": 'Faire 3 jours végétarien cette semaine.', "conditions": [], "mission_type": "long_term", "duplicable": True},
         {"id": 308, "title": 'Aujourd\'hui en vrac', "description": 'Acheter 5 produits différents en vrac.', "conditions": [], "mission_type": "one_shot"}
     ],
     "divers": [
         {"id": 400, "title": 'Règle des 48h', "description": 'Vous avez envie d\'acheter ce vêtement neuf ? Attendez 48h pour voir si l\'envie passe.', "conditions": ["shopping_important"], "mission_type": "one_shot"},
-        {"id": 401, "title": 'Cendrier de poche', "description": 'Si vous fumez à l\'extérieur, ne jetez aucun mégot par terre cette semaine.', "conditions": ["fumeur"], "mission_type": "long_term"},
+        {"id": 401, "title": 'Cendrier de poche', "description": 'Si vous fumez à l\'extérieur, ne jetez aucun mégot par terre cette semaine.', "conditions": ["fumeur"], "mission_type": "long_term", "duplicable": True},
         {"id": 402, "title": 'Compostage', "description": 'Installez un bac à compost dans votre jardin pour vos épluchures.', "conditions": ["vit_en_maison", "dechets_importants"], "mission_type": "one_shot"},
-        {"id": 403, "title": 'Seconde main', "description": 'Pour votre prochain achat (livre, vêtement, déco), regardez l\'achat d\'occasion.', "conditions": [], "mission_type": "one_shot"},
-        {"id": 404, "title": 'Réparer avant de jeter', "description": 'Recousez un bouton ou collez cet objet cassé au lieu de le remplacer.', "conditions": [], "mission_type": "one_shot"},
+        {"id": 403, "title": 'Seconde main', "description": 'Pour votre prochain achat (livre, vêtement, déco), regardez l\'achat d\'occasion.', "conditions": [], "mission_type": "one_shot", "duplicable": True},
+        {"id": 404, "title": 'Réparer avant de jeter', "description": 'Recousez un bouton ou collez cet objet cassé au lieu de le remplacer.', "conditions": [], "mission_type": "one_shot", "duplicable": True},
         {"id": 405, "title": 'Ménage au naturel', "description": 'Fabriquez un produit ménager maison (vinaigre blanc + eau) pour remplacer un produit chimique.', "conditions": [], "mission_type": "one_shot"},
-        {"id": 406, "title": 'Nettoyage numérique', "description": 'Supprimer 100 mails inutiles.', "conditions": [], "mission_type": "one_shot"},
+        {"id": 406, "title": 'Nettoyage numérique', "description": 'Supprimer 100 mails inutiles.', "conditions": [], "mission_type": "one_shot", "duplicable": True},
         {"id": 407, "title": 'Désabonnement', "description": 'Se désabonner de 5 listes de distribution non lues.', "conditions": [], "mission_type": "one_shot"},
         {"id": 408, "title": 'Veille nocturne', "description": 'Éteindre votre box internet pendant la nuit.', "conditions": [], "mission_type": "one_shot"},
-        {"id": 409, "title": 'Stop Sac Plastique', "description": 'Ne pas utiliser de sacs plastiques jetable pendant 1 semaine.', "conditions": [], "mission_type": "long_term"},
-        {"id": 410, "title": 'Seconde vie', "description": 'Revendre ou donner 1 objet inutilisé.', "conditions": [], "mission_type": "one_shot"}
+        {"id": 409, "title": 'Stop Sac Plastique', "description": 'Ne pas utiliser de sacs plastiques jetable pendant 1 semaine.', "conditions": [], "mission_type": "long_term", "duplicable": True},
+        {"id": 410, "title": 'Seconde vie', "description": 'Revendre ou donner 1 objet inutilisé.', "conditions": [], "mission_type": "one_shot", "duplicable": True}
     ],
 }
 
@@ -148,6 +149,18 @@ def init_trophies(db: Session):
 # --- HELPER FUNCTIONS ---
 def get_trophy_milestones(trophy):
     return trophy.milestones or []
+
+def extract_base_mission_title(title: str) -> str:
+    """
+    Extrait le titre de base d'une mission duplicable.
+    Ex: "Vélotaf 1" -> "Vélotaf"
+    Ex: "Journée sans voiture 3" -> "Journée sans voiture"
+    """
+    # Enlève " X" à la fin où X est un nombre
+    match = re.match(r'^(.+)\s+\d+$', title)
+    if match:
+        return match.group(1)
+    return title
 
 # --- RULES ROUTE ---
 RULES_PATH = Path(__file__).parent / "ngc" / "rules.json"
@@ -357,7 +370,11 @@ async def delete_friend(friend_id: int, current_user: models.User = Depends(get_
 # --- MISSIONS ROUTES ---
 @router.get("/missions/{category}", response_model=List[schemas.Mission], tags=["Missions"], summary="Get missions by category")
 async def get_missions_by_category(category: str, user_id: Optional[int] = None, db: Session = Depends(get_db)):
-    all_missions_db = db.query(models.Mission).filter(models.Mission.category_name == category).all()
+    # Récupérer les missions partagées (user_id IS NULL) et les missions personnelles de l'utilisateur
+    all_missions_db = db.query(models.Mission).filter(
+        models.Mission.category_name == category,
+        or_(models.Mission.user_id.is_(None), models.Mission.user_id == user_id) if user_id else models.Mission.user_id.is_(None)
+    ).all()
 
     if not all_missions_db and category in MISSIONS_DB:
         all_missions_db = [models.Mission(**m) for m in MISSIONS_DB[category]]
@@ -381,6 +398,62 @@ async def get_missions_by_category(category: str, user_id: Optional[int] = None,
                     break
 
             if is_eligible:
+                # Vérifier si cette mission a un statut pour l'utilisateur
+                status_entry = crud.get_user_mission_status(db, user_id, mission.id)
+                mission_status = status_entry.status if status_entry else "new"
+                
+                # Si la mission est duplicable, filtrer par statut
+                if mission.duplicable:
+                    base_id = mission.base_mission_id if mission.base_mission_id else mission.id
+                    
+                    if mission_status == "termine":
+                        # Pour les missions terminées, trouver la dernière version terminée
+                        highest_terminated = db.query(models.Mission).join(
+                            models.UserMissionStatus,
+                            models.UserMissionStatus.mission_id == models.Mission.id
+                        ).filter(
+                            or_(
+                                models.Mission.id == base_id,
+                                models.Mission.base_mission_id == base_id
+                            ),
+                            or_(
+                                models.Mission.user_id.is_(None),
+                                models.Mission.user_id == user_id
+                            ),
+                            models.UserMissionStatus.user_id == user_id,
+                            models.UserMissionStatus.status == "termine"
+                        ).order_by(models.Mission.duplicate_count.desc()).first()
+                        
+                        # Ne montrer que la dernière version terminée
+                        if highest_terminated and highest_terminated.id != mission.id:
+                            continue
+                    else:
+                        # Pour les missions non terminées, trouver la dernière version non terminée
+                        all_versions = db.query(models.Mission).filter(
+                            or_(
+                                models.Mission.id == base_id,
+                                models.Mission.base_mission_id == base_id
+                            ),
+                            or_(
+                                models.Mission.user_id.is_(None),
+                                models.Mission.user_id == user_id
+                            )
+                        ).all()
+                        
+                        # Filtrer pour ne garder que les versions non terminées
+                        non_terminated_versions = []
+                        for v in all_versions:
+                            v_status = crud.get_user_mission_status(db, user_id, v.id)
+                            v_status_str = v_status.status if v_status else "new"
+                            if v_status_str != "termine":
+                                non_terminated_versions.append(v)
+                        
+                        # Trouver la dernière version non terminée
+                        if non_terminated_versions:
+                            highest_non_terminated = max(non_terminated_versions, key=lambda x: x.duplicate_count)
+                            if highest_non_terminated.id != mission.id:
+                                continue
+                
                 filtered_missions.append(mission)
     else:
         filtered_missions = all_missions_db
@@ -403,6 +476,9 @@ async def get_missions_by_category(category: str, user_id: Optional[int] = None,
 async def update_mission(mission_id: int, payload: schemas.MissionUpdate, db: Session = Depends(get_db)):
     mission_db = db.query(models.Mission).filter(models.Mission.id == mission_id).first()
     mission_title = "Unknown Mission"
+    is_duplicable = False
+    mission_category = None
+    mission_data = None
 
     if not mission_db:
         found = False
@@ -410,6 +486,9 @@ async def update_mission(mission_id: int, payload: schemas.MissionUpdate, db: Se
             for m in missions:
                 if int(m.get('id')) == mission_id:
                     mission_title = m.get('title', 'Mission')
+                    is_duplicable = m.get('duplicable', False)
+                    mission_category = cat
+                    mission_data = m
                     found = True
                     break
             if found: break
@@ -417,10 +496,36 @@ async def update_mission(mission_id: int, payload: schemas.MissionUpdate, db: Se
             raise HTTPException(status_code=404, detail="Mission non trouvée")
     else:
         mission_title = mission_db.title
+        is_duplicable = mission_db.duplicable
+        mission_category = mission_db.category_name
 
     if payload.user_id:
         crud.update_user_mission_status(db, payload.user_id, mission_id, payload.status)
         crud.update_trophy_progress(db, payload.user_id)
+
+        # Si on remet une mission "en_cours", supprimer les versions ultérieures
+        if payload.status == 'en_cours' and is_duplicable and mission_db:
+            base_id = mission_db.base_mission_id if mission_db.base_mission_id else mission_id
+            current_count = mission_db.duplicate_count
+            
+            # Trouver et supprimer toutes les versions avec duplicate_count > current
+            newer_versions = db.query(models.Mission).filter(
+                models.Mission.base_mission_id == base_id,
+                models.Mission.duplicate_count > current_count,
+                models.Mission.user_id == payload.user_id
+            ).all()
+            
+            for newer in newer_versions:
+                # Supprimer les statuts associés
+                db.query(models.UserMissionStatus).filter(
+                    models.UserMissionStatus.user_id == payload.user_id,
+                    models.UserMissionStatus.mission_id == newer.id
+                ).delete()
+                # Supprimer la mission elle-même
+                db.delete(newer)
+            
+            if newer_versions:
+                db.commit()
 
         if payload.status == 'termine':
             user = crud.get_user(db, payload.user_id)
@@ -438,6 +543,51 @@ async def update_mission(mission_id: int, payload: schemas.MissionUpdate, db: Se
                 for friend in friends:
                     if friend.username not in user_feed_db: user_feed_db[friend.username] = []
                     user_feed_db[friend.username].append(new_activity)
+            
+            # Logique pour les missions duplicables : garder l'historique
+            if is_duplicable and mission_db:
+                base_id = mission_db.base_mission_id if mission_db.base_mission_id else mission_id
+                
+                # Déterminer le prochain numéro (commence à 2)
+                current_count = mission_db.duplicate_count
+                next_count = current_count + 1
+                
+                # Le titre de base (sans numéro)
+                base_title = extract_base_mission_title(mission_db.title) if current_count > 0 else mission_db.title
+                new_title = f"{base_title} {next_count + 1}"
+                
+                # Vérifier si la prochaine version existe déjà
+                existing_next = db.query(models.Mission).filter(
+                    models.Mission.base_mission_id == base_id,
+                    models.Mission.duplicate_count == next_count,
+                    models.Mission.user_id == payload.user_id
+                ).first()
+                
+                # Créer la mission suivante seulement si elle n'existe pas déjà
+                if not existing_next:
+                    new_mission = models.Mission(
+                        title=new_title,
+                        description=mission_db.description,
+                        category_name=mission_db.category_name,
+                        conditions=mission_db.conditions,
+                        mission_type=mission_db.mission_type,
+                        duplicable=True,
+                        base_mission_id=base_id,
+                        duplicate_count=next_count,
+                        user_id=payload.user_id
+                    )
+                    db.add(new_mission)
+                    db.commit()
+                    db.refresh(new_mission)
+                    
+                    # Créer le statut "new" pour cette nouvelle mission
+                    new_status = models.UserMissionStatus(
+                        user_id=payload.user_id,
+                        mission_id=new_mission.id,
+                        status="new"
+                    )
+                    db.add(new_status)
+                    db.commit()
 
         return {"id": mission_id, "status": payload.status}
     else:
