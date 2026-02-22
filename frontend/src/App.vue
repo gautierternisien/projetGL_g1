@@ -14,7 +14,7 @@
         <div class="trophy-popup-content">
           <div class="trophy-popup-reward-icon">{{ trophiesStore.newTrophyNotification?.milestoneIcon }}</div>
           <p class="trophy-popup-title">{{ trophiesStore.newTrophyNotification?.trophy.title }}</p>
-          <p class="trophy-popup-milestone">{{ trophiesStore.newTrophyNotification?.milestone }} obtenue</p>
+          <p class="trophy-popup-milestone">{{ trophiesStore.newTrophyNotification?.milestone }} obtenu</p>
         </div>
         <div class="trophy-popup-actions">
           <button @click="dismissTrophyNotification" class="trophy-popup-btn trophy-popup-btn-secondary">Plus tard</button>
@@ -281,7 +281,6 @@ watch(() => showTrophyNotification.value, (isVisible) => {
   display: flex;
   justify-content: center;
   align-items: center;
-  //background-color: rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(5px);
 }
 

@@ -73,11 +73,11 @@ TROPHIES_DATA = [
         "icon": "🏆",
         "tier": "progressive",
         "requirement_type": "login_count",
-        "requirement_value": 5,
+        "requirement_value": 8,
         "milestones": [
             {"value": 2, "label": "Bronze", "icon": "🥉"},
-            {"value": 3, "label": "Argent", "icon": "🥈"},
-            {"value": 4, "label": "Or", "icon": "🥇"}
+            {"value": 4, "label": "Argent", "icon": "🥈"},
+            {"value": 6, "label": "Or", "icon": "🥇"}
         ]
     },
     {
@@ -95,9 +95,6 @@ TROPHIES_DATA = [
         ]
     }
 ]
-
-# Feed des activités
-user_feed_db: Dict[str, List[Dict]] = {}
 
 # --- DEPENDENCIES ---
 def get_db():
@@ -227,15 +224,6 @@ async def update_user_username(new_username: str, current_user: models.User = De
     if existing_user and existing_user.id != current_user.id:
         raise HTTPException(status_code=400, detail="Pseudo déjà utilisé")
 
-    old_username = current_user.username
-    user_id = current_user.id
-    if old_username in user_feed_db:
-        user_feed_db[new_username] = user_feed_db.pop(old_username)
-    for feed in user_feed_db.values():
-        for act in feed:
-            if act.get("sender_id") == user_id:
-                act["sender_username"] = new_username
-
     return crud.update_user_username(db, current_user.id, new_username)
 
 @router.put("/users/me/first_name", response_model=schemas.User, tags=["Users"])
@@ -288,18 +276,22 @@ async def list_friends(current_user: models.User = Depends(get_current_user), db
 
 @router.get("/friends/activity", response_model=List[schemas.FriendActivity], tags=["Friends"])
 async def get_friends_activity(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
-    my_feed = user_feed_db.get(current_user.username, [])
+    activities = crud.get_user_activities(db, current_user.id)
     response_activities = []
-    for activity in reversed(my_feed):
-        sender = crud.get_user(db, activity["sender_id"])
-        sender_username = "utilisateur_supprimé" if sender and sender.is_deleted else activity["sender_username"]
+    for activity in activities:
+        sender = crud.get_user(db, activity.sender_id)
+        sender_username = "utilisateur_supprimé" if sender and sender.is_deleted else (sender.username if sender else "Inconnu")
         response_activities.append(schemas.FriendActivity(
-            friend_id=activity["sender_id"],
+            friend_id=activity.sender_id,
             friend_username=sender_username,
-            mission_title=activity["mission_title"],
-            mission_id=activity["mission_id"],
-            status=activity["status"],
-            timestamp=activity["timestamp"].isoformat() if activity.get("timestamp") else None
+            activity_type=activity.activity_type,
+            mission_title=activity.mission_title,
+            mission_id=activity.mission_id,
+            trophy_title=activity.trophy_title,
+            trophy_id=activity.trophy_id,
+            trophy_icon=activity.trophy_icon,
+            status=activity.status,
+            timestamp=activity.created_at.isoformat() if activity.created_at else None
         ))
     return response_activities
 
@@ -358,13 +350,19 @@ async def delete_friend(friend_id: int, current_user: models.User = Depends(get_
         crud.remove_friend(db, current_user.id, friend_id)
         db.delete(req)
         db.commit()
+        
+        # Supprimer les activités de l'ami du feed de l'utilisateur
         friend_user = crud.get_user(db, friend_id)
         if friend_user:
-            friend_username = friend_user.username
-            if current_user.username in user_feed_db:
-                user_feed_db[current_user.username] = [act for act in user_feed_db[current_user.username] if act["sender_username"] != friend_username]
-            if friend_username in user_feed_db:
-                user_feed_db[friend_username] = [act for act in user_feed_db[friend_username] if act["sender_username"] != current_user.username]
+            db.query(models.Activity).filter(
+                models.Activity.user_id == current_user.id,
+                models.Activity.sender_id == friend_id
+            ).delete()
+            db.query(models.Activity).filter(
+                models.Activity.user_id == friend_id,
+                models.Activity.sender_id == current_user.id
+            ).delete()
+            db.commit()
     return {"deleted": True}
 
 # --- MISSIONS ROUTES ---
@@ -501,7 +499,34 @@ async def update_mission(mission_id: int, payload: schemas.MissionUpdate, db: Se
 
     if payload.user_id:
         crud.update_user_mission_status(db, payload.user_id, mission_id, payload.status)
-        crud.update_trophy_progress(db, payload.user_id)
+        newly_obtained_trophies, lost_trophies = crud.update_trophy_progress(db, payload.user_id)
+        
+        # Ajouter les nouveaux trophées au feed
+        if newly_obtained_trophies:
+            user = crud.get_user(db, payload.user_id)
+            if user:
+                friend_ids = crud.get_accepted_friends(db, user.id)
+                for trophy in newly_obtained_trophies:
+                    for friend_id in friend_ids:
+                        crud.create_activity(
+                            db=db,
+                            user_id=friend_id,
+                            sender_id=payload.user_id,
+                            activity_type="trophy",
+                            trophy_id=trophy.id,
+                            trophy_title=trophy.title,
+                            trophy_icon=trophy.icon,
+                            status="obtained"
+                        )
+        
+        # Supprimer les trophées perdus du feed
+        if lost_trophies:
+            for trophy in lost_trophies:
+                crud.delete_trophy_activities(db, payload.user_id, trophy.id)
+        
+        # Si la mission n'est plus "termine", supprimer l'activité du feed
+        if payload.status != 'termine':
+            crud.delete_mission_activities(db, payload.user_id, mission_id)
 
         # Si on remet une mission "en_cours", supprimer les versions ultérieures
         if payload.status == 'en_cours' and is_duplicable and mission_db:
@@ -531,18 +556,16 @@ async def update_mission(mission_id: int, payload: schemas.MissionUpdate, db: Se
             user = crud.get_user(db, payload.user_id)
             if user:
                 friend_ids = crud.get_accepted_friends(db, user.id)
-                friends = crud.get_users_by_ids(db, friend_ids)
-                new_activity = {
-                    "sender_id": payload.user_id,
-                    "sender_username": user.username,
-                    "mission_id": mission_id,
-                    "mission_title": mission_title,
-                    "status": payload.status,
-                    "timestamp": datetime.now()
-                }
-                for friend in friends:
-                    if friend.username not in user_feed_db: user_feed_db[friend.username] = []
-                    user_feed_db[friend.username].append(new_activity)
+                for friend_id in friend_ids:
+                    crud.create_activity(
+                        db=db,
+                        user_id=friend_id,
+                        sender_id=payload.user_id,
+                        activity_type="mission",
+                        mission_id=mission_id,
+                        mission_title=mission_title,
+                        status=payload.status
+                    )
             
             # Logique pour les missions duplicables : garder l'historique
             if is_duplicable and mission_db:

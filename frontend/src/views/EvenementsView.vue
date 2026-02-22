@@ -40,8 +40,13 @@ onMounted(async () => {
             <div class="avatar">{{ act.friend_username.charAt(0).toUpperCase() }}</div>
             <div class="activity-info">
               <span class="friend-name">{{ act.friend_username }}</span>
-              <span class="activity-text">a terminé la mission</span>
-              <span class="mission-title">"{{ act.mission_title }}"</span>
+              <span v-if="act.activity_type === 'mission'" class="activity-text">a terminé la mission</span>
+              <span v-if="act.activity_type === 'mission'" class="mission-title">"{{ act.mission_title }}"</span>
+              <span v-if="act.activity_type === 'trophy'" class="activity-text">a obtenu le trophée</span>
+              <span v-if="act.activity_type === 'trophy'" class="trophy-badge">
+                <span class="trophy-icon">{{ act.trophy_icon }}</span>
+                <span class="trophy-title">{{ act.trophy_title }}</span>
+              </span>
             </div>
           </div>
         </div>
@@ -128,5 +133,25 @@ onMounted(async () => {
   font-style: italic;
   font-weight: 500;
   color: #679436;
+}
+
+.trophy-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-weight: 600;
+  color: #333;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.trophy-icon {
+  font-size: 1.2rem;
+}
+
+.trophy-title {
+  font-size: 0.9rem;
 }
 </style>

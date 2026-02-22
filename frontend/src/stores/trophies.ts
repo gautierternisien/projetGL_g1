@@ -22,12 +22,12 @@ export interface NewTrophyNotification {
   trophy: Trophy
   milestone: string
   milestoneIcon: string
+  milestoneKey: string
 }
 
 const getSeenTrophiesKey = (userId: number) => `seen_trophy_ids_${userId}`
 
 export const useTrophiesStore = defineStore('trophies', () => {
-  const obtainedTrophies = ref<Trophy[]>([])
   const newTrophyNotification = ref<NewTrophyNotification | null>(null)
 
   function getSeenTrophyIds(userId: number): Set<string> {
@@ -47,41 +47,36 @@ export const useTrophiesStore = defineStore('trophies', () => {
     }
   }
 
-  function getLastObtainedMilestone(trophy: Trophy): { label: string; icon: string } {
+  function getAllAchievedMilestones(trophy: Trophy): Array<{ key: string; label: string; icon: string; value: number }> {
     const progress = trophy.progress || 0
     const finalValue = trophy.requirement_value || 5
     const milestones = trophy.milestones || []
+    const achieved: Array<{ key: string; label: string; icon: string; value: number }> = []
     
-    // Si le trophée final est obtenu
-    if (progress >= finalValue) {
-      return { label: 'Trophée', icon: trophy.icon || '🏆' }
-    }
-    
-    // Sinon, trouver la médaille la plus haute obtenue
-    const sortedMilestones = [...milestones].sort((a, b) => b.value - a.value)
-    for (const milestone of sortedMilestones) {
+    // Ajouter tous les milestones atteints
+    for (const milestone of milestones) {
       if (progress >= milestone.value) {
-        return { label: milestone.label, icon: milestone.icon }
+        achieved.push({
+          key: `${trophy.id}_milestone_${milestone.value}`,
+          label: milestone.label,
+          icon: milestone.icon,
+          value: milestone.value
+        })
       }
     }
-    return { label: 'Récompense', icon: '🎁' }
-  }
-
-  async function fetchObtainedTrophies(token: string) {
-    try {
-      const response = await fetch(`${API_URL}/trophies/obtained`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+    
+    // Ajouter le trophée final si atteint
+    if (progress >= finalValue) {
+      achieved.push({
+        key: `${trophy.id}_final`,
+        label: 'Trophée',
+        icon: trophy.icon || '🏆',
+        value: finalValue
       })
-
-      if (response.ok) {
-        const data = await response.json()
-        obtainedTrophies.value = data.trophies || []
-      }
-    } catch (error) {
-      console.error('Erreur lors du chargement des trophées:', error)
     }
+    
+    // Trier par valeur croissante pour notifier du plus petit au plus grand
+    return achieved.sort((a, b) => a.value - b.value)
   }
 
   async function checkNewTrophies(token: string, userId: number, silent: boolean = false) {
@@ -97,15 +92,17 @@ export const useTrophiesStore = defineStore('trophies', () => {
         const trophies: Trophy[] = data.trophies || []
         const seenIds = getSeenTrophyIds(userId)
         
-        // Créer un Set des trophées actuellement obtenus pour nettoyage
-        const currentTrophyKeys = new Set(
-          trophies.map(t => `${t.id}_${t.progress}`)
-        )
+        // Créer un Set de tous les milestones actuellement atteints
+        const currentMilestoneKeys = new Set<string>()
+        trophies.forEach(trophy => {
+          const achieved = getAllAchievedMilestones(trophy)
+          achieved.forEach(m => currentMilestoneKeys.add(m.key))
+        })
         
-        // Nettoyer le localStorage : retirer les trophées vus qui ne sont plus obtenus
+        // Nettoyer le localStorage : retirer les milestones vus qui ne sont plus atteints
         const cleanedSeenIds = new Set<string>()
         seenIds.forEach(seenKey => {
-          if (currentTrophyKeys.has(seenKey)) {
+          if (currentMilestoneKeys.has(seenKey)) {
             cleanedSeenIds.add(seenKey)
           }
         })
@@ -115,25 +112,28 @@ export const useTrophiesStore = defineStore('trophies', () => {
           saveSeenTrophyIds(userId, cleanedSeenIds)
         }
         
-        // En mode silencieux, marquer tous les trophées comme vus sans notification
+        // En mode silencieux, marquer tous les milestones comme vus sans notification
         if (silent) {
-          const allTrophyKeys = new Set(trophies.map(t => `${t.id}_${t.progress}`))
-          saveSeenTrophyIds(userId, allTrophyKeys)
+          saveSeenTrophyIds(userId, currentMilestoneKeys)
           newTrophyNotification.value = null
           return
         }
         
-        // Trouver le premier nouveau trophée non vu
+        // Trouver le premier nouveau milestone non vu
         for (const trophy of trophies) {
-          const trophyKey = `${trophy.id}_${trophy.progress}`
-          if (!cleanedSeenIds.has(trophyKey)) {
-            const milestoneData = getLastObtainedMilestone(trophy)
-            newTrophyNotification.value = { 
-              trophy, 
-              milestone: milestoneData.label,
-              milestoneIcon: milestoneData.icon
+          const achievedMilestones = getAllAchievedMilestones(trophy)
+          
+          for (const milestone of achievedMilestones) {
+            if (!cleanedSeenIds.has(milestone.key)) {
+              // Nouveau milestone trouvé !
+              newTrophyNotification.value = { 
+                trophy, 
+                milestone: milestone.label,
+                milestoneIcon: milestone.icon,
+                milestoneKey: milestone.key
+              }
+              return
             }
-            return
           }
         }
         
@@ -144,30 +144,22 @@ export const useTrophiesStore = defineStore('trophies', () => {
     }
   }
 
-  function markTrophyAsSeen(userId: number, trophyId: number, progress: number) {
+  function markMilestoneAsSeen(userId: number, milestoneKey: string) {
     const seenIds = getSeenTrophyIds(userId)
-    const trophyKey = `${trophyId}_${progress}`
-    seenIds.add(trophyKey)
+    seenIds.add(milestoneKey)
     saveSeenTrophyIds(userId, seenIds)
     newTrophyNotification.value = null
   }
 
   function dismissNotification(userId: number) {
     if (newTrophyNotification.value) {
-      markTrophyAsSeen(
-        userId,
-        newTrophyNotification.value.trophy.id,
-        newTrophyNotification.value.trophy.progress || 0
-      )
+      markMilestoneAsSeen(userId, newTrophyNotification.value.milestoneKey)
     }
   }
 
   return {
-    obtainedTrophies,
     newTrophyNotification,
-    fetchObtainedTrophies,
     checkNewTrophies,
-    markTrophyAsSeen,
     dismissNotification
   }
 })

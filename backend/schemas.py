@@ -63,8 +63,12 @@ class FriendProfile(BaseModel):
 class FriendActivity(BaseModel):
     friend_id: int
     friend_username: str
-    mission_title: str
-    mission_id: int
+    activity_type: str  # 'mission' ou 'trophy'
+    mission_title: Optional[str] = None
+    mission_id: Optional[int] = None
+    trophy_title: Optional[str] = None
+    trophy_id: Optional[int] = None
+    trophy_icon: Optional[str] = None
     status: str
     timestamp: Optional[str] = None
 

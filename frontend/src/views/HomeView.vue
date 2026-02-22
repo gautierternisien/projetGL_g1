@@ -751,7 +751,7 @@ watch(isConnected, () => {
       </RouterLink>
 
       <RouterLink to="/missions" class="unstyled-link">
-        <Card title="Missions en cours" :hasArrow="true">
+        <Card title="Dernières missions en cours" :hasArrow="true">
           <div v-if="isConnected" class="carousel-container">
             <div v-for="item in displayMissions" :key="item.mission.id" class="mission-card">
               <RouterLink
@@ -776,7 +776,7 @@ watch(isConnected, () => {
       </RouterLink>
 
       <RouterLink to="/communaute" class="unstyled-link">
-        <Card title="Évènements communautaires " :hasArrow="true">
+        <Card title="Derniers évènements communautaires " :hasArrow="true">
           <div v-if="isConnected" class="carousel-container">
             <div v-for="(event, i) in events" :key="i" class="mission-card">
               <RouterLink to="/communaute/evenements" class="unstyled-link inner-mission-link">
@@ -784,7 +784,12 @@ watch(isConnected, () => {
                   <span class="card-icon">👥</span>
                   <div class="card-texts">
                     <span class="card-title">{{ event.friend_username }}</span>
-                    <span class="card-subtitle">a terminé : {{ event.mission_title }}</span>
+                    <span v-if="event.activity_type === 'mission'" class="card-subtitle">
+                      a terminé : {{ event.mission_title }}
+                    </span>
+                    <span v-if="event.activity_type === 'trophy'" class="card-subtitle">
+                      a obtenu le trophée: {{ event.trophy_icon }} {{ event.trophy_title }}
+                    </span>
                   </div>
                 </div>
               </RouterLink>

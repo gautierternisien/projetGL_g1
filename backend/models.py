@@ -1,5 +1,6 @@
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, UniqueConstraint, JSON, DateTime
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 from database import Base
 
 class User(Base):
@@ -286,3 +287,30 @@ class UserLogin(Base):
     login_at = Column(DateTime)
 
     user = relationship("User", back_populates="logins")
+
+
+class Activity(Base):
+    __tablename__ = "activities"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)  # L'utilisateur qui verra cette activité dans son feed
+    sender_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # L'utilisateur qui a fait l'action
+    activity_type = Column(String, nullable=False)  # "mission" ou "trophy"
+    
+    # Pour les missions
+    mission_id = Column(Integer, ForeignKey("missions.id"), nullable=True)
+    mission_title = Column(String, nullable=True)
+    
+    # Pour les trophées
+    trophy_id = Column(Integer, ForeignKey("trophies.id"), nullable=True)
+    trophy_title = Column(String, nullable=True)
+    trophy_icon = Column(String, nullable=True)
+    
+    status = Column(String, nullable=False)  # "termine" ou "obtained"
+    created_at = Column(DateTime, server_default=func.now())
+    
+    # Relations
+    user = relationship("User", foreign_keys=[user_id])
+    sender = relationship("User", foreign_keys=[sender_id])
+    mission = relationship("Mission", foreign_keys=[mission_id])
+    trophy = relationship("Trophy", foreign_keys=[trophy_id])

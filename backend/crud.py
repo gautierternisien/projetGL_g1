@@ -910,7 +910,8 @@ def get_user_login_count(db: Session, user_id: int):
 
 
 def update_trophy_progress(db: Session, user_id: int):
-    """Update trophy progress for a user based on their activities"""
+    """Update trophy progress for a user based on their activities
+    Returns a tuple of (newly obtained trophies, lost trophies)"""
     from datetime import datetime
 
     # Get login count and mission count
@@ -919,6 +920,9 @@ def update_trophy_progress(db: Session, user_id: int):
 
     # Get all trophies
     trophies = get_all_trophies(db)
+    
+    newly_obtained_trophies = []
+    lost_trophies = []
 
     for trophy in trophies:
         # Determine the count based on trophy type
@@ -947,8 +951,15 @@ def update_trophy_progress(db: Session, user_id: int):
         # If trophée just became obtained
         if is_obtained and existing_trophy and not existing_trophy.is_obtained:
             obtained_at = datetime.utcnow()
+            newly_obtained_trophies.append(trophy)
         elif is_obtained and not existing_trophy:
             obtained_at = datetime.utcnow()
+            newly_obtained_trophies.append(trophy)
+        
+        # If trophée was obtained but is no longer
+        if existing_trophy and existing_trophy.is_obtained and not is_obtained:
+            obtained_at = None
+            lost_trophies.append(trophy)
 
         # Update last_milestone_date when a milestone is reached
         # Chercher la médaille la plus haute obtenue (tri décroissant)
@@ -964,6 +975,8 @@ def update_trophy_progress(db: Session, user_id: int):
                     break
 
         upsert_user_trophy(db, user_id, trophy.id, progress, is_obtained, obtained_at, last_milestone_date)
+    
+    return newly_obtained_trophies, lost_trophies
 
 
 # --- USER PREFERENCES ---
@@ -1079,3 +1092,61 @@ def process_league_rewards(db: Session):
         # 5. Marquer la ligue comme traitée
         league.rewards_distributed = True
         db.commit()
+
+
+# --- ACTIVITIES (FEED) ---
+
+def create_activity(db: Session, user_id: int, sender_id: int, activity_type: str, status: str,
+                   mission_id: int = None, mission_title: str = None,
+                   trophy_id: int = None, trophy_title: str = None, trophy_icon: str = None):
+    """Create a new activity in the feed for a specific user"""
+    activity = models.Activity(
+        user_id=user_id,
+        sender_id=sender_id,
+        activity_type=activity_type,
+        mission_id=mission_id,
+        mission_title=mission_title,
+        trophy_id=trophy_id,
+        trophy_title=trophy_title,
+        trophy_icon=trophy_icon,
+        status=status
+    )
+    db.add(activity)
+    db.commit()
+    db.refresh(activity)
+    return activity
+
+
+def get_user_activities(db: Session, user_id: int, limit: int = 100):
+    """Get all activities for a user's feed, ordered by most recent first"""
+    return db.query(models.Activity).filter(
+        models.Activity.user_id == user_id
+    ).order_by(models.Activity.created_at.desc()).limit(limit).all()
+
+
+def delete_mission_activities(db: Session, sender_id: int, mission_id: int):
+    """Delete all mission activities for a specific sender and mission"""
+    db.query(models.Activity).filter(
+        models.Activity.sender_id == sender_id,
+        models.Activity.activity_type == "mission",
+        models.Activity.mission_id == mission_id
+    ).delete()
+    db.commit()
+
+
+def delete_trophy_activities(db: Session, sender_id: int, trophy_id: int):
+    """Delete all trophy activities for a specific sender and trophy"""
+    db.query(models.Activity).filter(
+        models.Activity.sender_id == sender_id,
+        models.Activity.activity_type == "trophy",
+        models.Activity.trophy_id == trophy_id
+    ).delete()
+    db.commit()
+
+
+def delete_user_activities(db: Session, sender_id: int):
+    """Delete all activities from a specific sender (used when unfriending)"""
+    db.query(models.Activity).filter(
+        models.Activity.sender_id == sender_id
+    ).delete()
+    db.commit()

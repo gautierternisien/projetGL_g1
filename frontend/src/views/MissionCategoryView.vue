@@ -5,11 +5,13 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { Mission, MissionStatus } from '@/types/mission'
 import { useAuthStore } from '@/stores/auth'
+import { useTrophiesStore } from '@/stores/trophies'
 import { PREFERENCE_LABELS, type DerivedPreferences } from '@/utils/profileMapping'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const trophiesStore = useTrophiesStore()
 const category = route.params.category as string
 const user = computed(() => authStore.user)
 
@@ -260,6 +262,10 @@ function updateMissionStatus(mission: Mission, newStatus: Mission['status']) {
           // reload missions to keep in sync with server ordering
           await loadMissions()
           await nextTick()
+          // Vérifier immédiatement les nouveaux trophées si la mission est terminée
+          if (newStatus === 'termine' && authStore.token && authStore.user) {
+            await trophiesStore.checkNewTrophies(authStore.token, authStore.user.id)
+          }
         })
         .catch((e) => console.warn('PUT /missions/:id failed', e))
     }
@@ -463,7 +469,6 @@ const goBack = () => router.push('/missions')
   left: 0;
   width: 100%;
   height: 100%;
-  //background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(5px);
   z-index: 1000;
   display: flex;
