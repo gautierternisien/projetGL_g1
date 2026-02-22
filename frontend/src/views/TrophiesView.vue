@@ -206,6 +206,8 @@ function getDescription(progress: number, milestones: { value: number; label: st
         return `Terminez au moins ${next.value} missions`
       } else if (requirementType === 'login_count') {
         return `Connectez-vous au moins ${next.value} fois`
+      } else if (requirementType === 'league_created_count') {
+        return `Créez au moins ${next.value} ligues`
       } else {
         return `Objectif : ${next.value}`
       }
@@ -219,6 +221,8 @@ function getDescription(progress: number, milestones: { value: number; label: st
         return `Terminé au moins ${obtained.value} missions`
       } else if (requirementType === 'login_count') {
         return `Connecté au moins ${obtained.value} fois`
+      } else if (requirementType === 'league_created_count') {
+        return `Créé au moins ${obtained.value} ligues`
       } else {
         return `Objectif atteint : ${obtained.value}`
       }

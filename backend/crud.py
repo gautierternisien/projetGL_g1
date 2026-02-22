@@ -585,7 +585,8 @@ def create_league(db: Session, league: schemas.LeagueCreate, creator_id: int):
         start_date=league.start_date,
         end_date=league.end_date,
         created_at=now,
-        is_archived=False
+        is_archived=False,
+        creator_id=creator_id
     )
     db.add(db_league)
     db.commit()
@@ -604,6 +605,7 @@ def create_league(db: Session, league: schemas.LeagueCreate, creator_id: int):
     db_league.members_count = 1
 
     add_user_xp(db, creator_id, 5)
+    update_trophy_progress(db, creator_id)
     return db_league
 
 
@@ -909,14 +911,20 @@ def get_user_login_count(db: Session, user_id: int):
     return db.query(models.UserLogin).filter(models.UserLogin.user_id == user_id).count()
 
 
+def get_user_league_created_count(db: Session, user_id: int):
+    """Get the total number of leagues created by a user"""
+    return db.query(models.League).filter(models.League.creator_id == user_id).count()
+
+
 def update_trophy_progress(db: Session, user_id: int):
     """Update trophy progress for a user based on their activities
     Returns a tuple of (newly obtained trophies, lost trophies)"""
     from datetime import datetime
 
-    # Get login count and mission count
+    # Get login count, mission count and league created count
     login_count = get_user_login_count(db, user_id)
     mission_count = get_completed_missions_count(db, user_id)
+    league_created_count = get_user_league_created_count(db, user_id)
 
     # Get all trophies
     trophies = get_all_trophies(db)
@@ -930,6 +938,8 @@ def update_trophy_progress(db: Session, user_id: int):
             count = login_count
         elif trophy.requirement_type == "mission_count":
             count = mission_count
+        elif trophy.requirement_type == "league_created_count":
+            count = league_created_count
         else:
             continue
 

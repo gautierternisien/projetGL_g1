@@ -215,9 +215,11 @@ class League(Base):
     is_archived = Column(Boolean, default=False)
     created_at = Column(DateTime)
     rewards_distributed = Column(Boolean, default=False)
+    creator_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 
     members = relationship("LeagueMember", back_populates="league")
     invites = relationship("LeagueInvite", back_populates="league")
+    creator = relationship("User", foreign_keys=[creator_id])
 
 class LeagueMember(Base):
     __tablename__ = "league_members"

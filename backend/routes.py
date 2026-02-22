@@ -93,6 +93,20 @@ TROPHIES_DATA = [
             {"value": 4, "label": "Argent", "icon": "🥈"},
             {"value": 6, "label": "Or", "icon": "🥇"}
         ]
+    },
+    {
+        "name": "createur_ligues",
+        "title": "Créateur de ligues",
+        "description": "Créer au moins 8 ligues",
+        "icon": "🏆",
+        "tier": "progressive",
+        "requirement_type": "league_created_count",
+        "requirement_value": 8,
+        "milestones": [
+            {"value": 2, "label": "Bronze", "icon": "🥉"},
+            {"value": 4, "label": "Argent", "icon": "🥈"},
+            {"value": 6, "label": "Or", "icon": "🥇"}
+        ]
     }
 ]
 
