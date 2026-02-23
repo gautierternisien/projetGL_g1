@@ -241,6 +241,35 @@ function getDescription(
   }
   return 'Objectif atteint'
 }
+
+function getObtainedDescription(
+  progress: number,
+  milestones: { value: number; label: string; icon: string }[],
+  finalValue: number,
+  requirementType: string = 'login_count',
+): string {
+  // Trouver le palier atteint
+  const lastMilestone = getLastObtainedMilestone(progress, milestones, finalValue)
+  if (!lastMilestone) return ''
+
+  const value = lastMilestone.value
+  
+  if (requirementType === 'mission_count') {
+    return `Vous avez terminé ${value} mission${value > 1 ? 's' : ''}`
+  } else if (requirementType === 'login_count') {
+    return `Vous vous êtes connecté(e) ${value} fois`
+  } else if (requirementType === 'league_created_count') {
+    return `Vous avez créé ${value} ligue${value > 1 ? 's' : ''}`
+  } else if (requirementType === 'league_joined_count') {
+    return `Vous avez rejoint ${value} ligue${value > 1 ? 's' : ''}`
+  } else if (requirementType === 'league_completed_count') {
+    return `Vous avez terminé ${value} ligue${value > 1 ? 's' : ''}`
+  } else if (requirementType === 'questionnaire_completed_count') {
+    return `Vous avez terminé ${value} questionnaire${value > 1 ? 's' : ''}`
+  }
+  
+  return `Objectif atteint : ${value}`
+}
 </script>
 
 <template>
@@ -319,7 +348,12 @@ function getDescription(
                 <p class="trophy-description">
                   {{
                     activeTab === 1
-                      ? trophy.description
+                      ? getObtainedDescription(
+                          trophy.progress || 0,
+                          trophy.milestones || [],
+                          trophy.requirement_value || 5,
+                          trophy.requirement_type || 'login_count',
+                        )
                       : getDescription(
                           trophy.progress || 0,
                           trophy.milestones || [],
