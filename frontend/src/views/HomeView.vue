@@ -775,7 +775,7 @@ watch(isConnected, () => {
         </Card>
       </RouterLink>
 
-      <RouterLink to="/communaute" class="unstyled-link">
+      <RouterLink to="/communaute/evenements" class="unstyled-link">
         <Card title="Derniers évènements communautaires " :hasArrow="true">
           <div v-if="isConnected" class="carousel-container">
             <div v-for="(event, i) in events" :key="i" class="mission-card">
