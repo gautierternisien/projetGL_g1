@@ -16,10 +16,7 @@ const isConnected = computed(() => authStore.isConnected)
 onMounted(async () => {
   if (isConnected.value) {
     try {
-      await Promise.all([
-          friendsStore.fetchIncomingRequests(),
-          leaguesStore.fetchInvites()
-      ])
+      await Promise.all([friendsStore.fetchIncomingRequests(), leaguesStore.fetchInvites()])
     } catch {
       // ignore
     }
@@ -66,7 +63,7 @@ function handleCardClick(e: Event) {
         <RouterLink to="/communaute/ligues" class="unstyled-link" @click="handleCardClick">
           <Card title="Ligues" :hasArrow="isConnected">
             <div class="dashboard-card-content">
-              <span class="dashboard-emoji">🏆</span>
+              <span class="dashboard-emoji">🎖️</span>
               <p class="dashboard-text">Participez à des ligues et classements communautaires</p>
               <p v-if="leaguesStore.invitations.length > 0" class="pending-text">
                 Vous avez {{ leaguesStore.invitations.length }} invitation{{
@@ -83,7 +80,9 @@ function handleCardClick(e: Event) {
           <Card title="Évènements" :hasArrow="isConnected">
             <div class="dashboard-card-content">
               <span class="dashboard-emoji">🍾</span>
-              <p class="dashboard-text">Dernières missions réalisées par les amis</p>
+              <p class="dashboard-text">
+                Derniers trophées obtenus et missions réalisées par les amis
+              </p>
             </div>
           </Card>
         </RouterLink>

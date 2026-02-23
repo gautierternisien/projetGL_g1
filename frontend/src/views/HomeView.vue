@@ -782,7 +782,12 @@ watch(isConnected, () => {
               <RouterLink to="/communaute/evenements" class="unstyled-link inner-mission-link">
                 <div class="card-content">
                   <div class="card-avatar">
-                    <img v-if="event.profile_image" :src="event.profile_image" alt="Profil" class="avatar-image" />
+                    <img
+                      v-if="event.profile_image"
+                      :src="event.profile_image"
+                      alt="Profil"
+                      class="avatar-image"
+                    />
                     <span v-else>{{ event.friend_username.charAt(0).toUpperCase() }}</span>
                   </div>
                   <div class="card-texts">
@@ -815,7 +820,7 @@ watch(isConnected, () => {
         <div class="stats-grid">
           <div class="stat-item wide-item">
             <div class="stat-content-side">
-              <span class="stat-icon">👣</span>
+              <span class="stat-icon">🌍</span>
               <div class="stat-info">
                 <div class="stat-value-row">
                   <span class="stat-number">
@@ -833,7 +838,7 @@ watch(isConnected, () => {
             <div class="stat-separator"></div>
 
             <div class="stat-content-side">
-              <span class="stat-icon">🎯</span>
+              <span class="stat-icon">📌</span>
               <div class="stat-info">
                 <div class="stat-value-row">
                   <span class="stat-number goal-value">2.0</span>
@@ -845,7 +850,7 @@ watch(isConnected, () => {
           </div>
 
           <div class="stat-item small-item">
-            <span class="stat-icon">🏆</span>
+            <span class="stat-icon">🎖️</span>
             <div class="stat-info">
               <span class="stat-number">{{ globalStats.total_leagues }}</span>
               <span class="stat-label">Ligues<br />actives</span>
@@ -853,7 +858,7 @@ watch(isConnected, () => {
           </div>
 
           <div class="stat-item small-item">
-            <span class="stat-icon">✅</span>
+            <span class="stat-icon">🎯</span>
             <div class="stat-info">
               <span class="stat-number">{{ globalStats.total_missions_completed }}</span>
               <span class="stat-label">Missions<br />finies</span>
@@ -861,7 +866,7 @@ watch(isConnected, () => {
           </div>
 
           <div class="stat-item small-item">
-            <span class="stat-icon">🥇</span>
+            <span class="stat-icon">🏆</span>
             <div class="stat-info">
               <span class="stat-number">{{ globalStats.total_trophies }}</span>
               <span class="stat-label">Trophées<br />gagnés</span>

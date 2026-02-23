@@ -110,7 +110,7 @@ const goBack = () => router.push('/communaute')
             </div>
             <div v-else class="avatar">{{ f.username.charAt(0).toUpperCase() }}</div>
             <div class="name">{{ f.username }}</div>
-            <button class="remove-btn" @click="openRemove(f.id, f.username)">✕</button>
+            <button class="remove-btn" @click.stop="openRemove(f.id, f.username)">✕</button>
           </div>
         </div>
         <div v-else class="placeholder-content">
@@ -463,6 +463,8 @@ const goBack = () => router.push('/communaute')
   font-weight: 600;
   flex: 1;
   font-size: 1rem;
+  height: auto;
+  width: auto;
 }
 
 .confirm-actions .confirm-btn {
