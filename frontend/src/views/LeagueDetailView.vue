@@ -24,12 +24,12 @@ const invitedFriends = ref<number[]>([]) // track invited in this session
 const isFetchingInvites = ref(false)
 
 onMounted(async () => {
-    try {
-        await store.fetchLeagueDetail(leagueId)
-        await friendsStore.fetchFriends()
-    } catch {
-        // silent fail or redirect?
-    }
+  try {
+    await store.fetchLeagueDetail(leagueId)
+    await friendsStore.fetchFriends()
+  } catch {
+    // silent fail or redirect?
+  }
 })
 
 const league = computed(() => store.currentLeague)
@@ -37,38 +37,40 @@ const league = computed(() => store.currentLeague)
 const sortedMembers = computed(() => {
   if (!league.value) return []
   // Sort by missionsCompleted descending
-  return [...league.value.members].sort((a, b) => (b.missions_completed || 0) - (a.missions_completed || 0))
+  return [...league.value.members].sort(
+    (a, b) => (b.missions_completed || 0) - (a.missions_completed || 0),
+  )
 })
 
 const timeRemaining = computed(() => {
-    if (!league.value || league.value.is_archived) return null
+  if (!league.value || league.value.is_archived) return null
 
-    const start = new Date(league.value.start_date).getTime()
-    const end = new Date(league.value.end_date).getTime()
-    const now = new Date().getTime()
+  const start = new Date(league.value.start_date).getTime()
+  const end = new Date(league.value.end_date).getTime()
+  const now = new Date().getTime()
 
-    // Not started yet
-    if (now < start) return null // Display date range instead
+  // Not started yet
+  if (now < start) return null // Display date range instead
 
-    const diff = end - now
+  const diff = end - now
 
-    if (diff <= 0) return "Terminée"
+  if (diff <= 0) return 'Terminée'
 
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-    if (days > 0) return `${days} jour${days > 1 ? 's' : ''}`
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+  if (days > 0) return `${days} jour${days > 1 ? 's' : ''}`
 
-    const hours = Math.floor(diff / (1000 * 60 * 60))
-    return `${hours} heures`
+  const hours = Math.floor(diff / (1000 * 60 * 60))
+  return `${hours} heures`
 })
 
 const filteredFriends = computed(() => {
-    const q = inviteSearchQuery.value.toLowerCase()
-    // Exclude members already in league
-    const currentMemberIds = new Set(league.value?.members.map(m => m.user_id) || [])
+  const q = inviteSearchQuery.value.toLowerCase()
+  // Exclude members already in league
+  const currentMemberIds = new Set(league.value?.members.map((m) => m.user_id) || [])
 
-    return friendsStore.friends
-        .filter(f => !currentMemberIds.has(f.id)) // Filter out existing members
-        .filter(f => f.username.toLowerCase().includes(q))
+  return friendsStore.friends
+    .filter((f) => !currentMemberIds.has(f.id)) // Filter out existing members
+    .filter((f) => f.username.toLowerCase().includes(q))
 })
 
 function goBack() {
@@ -76,115 +78,117 @@ function goBack() {
 }
 
 async function openInviteModal() {
-    showInviteModal.value = true
-    inviteErrorMessage.value = ''
-    invitedFriends.value = []
-    isFetchingInvites.value = true
+  showInviteModal.value = true
+  inviteErrorMessage.value = ''
+  invitedFriends.value = []
+  isFetchingInvites.value = true
 
-    // Fetch pending invites to disable buttons for already invited
-    try {
-        const invites = await store.fetchLeaguePendingInvites(leagueId)
-        invitedFriends.value = invites.map(i => i.invitee_id)
-    } catch {
-        console.error("Impossible de récupérer les invitations en cours")
-    } finally {
-        isFetchingInvites.value = false
-    }
+  // Fetch pending invites to disable buttons for already invited
+  try {
+    const invites = await store.fetchLeaguePendingInvites(leagueId)
+    invitedFriends.value = invites.map((i) => i.invitee_id)
+  } catch {
+    console.error('Impossible de récupérer les invitations en cours')
+  } finally {
+    isFetchingInvites.value = false
+  }
 }
 
 function closeInviteModal() {
-    showInviteModal.value = false
-    inviteSearchQuery.value = ''
-    inviteErrorMessage.value = ''
-    invitedFriends.value = []
+  showInviteModal.value = false
+  inviteSearchQuery.value = ''
+  inviteErrorMessage.value = ''
+  invitedFriends.value = []
 }
 
 function openLeaveModal() {
-    showLeaveModal.value = true
-    leaveErrorMessage.value = ''
+  showLeaveModal.value = true
+  leaveErrorMessage.value = ''
 }
 
 function closeLeaveModal() {
-    showLeaveModal.value = false
-    leaveErrorMessage.value = ''
+  showLeaveModal.value = false
+  leaveErrorMessage.value = ''
 }
 
 async function confirmLeaveLeague() {
-    leaveErrorMessage.value = ''
-    try {
-        await store.leaveLeague(leagueId)
-        // Vérifier les trophées après avoir quitté la ligue (peut perdre des médailles)
-        if (authStore.token && authStore.user) {
-            await trophiesStore.checkNewTrophies(authStore.token, authStore.user.id)
-        }
-        router.push({ name: 'CommunityLeagues' })
-    } catch {
-        leaveErrorMessage.value = "Impossible de quitter la ligue."
+  leaveErrorMessage.value = ''
+  try {
+    await store.leaveLeague(leagueId)
+    // Vérifier les trophées après avoir quitté la ligue (peut perdre des médailles)
+    if (authStore.token && authStore.user) {
+      await trophiesStore.checkNewTrophies(authStore.token, authStore.user.id)
     }
+    router.push({ name: 'CommunityLeagues' })
+  } catch {
+    leaveErrorMessage.value = 'Impossible de quitter la ligue.'
+  }
 }
 
 async function inviteFriend(friendId: number) {
-    if (invitedFriends.value.includes(friendId)) return
+  if (invitedFriends.value.includes(friendId)) return
 
-    try {
-        await store.inviteUser(leagueId, friendId)
-        invitedFriends.value.push(friendId)
-    } catch {
-        inviteErrorMessage.value = "Erreur lors de l'invitation."
-    }
+  try {
+    await store.inviteUser(leagueId, friendId)
+    invitedFriends.value.push(friendId)
+  } catch {
+    inviteErrorMessage.value = "Erreur lors de l'invitation."
+  }
 }
-
 </script>
 
 <template>
   <div class="dashboard-wrapper">
     <Header
-        :title="league?.is_archived ? 'Ligue archivée' : 'Détails de la ligue'"
-        :showResumeBtn="true"
-        resumeBtnLabel="Retour"
-        @resumeLater="goBack"
+      :title="league?.is_archived ? 'Ligue archivée' : 'Détails de la ligue'"
+      :showResumeBtn="true"
+      resumeBtnLabel="Retour"
+      @resumeLater="goBack"
     />
 
-    <div v-if="league" class="scrollable-area content-container" :class="{ 'blurred-content': showInviteModal || showLeaveModal }">
+    <div
+      v-if="league"
+      class="scrollable-area content-container"
+      :class="{ 'blurred-content': showInviteModal || showLeaveModal }"
+    >
+      <div class="league-header">
+        <h2>{{ league.name }}</h2>
+      </div>
 
-        <div class="league-header">
-            <h2>{{ league.name }}</h2>
-        </div>
+      <div v-if="!league.is_archived" class="actions">
+        <button class="action-btn invite" @click="openInviteModal">Inviter un membre</button>
+        <button class="action-btn leave" @click="openLeaveModal">Quitter la ligue</button>
+      </div>
 
-        <div v-if="!league.is_archived" class="actions">
-            <button class="action-btn invite" @click="openInviteModal">Inviter un membre</button>
-            <button class="action-btn leave" @click="openLeaveModal">Quitter la ligue</button>
-        </div>
+      <div class="league-infos">
+        <p v-if="!league.is_archived">
+          <span v-if="new Date().getTime() < new Date(league.start_date).getTime()" class="timer">
+            Du {{ new Date(league.start_date).toLocaleDateString() }} au
+            {{ new Date(league.end_date).toLocaleDateString() }}
+          </span>
+          <span v-else-if="timeRemaining" class="timer"> Se termine dans {{ timeRemaining }} </span>
+        </p>
+        <p v-else class="timer">Terminée le {{ new Date(league.end_date).toLocaleDateString() }}</p>
+      </div>
 
-        <div class="league-infos">
-             <p v-if="!league.is_archived">
-                <span v-if="new Date().getTime() < new Date(league.start_date).getTime()" class="timer">
-                    Du {{ new Date(league.start_date).toLocaleDateString() }} au {{ new Date(league.end_date).toLocaleDateString() }}
-                </span>
-                <span v-else-if="timeRemaining" class="timer">
-                   Se termine dans {{ timeRemaining }}
-                </span>
-            </p>
-            <p v-else class="timer">Terminée le {{ new Date(league.end_date).toLocaleDateString() }}</p>
-        </div>
-
-        <div class="ranking-section">
-            <h3>Classement</h3>
-            <div class="ranking-list">
-                <div v-for="(member, index) in sortedMembers" :key="member.id" class="rank-item">
-                    <div class="rank-pos">{{ index + 1 }}</div>
-                    <div class="rank-info">
-                        <div class="username">{{ member.username }}</div>
-                        <div class="missions">{{ member.missions_completed }} mission{{ (member.missions_completed || 0) > 1 ? 's' : '' }}</div>
-                    </div>
-                </div>
+      <div class="ranking-section">
+        <h3>Classement</h3>
+        <div class="ranking-list">
+          <div v-for="(member, index) in sortedMembers" :key="member.id" class="rank-item">
+            <div class="rank-pos">{{ index + 1 }}</div>
+            <div class="rank-info">
+              <div class="username">{{ member.username }}</div>
+              <div class="missions">
+                {{ member.missions_completed }} mission{{
+                  (member.missions_completed || 0) > 1 ? 's' : ''
+                }}
+              </div>
             </div>
+          </div>
         </div>
-
+      </div>
     </div>
-    <div v-else class="loading">
-        Chargement...
-    </div>
+    <div v-else class="loading">Chargement...</div>
 
     <!-- Invite Modal -->
     <div v-if="showInviteModal" class="blur-overlay">
@@ -192,41 +196,35 @@ async function inviteFriend(friendId: number) {
         <h3>Inviter un ami</h3>
 
         <input
-            type="text"
-            v-model="inviteSearchQuery"
-            placeholder="Rechercher un ami..."
-            class="search-input"
+          type="text"
+          v-model="inviteSearchQuery"
+          placeholder="Rechercher un ami..."
+          class="search-input"
         />
 
         <div class="friends-list-modal">
-            <div v-if="isFetchingInvites" class="loading-small">
-                 Chargement...
+          <div v-if="isFetchingInvites" class="loading-small">Chargement...</div>
+          <div v-else-if="filteredFriends.length > 0">
+            <div v-for="friend in filteredFriends" :key="friend.id" class="friend-modal-item">
+              <div class="friend-name">{{ friend.username }}</div>
+              <button
+                class="add-friend-btn"
+                :class="{ selected: invitedFriends.includes(friend.id) }"
+                :disabled="invitedFriends.includes(friend.id)"
+                @click="inviteFriend(friend.id)"
+              >
+                {{ invitedFriends.includes(friend.id) ? 'Invité' : 'Inviter' }}
+              </button>
             </div>
-            <div v-else-if="filteredFriends.length > 0">
-                 <div
-                    v-for="friend in filteredFriends"
-                    :key="friend.id"
-                    class="friend-modal-item"
-                >
-                    <div class="friend-name">{{ friend.username }}</div>
-                    <button
-                        class="add-friend-btn"
-                        :class="{ 'selected': invitedFriends.includes(friend.id) }"
-                        :disabled="invitedFriends.includes(friend.id)"
-                        @click="inviteFriend(friend.id)"
-                    >
-                        {{ invitedFriends.includes(friend.id) ? 'Invité' : 'Inviter' }}
-                    </button>
-                </div>
-            </div>
+          </div>
 
-            <div v-if="!isFetchingInvites && filteredFriends.length === 0" class="empty-msg">
-                Aucun ami trouvé.
-            </div>
+          <div v-if="!isFetchingInvites && filteredFriends.length === 0" class="empty-msg">
+            Aucun ami trouvé.
+          </div>
         </div>
 
         <div v-if="inviteErrorMessage" class="error-message">
-            {{ inviteErrorMessage }}
+          {{ inviteErrorMessage }}
         </div>
 
         <div class="confirm-actions">
@@ -242,123 +240,120 @@ async function inviteFriend(friendId: number) {
         <p>Êtes-vous sûr de vouloir quitter cette ligue ?</p>
 
         <div v-if="leaveErrorMessage" class="error-message">
-            {{ leaveErrorMessage }}
+          {{ leaveErrorMessage }}
         </div>
 
         <div class="confirm-actions">
           <button @click="closeLeaveModal" class="cancel-btn">Annuler</button>
-          <button @click="confirmLeaveLeague" class="confirm-btn">Oui, quitter</button>
+          <button @click="confirmLeaveLeague" class="confirm-btn leave-btn">Oui, quitter</button>
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
 <style scoped>
-
-
 .league-header {
-    text-align: center;
+  text-align: center;
 }
 
 .league-infos {
-    text-align: center;
-    margin-top: 12px;
+  text-align: center;
+  margin-top: 12px;
 }
 
 .league-header h2 {
-    font-size: 1.5rem;
-    margin-bottom: 8px;
+  font-size: 1.5rem;
+  margin-bottom: 8px;
 }
 
 .timer {
-    color: #666;
-    font-style: italic;
+  color: #666;
+  font-style: italic;
 }
 
 .actions {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
 }
 
 .action-btn {
-    padding: 10px 16px;
-    border-radius: 8px;
-    border: none;
-    font-weight: 500;
-    cursor: pointer;
-    font-family: inherit;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
 }
 
 .action-btn.invite {
-    background-color: #e0f5e9;
-    color: #1f7a3a;
-    border: 1px solid #bfe8cd;
+  background-color: #e0f5e9;
+  color: #1f7a3a;
+  border: 1px solid #bfe8cd;
 }
 
 .action-btn.leave {
-    background-color: #f4e5e5;
-    color: #b23b3b;
-    border: 1px solid #e7caca;
+  background-color: #f4e5e5;
+  color: #b23b3b;
+  border: 1px solid #e7caca;
 }
 
 .ranking-section h3 {
-    margin-bottom: 12px;
-    font-size: 1.2rem;
+  margin-bottom: 12px;
+  font-size: 1.2rem;
 }
 
 .ranking-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .rank-item {
-    display: flex;
-    align-items: center;
-    background: #f7f9f5;
-    color: #1f2a2c;
-    border: 1px solid #dbe5d3;
-    padding: 12px;
-    border-radius: 12px;
-    gap: 16px;
+  display: flex;
+  align-items: center;
+  background: #f7f9f5;
+  color: #1f2a2c;
+  border: 1px solid #dbe5d3;
+  padding: 12px;
+  border-radius: 12px;
+  gap: 16px;
 }
 
 .rank-pos {
-    font-size: 1.2rem;
-    font-weight: bold;
-    width: 30px;
-    height: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #e3eddd;
-    border-radius: 50%;
-    color: #2f3b2f;
+  font-size: 1.2rem;
+  font-weight: bold;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e3eddd;
+  border-radius: 50%;
+  color: #2f3b2f;
 }
 
 .rank-info {
-    flex: 1;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .username {
-    font-weight: 600;
+  font-weight: 600;
 }
 
 .missions {
-    color: #666;
-    font-size: 0.9em;
+  color: #666;
+  font-size: 0.9em;
 }
 
 .loading {
-    padding: 40px;
-    text-align: center;
-    color: #666;
+  padding: 40px;
+  text-align: center;
+  color: #666;
 }
 
 .blur-overlay {
@@ -389,8 +384,8 @@ async function inviteFriend(friendId: number) {
 }
 
 .confirm-box h3 {
-    margin: 0;
-    font-size: 1.2rem;
+  margin: 0;
+  font-size: 1.2rem;
 }
 
 @keyframes popIn {
@@ -405,58 +400,58 @@ async function inviteFriend(friendId: number) {
 }
 
 .search-input {
-    width: 100%;
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    font-size: 1rem;
-    font-family: inherit;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-family: inherit;
 }
 
 .friends-list-modal {
-    max-height: 250px;
-    overflow-y: auto;
+  max-height: 250px;
+  overflow-y: auto;
 }
 
 .friend-modal-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px;
-    border-radius: 8px;
-    background: #f9f9f9;
-    margin-bottom: 8px;
-    border: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  border-radius: 8px;
+  background: #f9f9f9;
+  margin-bottom: 8px;
+  border: 1px solid #eee;
 }
 
 .friend-name {
-    font-weight: 500;
-    color: #333;
+  font-weight: 500;
+  color: #333;
 }
 
 .add-friend-btn {
-    padding: 6px 12px;
-    border-radius: 8px;
-    border: none;
-    background: #e0f5e9;
-    color: #1f7a3a;
-    border: 1px solid #bfe8cd;
-    cursor: pointer;
-    font-size: 0.9rem;
-    font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: none;
+  background: #e0f5e9;
+  color: #1f7a3a;
+  border: 1px solid #bfe8cd;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
 }
 
 .add-friend-btn.selected {
-    background: #f4e5e5;
-    color: #b23b3b;
-    border-color: #e7caca;
+  background: #f4e5e5;
+  color: #b23b3b;
+  border-color: #e7caca;
 }
 
 .empty-msg {
-    text-align: center;
-    color: #999;
-    font-size: 0.9rem;
-    padding: 10px;
+  text-align: center;
+  color: #999;
+  font-size: 0.9rem;
+  padding: 10px;
 }
 
 .confirm-actions {
@@ -479,13 +474,13 @@ async function inviteFriend(friendId: number) {
 }
 
 .error-message {
-    color: #b23b3b;
-    background: #f8d7da;
-    padding: 10px;
-    border-radius: 8px;
-    margin-top: 8px;
-    font-size: 0.9rem;
-    border: 1px solid #f5c6cb;
+  color: #b23b3b;
+  background: #f8d7da;
+  padding: 10px;
+  border-radius: 8px;
+  margin-top: 8px;
+  font-size: 0.9rem;
+  border: 1px solid #f5c6cb;
 }
 
 .leave-confirm {
@@ -504,10 +499,22 @@ async function inviteFriend(friendId: number) {
   font-size: 1rem;
 }
 
+.confirm-btn.leave-btn {
+  background-color: #ff4d4d;
+  color: white;
+  border: none;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  flex: 1;
+  font-size: 1rem;
+}
+
 .loading-small {
-    text-align: center;
-    padding: 20px;
-    color: #666;
-    font-style: italic;
+  text-align: center;
+  padding: 20px;
+  color: #666;
+  font-style: italic;
 }
 </style>
