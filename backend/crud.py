@@ -546,7 +546,9 @@ def get_user_mission_statuses_dict(db: Session, user_id: int):
 def update_user_mission_status(db: Session, user_id: int, mission_id: int, status: str):
     db_status = get_user_mission_status(db, user_id, mission_id)
 
-    was_completed = db_status and db_status.status == 'termine'
+    was_already_completed_ever = False
+    if db_status and db_status.completed_at is not None:
+        was_already_completed_ever = True
 
     if db_status:
         db_status.status = status
@@ -554,9 +556,15 @@ def update_user_mission_status(db: Session, user_id: int, mission_id: int, statu
         db_status = models.UserMissionStatus(user_id=user_id, mission_id=mission_id, status=status)
         db.add(db_status)
 
+    db.commit()
+    db.refresh(db_status)
+
+
     if status == 'termine':
-        db_status.completed_at = datetime.now()
-        if not was_completed:
+        if not was_already_completed_ever:
+            db_status.completed_at = datetime.now()
+            db.commit()
+            
             mission = db.query(models.Mission).filter(models.Mission.id == mission_id).first()
             if mission:
                 # 1. Points de mission
