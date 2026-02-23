@@ -25,16 +25,16 @@ const tabs = [
 ]
 
 interface MedalsSummary {
-  'Bronze': number;
-  'Argent': number;
-  'Or': number;
-  'Trophée': number;
+  Bronze: number
+  Argent: number
+  Or: number
+  Trophée: number
 }
 
 const inProgressTrophies = ref<Trophy[]>([])
 const obtainedTrophies = ref<Trophy[]>([])
 const notStartedTrophies = ref<Trophy[]>([])
-const medalsSummary = ref<MedalsSummary>({ 'Bronze': 0, 'Argent': 0, 'Or': 0, 'Trophée': 0 })
+const medalsSummary = ref<MedalsSummary>({ Bronze: 0, Argent: 0, Or: 0, Trophée: 0 })
 const loading = ref(true)
 
 async function loadTrophies() {
@@ -45,7 +45,7 @@ async function loadTrophies() {
 
   try {
     const headers = {
-      'Authorization': `Bearer ${authStore.token}`
+      Authorization: `Bearer ${authStore.token}`,
     }
 
     // Charger les trophées en cours et à commencer
@@ -63,7 +63,7 @@ async function loadTrophies() {
       const data = await obtainedRes.json()
       console.log('Données reçues de /trophies/obtained:', data)
       obtainedTrophies.value = data.trophies || []
-      medalsSummary.value = data.summary || { 'Bronze': 0, 'Argent': 0, 'Or': 0, 'Trophée': 0 }
+      medalsSummary.value = data.summary || { Bronze: 0, Argent: 0, Or: 0, Trophée: 0 }
       console.log('Trophées obtenus:', obtainedTrophies.value)
       console.log('Résumé médailles:', medalsSummary.value)
     } else {
@@ -81,12 +81,12 @@ onMounted(async () => {
     router.push('/login')
     return
   }
-  
+
   // Vérifier si on doit ouvrir l'onglet "Obtenus" via query parameter
   if (route.query.tab === 'obtained') {
     activeTab.value = 1
   }
-  
+
   // Charger les trophées pour l'affichage
   await loadTrophies()
 })
@@ -95,12 +95,12 @@ function getTrophyLevel(trophy: Trophy): number {
   const progress = trophy.progress || 0
   const finalValue = trophy.requirement_value || 5
   const milestones = trophy.milestones || []
-  
+
   // Si le trophée final est obtenu
   if (progress >= finalValue) {
     return 1 // Trophée (priorité la plus haute)
   }
-  
+
   // Sinon, trouver la médaille la plus haute obtenue
   const sortedMilestones = [...milestones].sort((a, b) => b.value - a.value)
   for (const milestone of sortedMilestones) {
@@ -110,7 +110,7 @@ function getTrophyLevel(trophy: Trophy): number {
       if (milestone.label === 'Bronze') return 4
     }
   }
-  
+
   // Aucun niveau atteint
   return 5
 }
@@ -124,7 +124,7 @@ const trophiesForActiveTab = computed(() => {
   } else {
     trophies = [...notStartedTrophies.value]
   }
-  
+
   // Trier par niveau : Trophée (1) → Or (2) → Argent (3) → Bronze (4)
   // Pour "À commencer", on garde l'ordre par défaut (level 5)
   return trophies.sort((a, b) => getTrophyLevel(a) - getTrophyLevel(b))
@@ -133,14 +133,18 @@ const trophiesForActiveTab = computed(() => {
 function formatDate(isoDate: string | undefined): string {
   if (!isoDate) return ''
   const date = new Date(isoDate)
-  return date.toLocaleDateString('fr-FR', { 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
+  return date.toLocaleDateString('fr-FR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
   })
 }
 
-function getNextMilestone(progress: number, milestones: { value: number; label: string; icon: string }[], finalValue: number): { value: number; label: string } | null {
+function getNextMilestone(
+  progress: number,
+  milestones: { value: number; label: string; icon: string }[],
+  finalValue: number,
+): { value: number; label: string } | null {
   // Chercher le prochain palier non atteint
   for (const milestone of milestones) {
     if (progress < milestone.value) {
@@ -154,7 +158,11 @@ function getNextMilestone(progress: number, milestones: { value: number; label: 
   return null
 }
 
-function getNextMilestoneIcon(progress: number, milestones: { value: number; label: string; icon: string }[], finalIcon: string): string {
+function getNextMilestoneIcon(
+  progress: number,
+  milestones: { value: number; label: string; icon: string }[],
+  finalIcon: string,
+): string {
   // Chercher la prochaine icône non atteinte
   for (const milestone of milestones) {
     if (progress < milestone.value) {
@@ -165,12 +173,17 @@ function getNextMilestoneIcon(progress: number, milestones: { value: number; lab
   return finalIcon
 }
 
-function getLastObtainedMilestoneIcon(progress: number, milestones: { value: number; label: string; icon: string }[], finalValue: number, finalIcon: string): string | null {
+function getLastObtainedMilestoneIcon(
+  progress: number,
+  milestones: { value: number; label: string; icon: string }[],
+  finalValue: number,
+  finalIcon: string,
+): string | null {
   // Si le trophée final est obtenu, retourner son icône
   if (progress >= finalValue) {
     return finalIcon
   }
-  
+
   // Sinon, trouver la médaille la plus haute obtenue (tri décroissant)
   const sortedMilestones = [...milestones].sort((a, b) => b.value - a.value)
   for (const milestone of sortedMilestones) {
@@ -181,12 +194,16 @@ function getLastObtainedMilestoneIcon(progress: number, milestones: { value: num
   return null
 }
 
-function getLastObtainedMilestone(progress: number, milestones: { value: number; label: string; icon: string }[], finalValue: number): { value: number; label: string; icon: string } | null {
+function getLastObtainedMilestone(
+  progress: number,
+  milestones: { value: number; label: string; icon: string }[],
+  finalValue: number,
+): { value: number; label: string; icon: string } | null {
   // Si le trophée final est obtenu
   if (progress >= finalValue) {
     return { value: finalValue, label: 'Trophée', icon: '🏆' }
   }
-  
+
   // Sinon, trouver la médaille la plus haute obtenue (tri décroissant)
   const sortedMilestones = [...milestones].sort((a, b) => b.value - a.value)
   for (const milestone of sortedMilestones) {
@@ -197,7 +214,12 @@ function getLastObtainedMilestone(progress: number, milestones: { value: number;
   return null
 }
 
-function getDescription(progress: number, milestones: { value: number; label: string; icon: string }[], finalValue: number, requirementType: string = 'login_count'): string {
+function getDescription(
+  progress: number,
+  milestones: { value: number; label: string; icon: string }[],
+  finalValue: number,
+  requirementType: string = 'login_count',
+): string {
   // Afficher le prochain objectif
   const next = getNextMilestone(progress, milestones, finalValue)
   if (next) {
@@ -217,19 +239,13 @@ function getDescription(progress: number, milestones: { value: number; label: st
       return `Objectif : ${next.value}`
     }
   }
-  return "Objectif atteint"
+  return 'Objectif atteint'
 }
-
 </script>
 
 <template>
   <div class="dashboard-wrapper">
-    <Header
-      title="Trophées"
-      :showResumeBtn="true"
-      resumeBtnLabel="Retour"
-      @resumeLater="goBack"
-    />
+    <Header title="Trophées" :showResumeBtn="true" resumeBtnLabel="Retour" @resumeLater="goBack" />
     <div class="scrollable-area">
       <div class="tabs">
         <button
@@ -241,9 +257,9 @@ function getDescription(progress: number, milestones: { value: number; label: st
           {{ t.label }}
         </button>
       </div>
-      
+
       <div v-if="loading" class="loading">Chargement...</div>
-      
+
       <!-- Résumé des médailles pour l'onglet "Récompenses obtenues" - toujours affiché -->
       <div v-if="!loading && activeTab === 1" class="medals-summary">
         <div class="medal-item">
@@ -267,7 +283,7 @@ function getDescription(progress: number, milestones: { value: number; label: st
           <span class="medal-count">x{{ medalsSummary['Bronze'] }}</span>
         </div>
       </div>
-      
+
       <template v-if="!loading && trophiesForActiveTab.length > 0">
         <div class="trophies-list">
           <Card
@@ -277,57 +293,113 @@ function getDescription(progress: number, milestones: { value: number; label: st
             class="trophy-card"
           >
             <div class="trophy-content">
-              <div class="trophy-icon" :class="{ 'trophy-icon-dimmed': activeTab === 0, 'trophy-icon-locked': activeTab === 2 }">
-                {{ activeTab === 1 ? getLastObtainedMilestoneIcon(trophy.progress || 0, trophy.milestones || [], trophy.requirement_value || 5, trophy.icon) : getNextMilestoneIcon(trophy.progress || 0, trophy.milestones || [], trophy.icon) }}
+              <div
+                class="trophy-icon"
+                :class="{
+                  'trophy-icon-dimmed': activeTab === 0,
+                  'trophy-icon-locked': activeTab === 2,
+                }"
+              >
+                {{
+                  activeTab === 1
+                    ? getLastObtainedMilestoneIcon(
+                        trophy.progress || 0,
+                        trophy.milestones || [],
+                        trophy.requirement_value || 5,
+                        trophy.icon,
+                      )
+                    : getNextMilestoneIcon(
+                        trophy.progress || 0,
+                        trophy.milestones || [],
+                        trophy.icon,
+                      )
+                }}
               </div>
               <div class="trophy-info">
                 <p class="trophy-description">
-                  {{ activeTab === 1 ? trophy.description : getDescription(trophy.progress || 0, trophy.milestones || [], trophy.requirement_value || 5, trophy.requirement_type || 'login_count') }}
+                  {{
+                    activeTab === 1
+                      ? trophy.description
+                      : getDescription(
+                          trophy.progress || 0,
+                          trophy.milestones || [],
+                          trophy.requirement_value || 5,
+                          trophy.requirement_type || 'login_count',
+                        )
+                  }}
                 </p>
-                
+
                 <!-- En cours : afficher la progression -->
                 <div v-if="activeTab === 0" class="trophy-progress">
                   <!-- Prochain objectif -->
-                  <div v-if="getNextMilestone(trophy.progress || 0, trophy.milestones || [], trophy.requirement_value || 60)" class="next-milestone">
+                  <div
+                    v-if="
+                      getNextMilestone(
+                        trophy.progress || 0,
+                        trophy.milestones || [],
+                        trophy.requirement_value || 60,
+                      )
+                    "
+                    class="next-milestone"
+                  >
                     <div class="progress-text">
-                      Prochain : {{ getNextMilestone(trophy.progress || 0, trophy.milestones || [], trophy.requirement_value || 60)?.label }}
-                      ({{ trophy.progress }} / {{ getNextMilestone(trophy.progress || 0, trophy.milestones || [], trophy.requirement_value || 60)?.value }})
+                      Prochain :
+                      {{
+                        getNextMilestone(
+                          trophy.progress || 0,
+                          trophy.milestones || [],
+                          trophy.requirement_value || 60,
+                        )?.label
+                      }}
+                      ({{ trophy.progress }} /
+                      {{
+                        getNextMilestone(
+                          trophy.progress || 0,
+                          trophy.milestones || [],
+                          trophy.requirement_value || 60,
+                        )?.value
+                      }})
                     </div>
                     <div class="progress-bar">
-                      <div 
-                        class="progress-fill" 
-                        :style="{ 
-                          width: `${(trophy.progress! / (getNextMilestone(trophy.progress || 0, trophy.milestones || [], trophy.requirement_value || 60)?.value || 1)) * 100}%` 
+                      <div
+                        class="progress-fill"
+                        :style="{
+                          width: `${(trophy.progress! / (getNextMilestone(trophy.progress || 0, trophy.milestones || [], trophy.requirement_value || 60)?.value || 1)) * 100}%`,
                         }"
                       ></div>
                     </div>
                   </div>
                 </div>
-                
+
                 <!-- Obtenus : afficher la date de la dernière médaille obtenue -->
                 <div v-else-if="activeTab === 1" class="trophy-obtained">
                   <span class="obtained-date">
-                    {{ getLastObtainedMilestone(trophy.progress || 0, trophy.milestones || [], trophy.requirement_value || 5)?.label }} obtenue le {{ formatDate(trophy.last_milestone_date) }}
+                    {{
+                      getLastObtainedMilestone(
+                        trophy.progress || 0,
+                        trophy.milestones || [],
+                        trophy.requirement_value || 5,
+                      )?.label
+                    }}
+                    obtenu le {{ formatDate(trophy.last_milestone_date) }}
                   </span>
                 </div>
-                
+
                 <!-- À commencer : afficher un message d'encouragement -->
                 <div v-else-if="activeTab === 2" class="trophy-not-started">
-                  <span class="not-started-hint">
-                    Commencez dès maintenant !
-                  </span>
+                  <span class="not-started-hint"> Commencez dès maintenant ! </span>
                 </div>
               </div>
             </div>
           </Card>
         </div>
       </template>
-      
+
       <div v-if="!loading && trophiesForActiveTab.length === 0" class="empty-state">
         <p v-if="activeTab === 0">Aucun trophée en cours. Commencez une nouvelle récompense !</p>
         <p v-else-if="activeTab === 1">
-          Aucune récompense obtenue pour le moment.<br>
-          <small style="color: #999; margin-top: 8px; display: block;">
+          Aucune récompense obtenue pour le moment.<br />
+          <small style="color: #999; margin-top: 8px; display: block">
             Venez régulièrement pour gagner des médailles !
           </small>
         </p>
@@ -403,7 +475,15 @@ function getDescription(progress: number, milestones: { value: number; label: st
 
 .trophy-info {
   flex: 1;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
 }
 
 .trophy-description {
