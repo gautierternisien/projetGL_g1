@@ -21,7 +21,7 @@ export interface FriendRequest {
 export interface FriendActivity {
   friend_username: string
   profile_image?: string
-  activity_type: 'mission' | 'trophy'
+  activity_type: 'mission' | 'trophy' | 'league'
   mission_title?: string
   mission_id?: number
   trophy_title?: string
@@ -39,6 +39,18 @@ export interface FriendProfile {
   level: number
   xp: number
   profile_image?: string
+  medals_summary?: {
+    trophee: number
+    or: number
+    argent: number
+    bronze: number
+  }
+  missions_by_category?: {
+    transport: number
+    logement: number
+    alimentation: number
+    divers: number
+  }
 }
 
 export const useFriendsStore = defineStore('friends', () => {

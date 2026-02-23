@@ -130,6 +130,168 @@ export type QuestionRecord = {
   ordre_affichage: number
 }
 
+type OptionLabelMap = Record<string, string>
+
+function normalizeOptionKey(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[-–—]/g, ' ')
+    .replace(/[’]/g, "'")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ')
+}
+
+function sentenceCase(value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed) return trimmed
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
+}
+
+function humanizeOptionLabel(raw: string): string {
+  const label = sentenceCase(raw.trim().replace(/\s+/g, ' '))
+  const normalized = normalizeOptionKey(label)
+
+  if (normalized === 'pac') return 'Pompe à chaleur (PAC)'
+  if (normalized === 'vae') return 'Vélo à assistance électrique (VAE)'
+  if (normalized === 'vul') return 'VUL (utilitaire)'
+  if (normalized === 'suv') return 'SUV'
+
+  return label
+}
+
+const GLOBAL_OPTION_LABEL_OVERRIDES: OptionLabelMap = {
+  [normalizeOptionKey('jamais')]: 'Jamais',
+  [normalizeOptionKey('parfois')]: 'Parfois',
+  [normalizeOptionKey('souvent')]: 'Souvent',
+  [normalizeOptionKey('occasionnellement')]: 'Occasionnellement',
+  [normalizeOptionKey('fréquemment')]: 'Fréquemment',
+  [normalizeOptionKey('oui toujours')]: 'Oui, toujours',
+  [normalizeOptionKey('aucun')]: 'Aucun',
+  [normalizeOptionKey('non concerné')]: 'Non concerné',
+  [normalizeOptionKey('non concerne')]: 'Non concerné',
+  [normalizeOptionKey('non-concerné')]: 'Non concerné',
+  [normalizeOptionKey('non-concerne')]: 'Non concerné',
+}
+
+const OPTION_LABEL_OVERRIDES_BY_SLUG: Record<string, OptionLabelMap> = {
+  [normalizeOptionKey('transport . voiture . utilisateur')]: {
+    [normalizeOptionKey('propriétaire')]: 'Régulièrement avec ma propre voiture',
+    [normalizeOptionKey('régulier non propriétaire')]:
+      'Régulièrement mais pas avec ma propre voiture',
+    [normalizeOptionKey('non régulier')]: 'Pas souvent',
+    [normalizeOptionKey('jamais')]: 'Jamais',
+  },
+  [normalizeOptionKey('transport . avion . usager')]: {
+    [normalizeOptionKey('jamais')]: 'Jamais',
+    [normalizeOptionKey('occasionnellement')]: 'Entre 1 et 5 fois',
+    [normalizeOptionKey('fréquemment')]: 'Plus de 5 fois',
+  },
+  [normalizeOptionKey('transport . voiture . motorisation')]: {
+    [normalizeOptionKey('thermique')]: 'Thermique (essence/diesel)',
+    [normalizeOptionKey('électrique')]: 'Électrique',
+    [normalizeOptionKey('hybride non rechargeable')]: 'Hybride non rechargeable',
+    [normalizeOptionKey('hybride rechargeable')]: 'Hybride rechargeable',
+  },
+  [normalizeOptionKey('transport . voiture . gabarit')]: {
+    [normalizeOptionKey('petite')]: 'Petite citadine',
+    [normalizeOptionKey('moyenne')]: 'Voiture moyenne',
+    [normalizeOptionKey('berline')]: 'Berline',
+    [normalizeOptionKey('suv')]: 'SUV / 4x4',
+    [normalizeOptionKey('vul')]: 'Utilitaire (VUL)',
+  },
+  [normalizeOptionKey('transport . voiture . thermique . carburant')]: {
+    [normalizeOptionKey('gazole B7 ou B10')]: 'Diesel (B7/B10)',
+    [normalizeOptionKey('essence E5 ou E10')]: 'Essence (E5/E10)',
+    [normalizeOptionKey('essence E85')]: 'Superéthanol E85',
+    [normalizeOptionKey('GPL')]: 'GPL',
+  },
+  [normalizeOptionKey('transport . mobilité douce')]: {
+    [normalizeOptionKey('vélo')]: 'Vélo classique',
+    [normalizeOptionKey('vae')]: 'Vélo à assistance électrique (VAE)',
+    [normalizeOptionKey('autres véhicules à moteur')]:
+      'Trottinette et autres véhicules électriques',
+  },
+  [normalizeOptionKey('logement . type')]: {
+    [normalizeOptionKey('maison')]: 'Maison',
+    [normalizeOptionKey('appartement')]: 'Appartement',
+    [normalizeOptionKey('autre')]: 'Autre',
+  },
+  [normalizeOptionKey('logement . propriétaire')]: {
+    [normalizeOptionKey('propriétaire')]: 'Propriétaire',
+    [normalizeOptionKey('locataire')]: 'Locataire',
+    [normalizeOptionKey('hébergé')]: 'Hébergé·e à titre gratuit',
+  },
+  [normalizeOptionKey('logement . âge')]: {
+    [normalizeOptionKey('très récent')]: 'Très récent (moins de 10 ans)',
+    [normalizeOptionKey('récent')]: 'Récent (10 à 50 ans)',
+    [normalizeOptionKey('ancien')]: 'Ancien (plus de 50 ans)',
+  },
+  [normalizeOptionKey('logement . chauffage . précision consommation . ressenti')]: {
+    [normalizeOptionKey('passoire thermique')]: "Je chauffe mais j'ai froid",
+    [normalizeOptionKey('moyen')]: 'Je chauffe normalement',
+    [normalizeOptionKey('confortable')]: 'Je chauffe peu, il fait bon naturellement',
+  },
+  [normalizeOptionKey('logement . vacances')]: {
+    [normalizeOptionKey('hotel')]: 'Hôtel',
+    [normalizeOptionKey('camping')]: 'Camping',
+    [normalizeOptionKey('auberge de jeunesse')]: 'Auberge de jeunesse',
+    [normalizeOptionKey('locations')]: 'Location',
+    [normalizeOptionKey('famille ou amis')]: 'Chez la famille ou des amis',
+    [normalizeOptionKey('échange')]: 'Échange de maison',
+    [normalizeOptionKey('résidence secondaire')]: 'Résidence secondaire',
+    [normalizeOptionKey('croisière')]: 'Croisière',
+  },
+  [normalizeOptionKey('alimentation . petit déjeuner . type')]: {
+    [normalizeOptionKey('continental')]: 'Pain ou viennoiserie',
+    [normalizeOptionKey('lait céréales')]: 'Produit laitier et céréales',
+    [normalizeOptionKey('britannique')]: 'Salé (type britannique)',
+    [normalizeOptionKey('végétalien')]: 'Fruits / végétal',
+    [normalizeOptionKey('aucun')]: 'Je ne prends pas de petit-déjeuner',
+  },
+  [normalizeOptionKey('alimentation . local . consommation')]: {
+    [normalizeOptionKey('jamais')]: 'Jamais',
+    [normalizeOptionKey('parfois')]: 'Parfois',
+    [normalizeOptionKey('souvent')]: 'Souvent',
+    [normalizeOptionKey('oui toujours')]: 'Toujours',
+  },
+  [normalizeOptionKey('alimentation . de saison . consommation')]: {
+    [normalizeOptionKey('jamais')]: 'Jamais',
+    [normalizeOptionKey('parfois')]: 'Parfois',
+    [normalizeOptionKey('souvent')]: 'Souvent',
+    [normalizeOptionKey('oui toujours')]: 'Toujours',
+  },
+  [normalizeOptionKey('alimentation . déchets . quantité jetée')]: {
+    [normalizeOptionKey('base')]: 'Je jette sans faire attention',
+    [normalizeOptionKey('réduction')]: 'Je limite mes déchets',
+    [normalizeOptionKey('zéro déchet')]: 'Je suis zéro déchet',
+  },
+  [normalizeOptionKey('divers . textile . volume')]: {
+    [normalizeOptionKey('minimum')]: 'Le strict minimum',
+    [normalizeOptionKey('renouvellement occasionnel')]: 'Renouvellement occasionnel',
+    [normalizeOptionKey('accro au shopping')]: 'Accro au shopping',
+  },
+  [normalizeOptionKey('divers . numérique . appareils . renouvellement téléphone')]: {
+    [normalizeOptionKey('faible')]: '0 à 1 fois',
+    [normalizeOptionKey('moyen')]: '2 à 3 fois',
+    [normalizeOptionKey('élevé')]: '4 fois ou plus',
+  },
+}
+
+function prettifyOptionLabel(slug: string, rawLabel: string, rawValue?: string): string {
+  const slugKey = normalizeOptionKey(slug)
+  const valueKey = normalizeOptionKey(rawValue ?? rawLabel)
+
+  const bySlug = OPTION_LABEL_OVERRIDES_BY_SLUG[slugKey]
+  if (bySlug && bySlug[valueKey]) return bySlug[valueKey]
+
+  const globalOverride = GLOBAL_OPTION_LABEL_OVERRIDES[valueKey]
+  if (globalOverride) return globalOverride
+
+  return humanizeOptionLabel(rawLabel)
+}
+
 /** Déduit le type de widget à afficher à partir de la règle Publicodes parsée. */
 export function determineWidgetType(rule: any): WidgetType {
   const raw = rule?.rawNode ?? {}
@@ -156,7 +318,8 @@ export function buildConfigJson(slug: string, rule: any, widgetType: WidgetType)
   if (Array.isArray(rule?.possibilities) && rule.possibilities.length > 0) {
     const normalized = rule.possibilities
       .map((p: any) => {
-        if (typeof p === 'string') return { label: p, value: p }
+        if (typeof p === 'string')
+          return { label: prettifyOptionLabel(slug, String(p), String(p)), value: p }
 
         const label =
           p.title ??
@@ -167,7 +330,11 @@ export function buildConfigJson(slug: string, rule: any, widgetType: WidgetType)
           String(p.dottedName ?? p)
 
         const value = p.dottedName ?? p.name ?? p.value ?? label
-        return { label: String(label), value: String(value) }
+        const valueStr = String(value)
+        return {
+          label: prettifyOptionLabel(slug, String(label), valueStr),
+          value: valueStr,
+        }
       })
       .filter(Boolean)
 
@@ -183,7 +350,7 @@ export function buildConfigJson(slug: string, rule: any, widgetType: WidgetType)
     if (widgetType === 'CHOIX_MULTIPLE') {
       const noneLabel = raw.mosaique['option aucun']
       if (typeof noneLabel === 'string' && noneLabel.trim().length > 0)
-        config.noneOptionLabel = noneLabel.trim()
+        config.noneOptionLabel = prettifyOptionLabel(slug, noneLabel.trim(), noneLabel.trim())
       else config.noneOptionLabel = 'Aucun'
     }
 
@@ -191,7 +358,8 @@ export function buildConfigJson(slug: string, rule: any, widgetType: WidgetType)
       config.options = raw.mosaique.options.map((opt: any) => {
         if (typeof opt === 'string') {
           const fullSlug = resolveMosaicOptionSlug(slug, opt)
-          return { label: prettifyPresentLabel(opt), slug: fullSlug }
+          const rawLabel = prettifyPresentLabel(opt)
+          return { label: prettifyOptionLabel(slug, rawLabel, rawLabel), slug: fullSlug }
         }
 
         const candidate = opt?.dottedName ?? opt?.valeur ?? opt?.name
@@ -199,13 +367,21 @@ export function buildConfigJson(slug: string, rule: any, widgetType: WidgetType)
         const fullSlug = resolveMosaicOptionSlug(slug, rawStr)
 
         const rawLabel = String(opt?.titre ?? opt?.title ?? opt?.label ?? rawStr)
-        return { label: prettifyPresentLabel(rawLabel), slug: fullSlug }
+        const cleanLabel = prettifyPresentLabel(rawLabel)
+        return {
+          label: prettifyOptionLabel(slug, cleanLabel, cleanLabel),
+          slug: fullSlug,
+        }
       })
     }
   }
 
-  if (!config.options && Array.isArray(raw['une possibilité']))
-    config.options = raw['une possibilité']
+  if (!config.options && Array.isArray(raw['une possibilité'])) {
+    config.options = raw['une possibilité'].map((opt: any) => {
+      const value = String(opt)
+      return { label: prettifyOptionLabel(slug, value, value), value }
+    })
+  }
   if (widgetType === 'BOOLEEN' && !config.options) config.options = ['oui', 'non']
   if (widgetType === 'BOOLEEN') config.booleanNative = !hasExplicitPossibilities
 

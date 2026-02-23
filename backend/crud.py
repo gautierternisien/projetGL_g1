@@ -1117,6 +1117,7 @@ def process_league_rewards(db: Session):
 
         # 2. Récupérer les membres et leurs scores
         members_stats = get_league_members_with_stats(db, league.id)
+        member_ids = [m["user_id"] for m in members_stats]
 
         # 3. Trier par score décroissant (missions_completed)
         # En cas d'égalité, on peut départager par date de jointure ou laisser ex-aequo.
@@ -1143,7 +1144,12 @@ def process_league_rewards(db: Session):
                 add_user_xp(db, user_id, xp_bonus)
                 print(f"  - User {member_data['username']} (Rang {rank}) : +{xp_bonus} XP")
 
+        # 5. Notifier la fin de ligue dans le feed communautaire.
+        # On envoie l'événement aux amis de chaque membre, et au membre lui-même.
+        create_league_completion_activities(db, league.name, member_ids)
+
         # 5. Marquer la ligue comme traitée
+        league.is_archived = True
         league.rewards_distributed = True
         db.commit()
 
@@ -1169,6 +1175,38 @@ def create_activity(db: Session, user_id: int, sender_id: int, activity_type: st
     db.commit()
     db.refresh(activity)
     return activity
+
+
+def create_league_completion_activities(db: Session, league_name: str, member_ids: list[int]):
+    """Create feed events when a league ends.
+
+    Reuses mission_title to carry league name for activity_type='league'
+    to avoid schema migration.
+    """
+    for sender_id in member_ids:
+        recipient_ids = set(get_accepted_friends(db, sender_id))
+        recipient_ids.add(sender_id)
+
+        for recipient_id in recipient_ids:
+            exists = db.query(models.Activity).filter(
+                models.Activity.user_id == recipient_id,
+                models.Activity.sender_id == sender_id,
+                models.Activity.activity_type == "league",
+                models.Activity.mission_title == league_name,
+                models.Activity.status == "terminee"
+            ).first()
+
+            if exists:
+                continue
+
+            create_activity(
+                db=db,
+                user_id=recipient_id,
+                sender_id=sender_id,
+                activity_type="league",
+                mission_title=league_name,
+                status="terminee",
+            )
 
 
 def get_user_activities(db: Session, user_id: int, limit: int = 100):
