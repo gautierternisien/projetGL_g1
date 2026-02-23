@@ -1014,8 +1014,7 @@ async def get_global_stats(db: Session = Depends(get_db)):
             print(f"Erreur stats missions: {e}")
 
         try:
-            stats["total_trophies"] = db.query(models.UserTrophy).join(models.User).filter(
-                models.User.is_deleted == False,
+            stats["total_trophies"] = db.query(models.UserTrophy).filter(
                 models.UserTrophy.is_obtained == True
             ).count()
         except Exception as e:

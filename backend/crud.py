@@ -100,6 +100,16 @@ def delete_user(db: Session, user_id: int):
     import string
     db_user = db.query(models.User).filter(models.User.id == user_id).first()
     if db_user:
+        # Supprimer toutes les demandes d'amis envoyées ou reçues par cet utilisateur
+        db.query(models.FriendRequest).filter(
+            (models.FriendRequest.sender_id == user_id) | (models.FriendRequest.receiver_id == user_id)
+        ).delete()
+        
+        # Supprimer toutes les invitations de ligue envoyées ou reçues par cet utilisateur
+        db.query(models.LeagueInvite).filter(
+            (models.LeagueInvite.inviter_id == user_id) | (models.LeagueInvite.invitee_id == user_id)
+        ).delete()
+        
         # Générer un code aléatoire de 5 caractères
         code = ''.join(random.choices(string.ascii_letters + string.digits, k=5))
         # Modifier le username
