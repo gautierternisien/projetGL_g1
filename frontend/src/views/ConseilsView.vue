@@ -1,14 +1,8 @@
 <script setup lang="ts">
 import Card from '@/components/AppCard.vue'
 import Header from '@/components/AppHeader.vue'
-import { useAuthStore } from '@/stores/auth'
-import { useRouter } from 'vue-router'
 import { computed } from 'vue'
 import { conseilHebdo } from '@/data/conseilHebdo.ts'
-
-const authStore = useAuthStore()
-const router = useRouter()
-const isConnected = computed(() => authStore.isConnected)
 
 // --- FONCTION UTILITAIRE : Récupérer le numéro de la semaine (1-52) ---
 function getWeekNumber(d: Date): number {
@@ -36,15 +30,8 @@ const conseilActuel = computed(() => {
 <template>
   <div class="dashboard-wrapper">
     <Header title="Conseils" />
-    <div class="scrollable-area" :style="!isConnected ? { overflow: 'hidden' } : {}">
-      <div v-if="!isConnected" class="blur-overlay">
-        <div class="lock-message">
-          <span class="lock-icon">🔒</span>
-          <p>Connectez-vous pour accéder aux conseils</p>
-          <button @click="router.push('/login')" class="login-btn">Se connecter</button>
-        </div>
-      </div>
-      <div :class="{ 'blurred-content': !isConnected }">
+    <div class="scrollable-area">
+      <div>
         <!-- Conseil de la semaine -->
         <Card title="Conseil de la semaine">
           <div class="dashboard-card-content">
@@ -100,18 +87,6 @@ const conseilActuel = computed(() => {
 </template>
 
 <style scoped>
-
-.login-btn {
-  background-color: #679436;
-  color: white;
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  font-size: 1rem;
-}
-
 .dashboard-card-content {
   display: flex;
   flex-direction: column;
