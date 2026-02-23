@@ -56,6 +56,12 @@ class FriendProfile(BaseModel):
     level: int
     xp: int
     profile_image: Optional[str] = None
+    medals_summary: Dict[str, int] = Field(
+        default_factory=lambda: {"trophee": 0, "or": 0, "argent": 0, "bronze": 0}
+    )
+    missions_by_category: Dict[str, int] = Field(
+        default_factory=lambda: {"transport": 0, "logement": 0, "alimentation": 0, "divers": 0}
+    )
 
     class Config:
         from_attributes = True
@@ -64,7 +70,7 @@ class FriendActivity(BaseModel):
     friend_id: int
     friend_username: str
     profile_image: Optional[str] = None
-    activity_type: str  # 'mission' ou 'trophy'
+    activity_type: str  # 'mission' ou 'trophy' ou 'league'
     mission_title: Optional[str] = None
     mission_id: Optional[int] = None
     trophy_title: Optional[str] = None

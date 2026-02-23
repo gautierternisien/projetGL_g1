@@ -27,9 +27,9 @@ onMounted(async () => {
     loading.value = false
     return
   }
-  const id = parseInt(idStr)
+
   try {
-    profile.value = await store.fetchFriendProfile(id)
+    profile.value = await store.fetchFriendProfile(parseInt(idStr, 10))
   } catch {
     error.value = 'Impossible de charger le profil'
   } finally {
@@ -55,16 +55,33 @@ async function confirmRemove() {
 
 const goBack = () => router.push('/communaute/amis')
 
-// For progress bar
 const friendXp = computed(() => profile.value?.xp || 0)
 
-const friendLevel = computed(() => {
-  return Math.floor(friendXp.value / 100) + 1
-})
+const friendLevel = computed(() => Math.floor(friendXp.value / 100) + 1)
 
-const xpProgress = computed(() => {
-  return friendXp.value % 100
-})
+const xpProgress = computed(() => friendXp.value % 100)
+
+const medalsSummary = computed(() => ({
+  trophee: profile.value?.medals_summary?.trophee ?? profile.value?.trophy_count ?? 0,
+  or: profile.value?.medals_summary?.or ?? 0,
+  argent: profile.value?.medals_summary?.argent ?? 0,
+  bronze: profile.value?.medals_summary?.bronze ?? 0,
+}))
+
+const missionsStats = computed(() => ({
+  total: profile.value?.mission_count ?? 0,
+  transport: profile.value?.missions_by_category?.transport ?? 0,
+  logement: profile.value?.missions_by_category?.logement ?? 0,
+  alimentation: profile.value?.missions_by_category?.alimentation ?? 0,
+  divers: profile.value?.missions_by_category?.divers ?? 0,
+}))
+
+const missionItems = computed(() => [
+  { key: 'transport', label: 'Transport', emoji: '🚗', value: missionsStats.value.transport },
+  { key: 'logement', label: 'Logement', emoji: '🏠', value: missionsStats.value.logement },
+  { key: 'alimentation', label: 'Alimentation', emoji: '🍽️', value: missionsStats.value.alimentation },
+  { key: 'divers', label: 'Divers', emoji: '📦', value: missionsStats.value.divers },
+])
 </script>
 
 <template>
@@ -75,14 +92,17 @@ const xpProgress = computed(() => {
       resumeBtnLabel="Retour"
       @resumeLater="goBack"
     />
+
     <div class="scrollable-area" :class="{ 'blurred-content': isBlurred }">
       <div v-if="loading" class="loading">Chargement...</div>
       <div v-else-if="error" class="error">{{ error }}</div>
+
       <div v-else-if="profile" class="profile-container">
         <div v-if="profile.profile_image" class="avatar-large avatar-image">
           <img :src="profile.profile_image" :alt="'Image de profil'" />
         </div>
         <div v-else class="avatar-large">{{ profile.username.charAt(0).toUpperCase() }}</div>
+
         <h2 class="username">{{ profile.username }}</h2>
 
         <div class="level-section">
@@ -96,14 +116,50 @@ const xpProgress = computed(() => {
           />
         </div>
 
-        <div class="stats-grid">
-          <div class="stat-card">
-            <span class="stat-value">{{ profile.mission_count }}</span>
-            <span class="stat-label">Missions terminées</span>
+        <div class="summary-card">
+          <h3 class="summary-title">Trophées obtenus</h3>
+          <div class="medals-summary">
+            <div class="medal-item">
+              <span class="medal-icon">🏆</span>
+              <span class="medal-label">Trophée</span>
+              <span class="medal-count">x{{ medalsSummary.trophee }}</span>
+            </div>
+            <div class="medal-item">
+              <span class="medal-icon">🥇</span>
+              <span class="medal-label">Or</span>
+              <span class="medal-count">x{{ medalsSummary.or }}</span>
+            </div>
+            <div class="medal-item">
+              <span class="medal-icon">🥈</span>
+              <span class="medal-label">Argent</span>
+              <span class="medal-count">x{{ medalsSummary.argent }}</span>
+            </div>
+            <div class="medal-item">
+              <span class="medal-icon">🥉</span>
+              <span class="medal-label">Bronze</span>
+              <span class="medal-count">x{{ medalsSummary.bronze }}</span>
+            </div>
           </div>
-          <div class="stat-card">
-            <span class="stat-value">{{ profile.trophy_count }}</span>
-            <span class="stat-label">Trophées</span>
+        </div>
+
+        <div class="summary-card">
+          <h3 class="summary-title">Missions réalisées</h3>
+          <div class="missions-grid">
+            <div class="mission-item mission-total">
+              <span class="mission-icon">🎯</span>
+              <span class="mission-label">Total</span>
+              <span class="mission-count">{{ missionsStats.total }}</span>
+            </div>
+
+            <div
+              v-for="item in missionItems"
+              :key="item.key"
+              class="mission-item"
+            >
+              <span class="mission-icon">{{ item.emoji }}</span>
+              <span class="mission-label">{{ item.label }}</span>
+              <span class="mission-count">{{ item.value }}</span>
+            </div>
           </div>
         </div>
 
@@ -111,7 +167,6 @@ const xpProgress = computed(() => {
       </div>
     </div>
 
-    <!-- Pop-up de confirmation -->
     <div v-if="confirmState.open" class="confirm-overlay">
       <div class="confirm-modal">
         <h3>Supprimer {{ confirmState.name }} ?</h3>
@@ -132,12 +187,13 @@ const xpProgress = computed(() => {
   margin-top: 2rem;
   color: #666;
 }
+
 .profile-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 2rem;
-  gap: 1.5rem;
+  padding: 1.5rem 1rem 2.2rem;
+  gap: 1.2rem;
 }
 
 .avatar-large {
@@ -166,56 +222,109 @@ const xpProgress = computed(() => {
 }
 
 .username {
-  font-size: 1.5rem;
-  color: #000;
+  font-size: 1.45rem;
+  color: #111;
+  margin: 0;
 }
 
 .level-section {
   width: 100%;
-  max-width: 300px;
+  max-width: 360px;
   display: flex;
   flex-direction: row;
-  gap: 1rem;
+  gap: 0.85rem;
   align-items: center;
 }
 
 .level-text {
-  font-weight: 400;
+  font-weight: 500;
   white-space: nowrap;
 }
 
-.xp-bar {
+.xp-progress-bar {
+  flex: 1;
+}
+
+.summary-card {
   width: 100%;
-  height: 10px;
-}
-
-.stats-grid {
-  display: flex;
-  gap: 1rem;
-  margin: 1rem 0;
-}
-
-.stat-card {
-  background: white;
-  padding: 1rem;
+  max-width: 360px;
+  background: #fff;
   border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e5e5;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+  padding: 0.95rem;
+}
+
+.summary-title {
+  margin: 0 0 0.85rem;
+  font-size: 1rem;
+  color: #679436;
+  text-align: center;
+}
+
+.medals-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.medal-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-width: 120px;
+  gap: 0.2rem;
 }
 
-.stat-value {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: #679436;
+.medal-icon {
+  font-size: 1.2rem;
 }
 
-.stat-label {
-  font-size: 0.8rem;
+.medal-label {
+  font-size: 0.74rem;
   color: #666;
-  text-align: center;
+}
+
+.medal-count {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #333;
+}
+
+.missions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.mission-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  background: #f7f7f7;
+}
+
+.mission-total {
+  grid-column: span 2;
+  background: #eef6e4;
+}
+
+.mission-icon {
+  font-size: 1rem;
+}
+
+.mission-label {
+  flex: 1;
+  font-size: 0.82rem;
+  color: #555;
+}
+
+.mission-count {
+  font-weight: 700;
+  color: #222;
+  font-size: 0.95rem;
 }
 
 .delete-btn {
@@ -224,15 +333,15 @@ const xpProgress = computed(() => {
   border: none;
   padding: 0.75rem 1.5rem;
   border-radius: 8px;
-  font-weight: bold;
+  font-weight: 600;
   cursor: pointer;
-  margin-top: 1rem;
+  margin-top: 0.35rem;
 }
+
 .delete-btn:hover {
   background-color: #e60000;
 }
 
-/* Copié de FriendsView.vue pour le style popup - à centraliser potentiellement */
 .blurred-content {
   filter: blur(4px);
   pointer-events: none;
@@ -249,7 +358,7 @@ const xpProgress = computed(() => {
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: rgba(0, 0, 0, 0.2); /* Fond semi-transparent */
+  background-color: rgba(0, 0, 0, 0.2);
 }
 
 .confirm-modal {

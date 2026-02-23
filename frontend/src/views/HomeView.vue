@@ -799,6 +799,13 @@ watch(isConnected, () => {
                       <span class="badge-icon">🎯</span>
                       <span class="badge-title">{{ event.mission_title }}</span>
                     </span>
+                    <span v-if="event.activity_type === 'league'" class="card-subtitle-text">
+                      a terminé la ligue
+                    </span>
+                    <span v-if="event.activity_type === 'league'" class="card-league-badge">
+                      <span class="badge-icon">🏁</span>
+                      <span class="badge-title">{{ event.mission_title }}</span>
+                    </span>
                     <span v-if="event.activity_type === 'trophy'" class="card-subtitle-text">
                       a obtenu le trophée
                     </span>
@@ -1105,6 +1112,20 @@ watch(isConnected, () => {
   align-items: center;
   gap: 0.4rem;
   background: linear-gradient(135deg, #e5cd48 0%, #e5cd48 100%);
+  padding: 0.2rem 0.6rem;
+  border-radius: 16px;
+  font-weight: 600;
+  color: #333;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-top: 2px;
+  max-width: 100%;
+}
+
+.card-league-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: linear-gradient(135deg, #b7d0f0 0%, #b7d0f0 100%);
   padding: 0.2rem 0.6rem;
   border-radius: 16px;
   font-weight: 600;

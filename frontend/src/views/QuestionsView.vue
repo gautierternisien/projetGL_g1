@@ -923,8 +923,7 @@ onUnmounted(() => {
 
       <div v-else class="question-container">
         <h3 class="question-counter">
-          Bilan : {{ bilan.val ?? '—' }} {{ bilan.unit }} • Question
-          {{ visibleQuestions.length === 0 ? '—' : currentIndex + 1 }} sur
+          Question {{ visibleQuestions.length === 0 ? '—' : currentIndex + 1 }} sur
           {{ visibleQuestions.length }}
         </h3>
 

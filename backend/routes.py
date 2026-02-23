@@ -332,6 +332,8 @@ async def list_friends(current_user: models.User = Depends(get_current_user), db
 
 @router.get("/friends/activity", response_model=List[schemas.FriendActivity], tags=["Friends"])
 async def get_friends_activity(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Ensure ended leagues are processed so league-end events appear in feed.
+    crud.process_league_rewards(db)
     activities = crud.get_user_activities(db, current_user.id)
     response_activities = []
     for activity in activities:
@@ -812,6 +814,54 @@ def read_user_profile(user_id: int, db: Session = Depends(get_db), current_user:
 
     user_trophies = crud.get_user_trophies(db, user_id=user_id)
     trophy_count = sum(1 for ut in user_trophies if ut.is_obtained)
+    user_trophies_map = {ut.trophy_id: ut for ut in user_trophies}
+    all_trophies = crud.get_all_trophies(db)
+
+    medals_summary = {"trophee": 0, "or": 0, "argent": 0, "bronze": 0}
+    for trophy in all_trophies:
+        user_trophy = user_trophies_map.get(trophy.id)
+        if not user_trophy or user_trophy.progress <= 0:
+            continue
+
+        if user_trophy.progress >= trophy.requirement_value:
+            medals_summary["trophee"] += 1
+            continue
+
+        milestones = sorted(get_trophy_milestones(trophy), key=lambda m: m.get("value", 0), reverse=True)
+        for milestone in milestones:
+            try:
+                milestone_value = int(milestone.get("value", 0))
+            except Exception:
+                milestone_value = 0
+
+            if user_trophy.progress < milestone_value:
+                continue
+
+            label = str(milestone.get("label", "")).strip().lower()
+            if label == "or":
+                medals_summary["or"] += 1
+            elif label == "argent":
+                medals_summary["argent"] += 1
+            elif label == "bronze":
+                medals_summary["bronze"] += 1
+            break
+
+    missions_by_category = {"transport": 0, "logement": 0, "alimentation": 0, "divers": 0}
+    mission_rows = db.query(
+        models.Mission.category_name,
+        func.count(models.UserMissionStatus.id)
+    ).join(
+        models.UserMissionStatus,
+        models.UserMissionStatus.mission_id == models.Mission.id
+    ).filter(
+        models.UserMissionStatus.user_id == user_id,
+        models.UserMissionStatus.status == "termine"
+    ).group_by(models.Mission.category_name).all()
+
+    for category_name, count in mission_rows:
+        key = str(category_name or "").strip().lower()
+        if key in missions_by_category:
+            missions_by_category[key] = int(count or 0)
 
     return schemas.FriendProfile(
         id=user.id,
@@ -820,7 +870,9 @@ def read_user_profile(user_id: int, db: Session = Depends(get_db), current_user:
         trophy_count=trophy_count,
         level=real_level,
         xp=real_xp,
-        profile_image=user.profile_image
+        profile_image=user.profile_image,
+        medals_summary=medals_summary,
+        missions_by_category=missions_by_category
     )
 
 # --- PREFERENCES ROUTES ---
