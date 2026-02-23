@@ -744,10 +744,13 @@ def respond_league_invite(db: Session, invite_id: int, accept: bool):
             joined_at=datetime.now()
         )
         db.add(new_member)
+        db.commit()
+        # Update trophy progress for league joining
+        update_trophy_progress(db, invite.invitee_id)
     else:
         invite.status = "rejected"
+        db.commit()
 
-    db.commit()
     return invite
 
 def get_category_by_name(db: Session, name: str):
@@ -916,15 +919,46 @@ def get_user_league_created_count(db: Session, user_id: int):
     return db.query(models.League).filter(models.League.creator_id == user_id).count()
 
 
+def get_user_league_joined_count(db: Session, user_id: int):
+    """Get the total number of leagues joined by a user (excluding leagues they created)"""
+    return db.query(models.LeagueMember).join(
+        models.League, models.LeagueMember.league_id == models.League.id
+    ).filter(
+        models.LeagueMember.user_id == user_id,
+        models.League.creator_id != user_id
+    ).count()
+
+
+def get_user_league_completed_count(db: Session, user_id: int):
+    """Get the total number of archived/completed leagues a user participated in (excluding leagues they created)"""
+    return db.query(models.LeagueMember).join(
+        models.League, models.LeagueMember.league_id == models.League.id
+    ).filter(
+        models.LeagueMember.user_id == user_id,
+        models.League.creator_id != user_id,
+        models.League.is_archived == True
+    ).count()
+
+
+def get_user_questionnaire_completed_count(db: Session, user_id: int):
+    """Get the total number of questionnaire categories completed by a user"""
+    return db.query(models.UserQuestionnaireReward).filter(
+        models.UserQuestionnaireReward.user_id == user_id
+    ).count()
+
+
 def update_trophy_progress(db: Session, user_id: int):
     """Update trophy progress for a user based on their activities
     Returns a tuple of (newly obtained trophies, lost trophies)"""
     from datetime import datetime
 
-    # Get login count, mission count and league created count
+    # Get login count, mission count, league created count, league joined count, league completed count and questionnaire completed count
     login_count = get_user_login_count(db, user_id)
     mission_count = get_completed_missions_count(db, user_id)
     league_created_count = get_user_league_created_count(db, user_id)
+    league_joined_count = get_user_league_joined_count(db, user_id)
+    league_completed_count = get_user_league_completed_count(db, user_id)
+    questionnaire_completed_count = get_user_questionnaire_completed_count(db, user_id)
 
     # Get all trophies
     trophies = get_all_trophies(db)
@@ -940,6 +974,12 @@ def update_trophy_progress(db: Session, user_id: int):
             count = mission_count
         elif trophy.requirement_type == "league_created_count":
             count = league_created_count
+        elif trophy.requirement_type == "league_joined_count":
+            count = league_joined_count
+        elif trophy.requirement_type == "league_completed_count":
+            count = league_completed_count
+        elif trophy.requirement_type == "questionnaire_completed_count":
+            count = questionnaire_completed_count
         else:
             continue
 
@@ -1047,6 +1087,10 @@ def award_category_completion_xp(db: Session, user_id: int, category_name: str):
     db.add(reward)
     db.commit()
     db.refresh(reward)
+    
+    # Update trophy progress
+    update_trophy_progress(db, user_id)
+    
     return reward
 
 def process_league_rewards(db: Session):

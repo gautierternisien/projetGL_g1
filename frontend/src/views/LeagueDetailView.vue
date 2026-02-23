@@ -4,11 +4,15 @@ import { useRoute, useRouter } from 'vue-router'
 import Header from '@/components/AppHeader.vue'
 import { useLeaguesStore } from '@/stores/leagues'
 import { useFriendsStore } from '@/stores/friends'
+import { useAuthStore } from '@/stores/auth'
+import { useTrophiesStore } from '@/stores/trophies'
 
 const route = useRoute()
 const router = useRouter()
 const store = useLeaguesStore()
 const friendsStore = useFriendsStore()
+const authStore = useAuthStore()
+const trophiesStore = useTrophiesStore()
 const leagueId = Number(route.params.id)
 
 const showInviteModal = ref(false)
@@ -109,6 +113,10 @@ async function confirmLeaveLeague() {
     leaveErrorMessage.value = ''
     try {
         await store.leaveLeague(leagueId)
+        // Vérifier les trophées après avoir quitté la ligue (peut perdre des médailles)
+        if (authStore.token && authStore.user) {
+            await trophiesStore.checkNewTrophies(authStore.token, authStore.user.id)
+        }
         router.push({ name: 'CommunityLeagues' })
     } catch {
         leaveErrorMessage.value = "Impossible de quitter la ligue."

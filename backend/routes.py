@@ -69,7 +69,7 @@ TROPHIES_DATA = [
     {
         "name": "trop_connecte",
         "title": "Trop connecté",
-        "description": "Collectez toutes les médailles de connexion",
+        "description": "Bravo 🎉 vous vous êtes connecté(e) 8 fois",
         "icon": "🏆",
         "tier": "progressive",
         "requirement_type": "login_count",
@@ -83,7 +83,7 @@ TROPHIES_DATA = [
     {
         "name": "champion_missions",
         "title": "Champion des missions",
-        "description": "Collectez toutes les médailles de missions",
+        "description": "Bravo 🎉 vous avez terminé 8 missions",
         "icon": "🏆",
         "tier": "progressive",
         "requirement_type": "mission_count",
@@ -96,8 +96,8 @@ TROPHIES_DATA = [
     },
     {
         "name": "createur_ligues",
-        "title": "Créateur de ligues",
-        "description": "Créer au moins 8 ligues",
+        "title": "Créa-Ligueur",
+        "description": "Bravo 🎉 vous avez créé 8 ligues",
         "icon": "🏆",
         "tier": "progressive",
         "requirement_type": "league_created_count",
@@ -106,6 +106,48 @@ TROPHIES_DATA = [
             {"value": 2, "label": "Bronze", "icon": "🥉"},
             {"value": 4, "label": "Argent", "icon": "🥈"},
             {"value": 6, "label": "Or", "icon": "🥇"}
+        ]
+    },
+    {
+        "name": "membre_actif",
+        "title": "Le Panini des Ligues",
+        "description": "Bravo 🎉 vous avez rejoint 8 ligues",
+        "icon": "🏆",
+        "tier": "progressive",
+        "requirement_type": "league_joined_count",
+        "requirement_value": 8,
+        "milestones": [
+            {"value": 2, "label": "Bronze", "icon": "🥉"},
+            {"value": 4, "label": "Argent", "icon": "🥈"},
+            {"value": 6, "label": "Or", "icon": "🥇"}
+        ]
+    },
+    {
+        "name": "finisher",
+        "title": "Clap de fin des Ligues",
+        "description": "Bravo 🎉 vous avez terminé 8 ligues",
+        "icon": "🏆",
+        "tier": "progressive",
+        "requirement_type": "league_completed_count",
+        "requirement_value": 8,
+        "milestones": [
+            {"value": 2, "label": "Bronze", "icon": "🥉"},
+            {"value": 4, "label": "Argent", "icon": "🥈"},
+            {"value": 6, "label": "Or", "icon": "🥇"}
+        ]
+    },
+    {
+        "name": "quiz_master",
+        "title": "Maître des Quiz",
+        "description": "Bravo 🎉 vous avez terminé tous les questionnaires",
+        "icon": "🏆",
+        "tier": "progressive",
+        "requirement_type": "questionnaire_completed_count",
+        "requirement_value": 4,
+        "milestones": [
+            {"value": 1, "label": "Bronze", "icon": "🥉"},
+            {"value": 2, "label": "Argent", "icon": "🥈"},
+            {"value": 3, "label": "Or", "icon": "🥇"}
         ]
     }
 ]
@@ -1001,6 +1043,8 @@ def leave_league(league_id: int, current_user: schemas.User = Depends(get_curren
     if member:
         db.delete(member)
         db.commit()
+        # Update trophy progress after leaving a league
+        crud.update_trophy_progress(db, current_user.id)
     return {"status": "left"}
 
 # --- COMPLETION ROUTES ---

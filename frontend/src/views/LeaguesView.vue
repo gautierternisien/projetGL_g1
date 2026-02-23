@@ -3,9 +3,13 @@ import Header from '@/components/AppHeader.vue'
 import { useRouter } from 'vue-router'
 import { ref, computed, onMounted } from 'vue'
 import { useLeaguesStore } from '@/stores/leagues'
+import { useAuthStore } from '@/stores/auth'
+import { useTrophiesStore } from '@/stores/trophies'
 
 const router = useRouter()
 const store = useLeaguesStore()
+const authStore = useAuthStore()
+const trophiesStore = useTrophiesStore()
 const activeTab = ref(0) // 0: En cours, 2: Invitations, 1: Archives
 
 const tabs = [
@@ -19,6 +23,10 @@ onMounted(async () => {
     await store.fetchActiveLeagues()
     await store.fetchInvites()
     await store.fetchArchivedLeagues()
+    // Check for completed leagues trophy after loading leagues
+    if (authStore.token && authStore.user) {
+      await trophiesStore.checkNewTrophies(authStore.token, authStore.user.id)
+    }
   } catch {
     // silent fail
   }
@@ -84,6 +92,10 @@ function goToDetail(id: number) {
 // Invite actions
 async function acceptInvite(id: number) {
   await store.acceptInvite(id)
+  // Vérifier les nouveaux trophées après avoir rejoint une ligue
+  if (authStore.token && authStore.user) {
+    await trophiesStore.checkNewTrophies(authStore.token, authStore.user.id)
+  }
 }
 
 async function rejectInvite(id: number) {
@@ -176,6 +188,10 @@ async function confirmCreateLeague() {
       end_date: newEndDate.value,
     })
     closeCreateModal()
+    // Vérifier les nouveaux trophées après création de ligue
+    if (authStore.token && authStore.user) {
+      await trophiesStore.checkNewTrophies(authStore.token, authStore.user.id)
+    }
   } catch (e) {
     console.error(e)
     errorMessage.value = 'Erreur lors de la création de la ligue.'

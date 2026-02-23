@@ -197,38 +197,27 @@ function getLastObtainedMilestone(progress: number, milestones: { value: number;
   return null
 }
 
-function getDescription(progress: number, milestones: { value: number; label: string; icon: string }[], finalValue: number, requirementType: string = 'login_count', isInProgress: boolean = false): string {
-  if (isInProgress) {
-    // Pour les trophées en cours, afficher le prochain objectif
-    const next = getNextMilestone(progress, milestones, finalValue)
-    if (next) {
-      if (requirementType === 'mission_count') {
-        return `Terminez au moins ${next.value} missions`
-      } else if (requirementType === 'login_count') {
-        return `Connectez-vous au moins ${next.value} fois`
-      } else if (requirementType === 'league_created_count') {
-        return `Créez au moins ${next.value} ligues`
-      } else {
-        return `Objectif : ${next.value}`
-      }
+function getDescription(progress: number, milestones: { value: number; label: string; icon: string }[], finalValue: number, requirementType: string = 'login_count'): string {
+  // Afficher le prochain objectif
+  const next = getNextMilestone(progress, milestones, finalValue)
+  if (next) {
+    if (requirementType === 'mission_count') {
+      return `Terminez au moins ${next.value} missions`
+    } else if (requirementType === 'login_count') {
+      return `Connectez-vous au moins ${next.value} fois`
+    } else if (requirementType === 'league_created_count') {
+      return `Créez au moins ${next.value} ligues`
+    } else if (requirementType === 'league_joined_count') {
+      return `Rejoignez au moins ${next.value} ligues d'amis`
+    } else if (requirementType === 'league_completed_count') {
+      return `Terminez au moins ${next.value} ligues`
+    } else if (requirementType === 'questionnaire_completed_count') {
+      return `Terminez au moins ${next.value} questionnaire${next.value > 1 ? 's' : ''}`
+    } else {
+      return `Objectif : ${next.value}`
     }
-    return "Objectif atteint"
-  } else {
-    // Pour les trophées obtenus, afficher l'objectif atteint
-    const obtained = getLastObtainedMilestone(progress, milestones, finalValue)
-    if (obtained) {
-      if (requirementType === 'mission_count') {
-        return `Terminé au moins ${obtained.value} missions`
-      } else if (requirementType === 'login_count') {
-        return `Connecté au moins ${obtained.value} fois`
-      } else if (requirementType === 'league_created_count') {
-        return `Créé au moins ${obtained.value} ligues`
-      } else {
-        return `Objectif atteint : ${obtained.value}`
-      }
-    }
-    return "Trophée obtenu"
   }
+  return "Objectif atteint"
 }
 
 </script>
@@ -293,7 +282,7 @@ function getDescription(progress: number, milestones: { value: number; label: st
               </div>
               <div class="trophy-info">
                 <p class="trophy-description">
-                  {{ getDescription(trophy.progress || 0, trophy.milestones || [], trophy.requirement_value || 5, trophy.requirement_type || 'login_count', activeTab === 0 || activeTab === 2) }}
+                  {{ activeTab === 1 ? trophy.description : getDescription(trophy.progress || 0, trophy.milestones || [], trophy.requirement_value || 5, trophy.requirement_type || 'login_count') }}
                 </p>
                 
                 <!-- En cours : afficher la progression -->
