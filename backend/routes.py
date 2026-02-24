@@ -229,6 +229,19 @@ def get_rules():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/server-time", tags=["Utility"])
+def get_server_time():
+    """Return current server time in ISO format and as timestamp"""
+    now = utils.get_current_time()
+    # ISO 8601 week number (1-53)
+    week_number = now.isocalendar()[1]
+    return {
+        "iso": now.isoformat(),
+        "date": now.strftime("%Y-%m-%d"),
+        "timestamp": int(now.timestamp() * 1000),  # milliseconds
+        "week_number": week_number  # ISO 8601 week number
+    }
+
 # --- AUTHENTICATION ROUTES ---
 @router.post("/register", response_model=schemas.User, tags=["Authentication"], summary="Register a new user")
 def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):

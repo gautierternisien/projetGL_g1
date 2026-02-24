@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
-import models, schemas
+import models, schemas, utils
 from datetime import datetime
 import unicodedata
 
@@ -134,7 +134,7 @@ def get_user_ngc_answers(db: Session, user_id: int):
 
 def update_user_ngc_answers(db: Session, user_id: int, data_json: str):
     record = get_user_ngc_answers(db, user_id)
-    now = datetime.utcnow().isoformat()
+    now = utils.get_current_time().isoformat()
     if not record:
         record = models.UserNgcAnswers(user_id=user_id, data=data_json, updated_at=now)
         db.add(record)
@@ -315,7 +315,7 @@ def upsert_user_ngc_stats(db: Session, user_id: int, payload: schemas.NgcStatsPa
     row.alimentation = normalized_details.get('alimentation', 0)
     row.divers = normalized_details.get('divers', 0)
     row.services_societaux = normalized_details.get('services_societaux', 0)
-    row.updated_at = datetime.now()
+    row.updated_at = utils.get_current_time()
 
     progress_row = db.query(models.UserNgcProgress).filter(models.UserNgcProgress.user_id == user_id).first()
     if not progress_row:
@@ -326,7 +326,7 @@ def upsert_user_ngc_stats(db: Session, user_id: int, payload: schemas.NgcStatsPa
     progress_row.logement = progress.get('logement', 0)
     progress_row.alimentation = progress.get('alimentation', 0)
     progress_row.divers = progress.get('divers', 0)
-    progress_row.updated_at = datetime.now()
+    progress_row.updated_at = utils.get_current_time()
 
     db.commit()
     db.refresh(row)
@@ -562,7 +562,7 @@ def update_user_mission_status(db: Session, user_id: int, mission_id: int, statu
 
     if status == 'termine':
         if not was_already_completed_ever:
-            db_status.completed_at = datetime.now()
+            db_status.completed_at = utils.get_current_time()
             db.commit()
             
             mission = db.query(models.Mission).filter(models.Mission.id == mission_id).first()
@@ -597,7 +597,7 @@ def get_accepted_friends(db: Session, user_id: int):
 
 # --- LEAGUES ---
 def create_league(db: Session, league: schemas.LeagueCreate, creator_id: int):
-    now = datetime.now()
+    now = utils.get_current_time()
     db_league = models.League(
         name=league.name,
         start_date=league.start_date,
@@ -628,7 +628,7 @@ def create_league(db: Session, league: schemas.LeagueCreate, creator_id: int):
 
 
 def _archive_expired_leagues(db: Session):
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = utils.get_current_date_str()
     # Find active leagues that have ended (end_date < today)
     expired_leagues = db.query(models.League).filter(
         models.League.is_archived == False,
@@ -759,7 +759,7 @@ def respond_league_invite(db: Session, invite_id: int, accept: bool):
         new_member = models.LeagueMember(
             league_id=invite.league_id,
             user_id=invite.invitee_id,
-            joined_at=datetime.now()
+            joined_at=utils.get_current_time()
         )
         db.add(new_member)
         db.commit()
@@ -917,10 +917,9 @@ def upsert_user_trophy(db: Session, user_id: int, trophy_id: int, progress: int,
 
 def record_user_login(db: Session, user_id: int):
     """Record a user login"""
-    from datetime import datetime
     login = models.UserLogin(
         user_id=user_id,
-        login_at=datetime.utcnow()
+        login_at=utils.get_current_time()
     )
     db.add(login)
     db.commit()
@@ -1018,10 +1017,10 @@ def update_trophy_progress(db: Session, user_id: int):
 
         # If trophée just became obtained
         if is_obtained and existing_trophy and not existing_trophy.is_obtained:
-            obtained_at = datetime.utcnow()
+            obtained_at = utils.get_current_time()
             newly_obtained_trophies.append(trophy)
         elif is_obtained and not existing_trophy:
-            obtained_at = datetime.utcnow()
+            obtained_at = utils.get_current_time()
             newly_obtained_trophies.append(trophy)
         
         # If trophée was obtained but is no longer
@@ -1037,7 +1036,7 @@ def update_trophy_progress(db: Session, user_id: int):
                 if count >= milestone["value"]:
                     # Only update if not already set or if we're reaching a new milestone
                     if not existing_trophy or not existing_trophy.last_milestone_date or existing_trophy.progress < count:
-                        last_milestone_date = datetime.utcnow()
+                        last_milestone_date = utils.get_current_time()
                     else:
                         last_milestone_date = existing_trophy.last_milestone_date
                     break
@@ -1116,7 +1115,7 @@ def process_league_rewards(db: Session):
     Vérifie toutes les ligues terminées qui n'ont pas encore distribué leurs récompenses.
     Calcule le classement et attribue l'XP.
     """
-    today = datetime.now().strftime("%Y-%m-%d") # Format ISO YYYY-MM-DD
+    today = utils.get_current_date_str()
 
     # 1. Récupérer les ligues terminées (date de fin passée) et non traitées
     # On suppose que end_date est inclusif, donc terminé si today > end_date

@@ -5,6 +5,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useLeaguesStore } from '@/stores/leagues'
 import { useAuthStore } from '@/stores/auth'
 import { useTrophiesStore } from '@/stores/trophies'
+import { getServerTime, getServerDate, getServerDateString, getEndOfDayTimestamp } from '@/utils/serverTime'
 
 const router = useRouter()
 const store = useLeaguesStore()
@@ -34,29 +35,30 @@ onMounted(async () => {
 
 // Sort logic: Split active and upcoming, sort by start_date
 const startedLeagues = computed(() => {
-  const nowMs = Date.now()
-  const list = store.activeLeagues.filter((l) => new Date(l.start_date).getTime() <= nowMs)
+  const nowMs = getServerTime()
+  const list = store.activeLeagues.filter((l) => l.start_timestamp <= nowMs)
   // Most recently started first
-  return list.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime())
+  return list.sort((a, b) => b.start_timestamp - a.start_timestamp)
 })
 
 const upcomingLeagues = computed(() => {
-  const nowMs = Date.now()
-  const list = store.activeLeagues.filter((l) => new Date(l.start_date).getTime() > nowMs)
+  const nowMs = getServerTime()
+  const list = store.activeLeagues.filter((l) => l.start_timestamp > nowMs)
   // Starting soonest first
-  return list.sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime())
+  return list.sort((a, b) => a.start_timestamp - b.start_timestamp)
 })
 
 const sortedArchivedLeagues = computed(() => {
   return [...store.archivedLeagues].sort(
-    (a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime(),
+    (a, b) => b.start_timestamp - a.start_timestamp,
   )
 })
 
-function getTimeRemaining(league: { start_date: string; end_date: string }) {
-  const start = new Date(league.start_date).getTime()
-  const end = new Date(league.end_date).getTime()
-  const now = new Date().getTime()
+function getTimeRemaining(league: { start_date: string; start_timestamp: number; end_date: string; end_timestamp: number }) {
+  // Use backend-calculated timestamps
+  const start = league.start_timestamp
+  const end = league.end_timestamp
+  const now = getServerTime()
 
   // Not started yet
   if (now < start) {
@@ -64,7 +66,7 @@ function getTimeRemaining(league: { start_date: string; end_date: string }) {
     const days = Math.floor(diff / (1000 * 60 * 60 * 24))
 
     // Check for tomorrow specifically
-    const tomorrow = new Date()
+    const tomorrow = getServerDate()
     tomorrow.setDate(tomorrow.getDate() + 1)
     const tomorrowStr = tomorrow.toISOString().substring(0, 10)
     if (league.start_date === tomorrowStr) return 'Commence demain'
@@ -72,13 +74,18 @@ function getTimeRemaining(league: { start_date: string; end_date: string }) {
     if (days > 0) return `Commence dans ${days}j`
     return 'Commence bientôt'
   }
-
+  
   const diff = end - now
-  if (diff <= 0) return 'Terminée'
+  if (diff < 0) return `Terminée`
+  
   const days = Math.floor(diff / (1000 * 60 * 60 * 24))
   if (days > 0) return `${days}j`
+  
   const hours = Math.floor(diff / (1000 * 60 * 60))
-  return `${hours}h`
+  if (hours > 0) return `${hours}h`
+  
+  const min = Math.floor(diff / (1000 * 60))
+  return `${min}min`
 }
 
 function goBack() {
@@ -105,16 +112,10 @@ async function rejectInvite(id: number) {
 // Modal logic
 const showCreateModal = ref(false)
 const newLeagueName = ref('')
-const newStartDate = ref(new Date().toISOString().substring(0, 10))
+const newStartDate = ref(getServerDateString())
 const newEndDate = ref('')
 const isBlurred = ref(false)
 const errorMessage = ref('')
-
-// Date constraints
-const now = new Date()
-const todayStr = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
-  .toISOString()
-  .substring(0, 10)
 
 // Computed for form validation
 const formValidationError = computed(() => {
@@ -124,15 +125,17 @@ const formValidationError = computed(() => {
     return 'Le nom de la ligue est requis.'
   }
 
+  const todayStr = getServerDateString()
   if (newStartDate.value < todayStr) {
     return 'La date de début ne peut pas être dans le passé.'
   }
 
   const start = new Date(newStartDate.value).getTime()
-  const end = new Date(newEndDate.value).getTime()
+  // Use helper function that matches backend logic (inclusive end of day)
+  const end = getEndOfDayTimestamp(newEndDate.value)
 
-  if (end <= start) {
-    return 'La date de fin doit être postérieure au début.'
+  if (end < start) {
+    return 'La date de fin doit être postérieure ou égale au début.'
   }
 
   const oneYearLater = new Date(start + 365 * 24 * 60 * 60 * 1000).getTime()
@@ -149,9 +152,8 @@ const isFormValid = computed(() => {
 
 const minEndDate = computed(() => {
   if (!newStartDate.value) return ''
-  const minDate = new Date(newStartDate.value)
-  minDate.setDate(minDate.getDate() + 1)
-  return minDate.toISOString().split('T')[0]
+  // Allow same day leagues (end_date is inclusive until 23:59:59)
+  return newStartDate.value
 })
 const maxEndDate = computed(() => {
   if (!newStartDate.value) return ''
@@ -165,7 +167,7 @@ function openCreateModal() {
   showCreateModal.value = true
   errorMessage.value = ''
   // Reset start date to today
-  newStartDate.value = new Date().toISOString().substring(0, 10)
+  newStartDate.value = getServerDateString()
 }
 
 function closeCreateModal() {
@@ -237,7 +239,7 @@ async function confirmCreateLeague() {
               <div class="league-info">
                 <div class="league-name">{{ league.name }}</div>
                 <div class="league-meta">
-                  <span class="members-count">{{ league.members_count }} membres</span>
+                  <span class="members-count">{{ league.members_count }} membre{{ league.members_count > 1 ? 's' : '' }}</span>
                   <span class="separator">•</span>
                   <span class="timer">{{ getTimeRemaining(league) }}</span>
                 </div>
@@ -263,7 +265,7 @@ async function confirmCreateLeague() {
               <div class="league-info">
                 <div class="league-name">{{ league.name }}</div>
                 <div class="league-meta">
-                  <span class="members-count">{{ league.members_count }} membres</span>
+                  <span class="members-count">{{ league.members_count }} membre{{ league.members_count > 1 ? 's' : '' }}</span>
                   <span class="separator">•</span>
                   <span class="timer">{{ getTimeRemaining(league) }}</span>
                 </div>
@@ -337,7 +339,7 @@ async function confirmCreateLeague() {
         <div class="form-row">
           <div class="form-group">
             <label>Début</label>
-            <input v-model="newStartDate" type="date" :min="todayStr" />
+            <input v-model="newStartDate" type="date" :min="getServerDateString()" />
           </div>
           <div class="form-group">
             <label>Fin</label>

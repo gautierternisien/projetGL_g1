@@ -3,21 +3,10 @@ import Card from '@/components/AppCard.vue'
 import Header from '@/components/AppHeader.vue'
 import { computed } from 'vue'
 import { conseilHebdo } from '@/data/conseilHebdo.ts'
-
-// --- FONCTION UTILITAIRE : Récupérer le numéro de la semaine (1-52) ---
-function getWeekNumber(d: Date): number {
-  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
-  // On se cale sur le jeudi de la semaine actuelle (norme ISO 8601)
-  date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7))
-  // On récupère le 1er janvier
-  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1))
-  // On calcule le numéro de semaine
-  const weekNo = Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
-  return weekNo
-}
+import { getServerWeekNumber } from '@/utils/serverTime'
 
 const conseilActuel = computed(() => {
-  const currentWeek = getWeekNumber(new Date())
+  const currentWeek = getServerWeekNumber()
 
   // L'index d'un tableau commence à 0, donc on fait -1.
   // Le modulo (%) permet de boucler : si on est semaine 53, ça revient au conseil 1.

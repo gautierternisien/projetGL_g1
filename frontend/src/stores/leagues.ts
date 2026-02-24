@@ -20,6 +20,8 @@ export interface League {
     is_archived: boolean
     created_at: string
     members_count: number
+    start_timestamp: number  // Computed by backend: start_date at 00:00:00 in milliseconds
+    end_timestamp: number  // Computed by backend: end_date at 23:59:59 in milliseconds
 }
 
 export interface LeagueDetail extends League {

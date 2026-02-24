@@ -221,6 +221,20 @@ class League(Base):
     invites = relationship("LeagueInvite", back_populates="league")
     creator = relationship("User", foreign_keys=[creator_id])
 
+    @property
+    def start_timestamp(self) -> int:
+        """Return start_date as timestamp at 00:00:00 (start of day)"""
+        from datetime import datetime
+        dt = datetime.fromisoformat(self.start_date + "T00:00:00")
+        return int(dt.timestamp() * 1000)  # milliseconds
+
+    @property
+    def end_timestamp(self) -> int:
+        """Return end_date as timestamp at 23:59:59 (inclusive end of day)"""
+        from datetime import datetime
+        dt = datetime.fromisoformat(self.end_date + "T23:59:59")
+        return int(dt.timestamp() * 1000)  # milliseconds
+
 class LeagueMember(Base):
     __tablename__ = "league_members"
 

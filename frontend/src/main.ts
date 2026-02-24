@@ -5,6 +5,7 @@ import { createPinia } from 'pinia'
 
 import App from './App.vue'
 import router from './router'
+import { syncServerTime } from './utils/serverTime'
 
 import 'vuetify/styles'
 import { createVuetify } from 'vuetify'
@@ -29,5 +30,8 @@ const app = createApp(App)
 app.use(createPinia())
 app.use(router)
 app.use(vuetify)
+
+// Sync server time in background (non-blocking)
+syncServerTime()
 
 app.mount('#app')

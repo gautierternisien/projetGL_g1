@@ -160,6 +160,8 @@ class League(LeagueBase):
     is_archived: bool
     created_at: datetime
     members_count: int = 0
+    start_timestamp: int  # Computed: start_date at 00:00:00 in milliseconds
+    end_timestamp: int  # Computed: end_date at 23:59:59 in milliseconds
 
     class Config:
         from_attributes = True

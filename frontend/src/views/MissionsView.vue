@@ -10,7 +10,6 @@ import {
   PREFERENCE_LABELS,
   type DerivedPreferences,
 } from '@/utils/profileMapping'
-import { loadAnswers } from '@/lib/ngc/answersStorage.ts'
 
 const API_URL = 'http://localhost:8000'
 const authStore = useAuthStore()
@@ -266,7 +265,7 @@ function handleCardClick(e: Event) {
           </div>
         </div>
 
-        <button class="save-btn" @click="savePreferences" :disabled="isSubmittingPrefs">
+        <button class="save-btn" @click="() => savePreferences()" :disabled="isSubmittingPrefs">
           {{ isSubmittingPrefs ? '...' : 'Enregistrer' }}
         </button>
       </div>

@@ -6,6 +6,7 @@ import { useLeaguesStore } from '@/stores/leagues'
 import { useFriendsStore } from '@/stores/friends'
 import { useAuthStore } from '@/stores/auth'
 import { useTrophiesStore } from '@/stores/trophies'
+import { getServerTime } from '@/utils/serverTime'
 
 const route = useRoute()
 const router = useRouter()
@@ -45,9 +46,10 @@ const sortedMembers = computed(() => {
 const timeRemaining = computed(() => {
   if (!league.value || league.value.is_archived) return null
 
-  const start = new Date(league.value.start_date).getTime()
-  const end = new Date(league.value.end_date).getTime()
-  const now = new Date().getTime()
+  // Use backend-calculated timestamps
+  const start = league.value.start_timestamp
+  const end = league.value.end_timestamp
+  const now = getServerTime()
 
   // Not started yet
   if (now < start) return null // Display date range instead
@@ -162,7 +164,7 @@ async function inviteFriend(friendId: number) {
 
       <div class="league-infos">
         <p v-if="!league.is_archived">
-          <span v-if="new Date().getTime() < new Date(league.start_date).getTime()" class="timer">
+          <span v-if="getServerTime() < league.start_timestamp" class="timer">
             Du {{ new Date(league.start_date).toLocaleDateString() }} au
             {{ new Date(league.end_date).toLocaleDateString() }}
           </span>
@@ -481,10 +483,6 @@ async function inviteFriend(friendId: number) {
   margin-top: 8px;
   font-size: 0.9rem;
   border: 1px solid #f5c6cb;
-}
-
-.leave-confirm {
-  /* Specific styles for leave confirmation box */
 }
 
 .confirm-btn {
