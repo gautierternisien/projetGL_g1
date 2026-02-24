@@ -235,7 +235,7 @@ async function confirmCreateLeague() {
               class="league-card"
               @click="goToDetail(league.id)"
             >
-              <div class="league-icon">🏆</div>
+              <div class="league-icon">🎖️</div>
               <div class="league-info">
                 <div class="league-name">{{ league.name }}</div>
                 <div class="league-meta">
@@ -275,7 +275,7 @@ async function confirmCreateLeague() {
           </div>
         </div>
         <div v-else class="placeholder-content">
-          <span class="emoji">🏆</span>
+          <span class="emoji">🎖️</span>
           <p>Vous ne participez à aucune ligue pour le moment.</p>
         </div>
       </div>
@@ -309,7 +309,7 @@ async function confirmCreateLeague() {
             class="league-card archived"
             @click="goToDetail(league.id)"
           >
-            <div class="league-icon gray">🏆</div>
+            <div class="league-icon gray">🎖️</div>
             <div class="league-info">
               <div class="league-name">{{ league.name }}</div>
               <div class="league-meta">
