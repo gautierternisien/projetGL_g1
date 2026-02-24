@@ -74,16 +74,16 @@ function getTimeRemaining(league: { start_date: string; start_timestamp: number;
     if (days > 0) return `Commence dans ${days}j`
     return 'Commence bientôt'
   }
-  
+
   const diff = end - now
   if (diff < 0) return `Terminée`
-  
+
   const days = Math.floor(diff / (1000 * 60 * 60 * 24))
   if (days > 0) return `${days}j`
-  
+
   const hours = Math.floor(diff / (1000 * 60 * 60))
   if (hours > 0) return `${hours}h`
-  
+
   const min = Math.floor(diff / (1000 * 60))
   return `${min}min`
 }
@@ -426,6 +426,18 @@ async function confirmCreateLeague() {
   font-family: inherit;
   width: 100%;
   box-sizing: border-box;
+  /* Correctifs pour iOS */
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: white;
+  color: #333;
+  margin: 0;
+  min-height: 42px;
+}
+
+.form-group input[type="date"] {
+  text-align: left;
+  display: block;
 }
 
 .form-row {
