@@ -176,8 +176,13 @@ async function inviteFriend(friendId: number) {
       <div class="ranking-section">
         <h3>Classement</h3>
         <div class="ranking-list">
-          <div v-for="(member, index) in sortedMembers" :key="member.id" class="rank-item">
-            <div class="rank-pos">{{ index + 1 }}</div>
+          <div v-for="(member, index) in sortedMembers" :key="member.id" class="rank-item" :class="{ 'rank-gold': index === 0, 'rank-silver': index === 1, 'rank-bronze': index === 2 }">
+            <div class="rank-pos" :class="{ 'medal': index < 3 }">
+              <span v-if="index === 0">🥇</span>
+              <span v-else-if="index === 1">🥈</span>
+              <span v-else-if="index === 2">🥉</span>
+              <span v-else>{{ index + 1 }}</span>
+            </div>
             <div class="rank-info">
               <div class="username">{{ member.username }}</div>
               <div class="missions">
@@ -334,6 +339,32 @@ async function inviteFriend(friendId: number) {
   background: #e3eddd;
   border-radius: 50%;
   color: #2f3b2f;
+  flex-shrink: 0;
+}
+
+.rank-pos.medal {
+  background: transparent;
+  font-size: 1.6rem;
+  width: 36px;
+  height: 36px;
+}
+
+.rank-gold {
+  background: linear-gradient(135deg, #fff9e6 0%, #fff3cc 100%) !important;
+  border-color: #f0d060 !important;
+  box-shadow: 0 2px 8px rgba(240, 208, 96, 0.25);
+}
+
+.rank-silver {
+  background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%) !important;
+  border-color: #c0c0c0 !important;
+  box-shadow: 0 2px 8px rgba(192, 192, 192, 0.25);
+}
+
+.rank-bronze {
+  background: linear-gradient(135deg, #fdf0e6 0%, #f5e0cc 100%) !important;
+  border-color: #d4a373 !important;
+  box-shadow: 0 2px 8px rgba(212, 163, 115, 0.25);
 }
 
 .rank-info {

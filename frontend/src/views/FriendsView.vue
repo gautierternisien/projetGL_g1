@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Header from '@/components/AppHeader.vue'
 import { useFriendsStore } from '@/stores/friends'
+import { resolveProfileImage } from '@/utils/profileImage'
 import { useRouter } from 'vue-router'
 import { onMounted, ref, computed } from 'vue'
 
@@ -105,8 +106,8 @@ const goBack = () => router.push('/communaute')
             @click="goToProfile(f.id)"
             class="friend-item"
           >
-            <div v-if="f.profile_image" class="avatar avatar-image">
-              <img :src="f.profile_image" :alt="'Image de profil'" />
+            <div v-if="resolveProfileImage(f.profile_image)" class="avatar avatar-image">
+              <img :src="resolveProfileImage(f.profile_image)" :alt="'Image de profil'" />
             </div>
             <div v-else class="avatar">{{ f.username.charAt(0).toUpperCase() }}</div>
             <div class="name">{{ f.username }}</div>
@@ -123,8 +124,8 @@ const goBack = () => router.push('/communaute')
       <div v-if="activeTab === 1">
         <div v-if="store.pendingRequests.length" class="requests-list">
           <div v-for="r in store.pendingRequests" :key="r.id" class="request-item pending">
-            <div v-if="r.receiver.profile_image" class="avatar avatar-image">
-              <img :src="r.receiver.profile_image" :alt="'Image de profil'" />
+            <div v-if="resolveProfileImage(r.receiver.profile_image)" class="avatar avatar-image">
+              <img :src="resolveProfileImage(r.receiver.profile_image)" :alt="'Image de profil'" />
             </div>
             <div v-else class="avatar">{{ r.receiver.username.charAt(0).toUpperCase() }}</div>
             <div class="request-info">
@@ -144,8 +145,8 @@ const goBack = () => router.push('/communaute')
       <div v-if="activeTab === 2">
         <div v-if="store.incomingRequests.length" class="requests-list">
           <div v-for="r in store.incomingRequests" :key="r.id" class="request-item incoming">
-            <div v-if="r.sender.profile_image" class="avatar avatar-image">
-              <img :src="r.sender.profile_image" :alt="'Image de profil'" />
+            <div v-if="resolveProfileImage(r.sender.profile_image)" class="avatar avatar-image">
+              <img :src="resolveProfileImage(r.sender.profile_image)" :alt="'Image de profil'" />
             </div>
             <div v-else class="avatar">{{ r.sender.username.charAt(0).toUpperCase() }}</div>
             <div class="request-info">

@@ -4,6 +4,7 @@ import Card from '@/components/AppCard.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
+import { resolveProfileImage } from '@/utils/profileImage'
 import { useRouter } from 'vue-router'
 import { onMounted, ref, onUnmounted, computed } from 'vue'
 
@@ -26,7 +27,7 @@ onMounted(async () => {
     authStore.fetchUser()
     // Initialiser l'image de profil depuis les données utilisateur
     if (authStore.user?.profile_image) {
-      selectedProfileImage.value = authStore.user.profile_image
+      selectedProfileImage.value = resolveProfileImage(authStore.user.profile_image)
     }
   }
 })

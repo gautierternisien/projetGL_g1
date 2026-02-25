@@ -3,6 +3,7 @@ import Header from '@/components/AppHeader.vue'
 import { onMounted, ref, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useFriendsStore, type UserSummary } from '@/stores/friends'
+import { resolveProfileImage } from '@/utils/profileImage'
 
 const router = useRouter()
 const store = useFriendsStore()
@@ -122,7 +123,7 @@ const goBack = () => router.push('/communaute/amis')
       <div v-else-if="results.length" class="results">
         <div v-for="u in results" :key="u.id" class="result-item">
           <div class="avatar">
-            <img v-if="u.profile_image" :src="u.profile_image" :alt="u.username" class="avatar-image" />
+            <img v-if="resolveProfileImage(u.profile_image)" :src="resolveProfileImage(u.profile_image)" :alt="u.username" class="avatar-image" />
             <span v-else>{{ u.username.charAt(0).toUpperCase() }}</span>
           </div>
           <div class="name">{{ u.username }}</div>
@@ -136,7 +137,7 @@ const goBack = () => router.push('/communaute/amis')
   <div v-if="confirmState.open && confirmState.user" class="blur-overlay">
     <div class="confirm-box" v-if="isIncoming(confirmState.user.id)">
       <div class="modal-avatar">
-        <img v-if="confirmState.user.profile_image" :src="confirmState.user.profile_image" :alt="confirmState.user.username" class="modal-avatar-image" />
+        <img v-if="resolveProfileImage(confirmState.user.profile_image)" :src="resolveProfileImage(confirmState.user.profile_image)" :alt="confirmState.user.username" class="modal-avatar-image" />
         <span v-else>{{ confirmState.user.username.charAt(0).toUpperCase() }}</span>
       </div>
       <h3>{{ confirmState.user.username }} vous demande en ami</h3>
@@ -148,7 +149,7 @@ const goBack = () => router.push('/communaute/amis')
     </div>
     <div class="confirm-box" v-else>
       <div class="modal-avatar">
-        <img v-if="confirmState.user.profile_image" :src="confirmState.user.profile_image" :alt="confirmState.user.username" class="modal-avatar-image" />
+        <img v-if="resolveProfileImage(confirmState.user.profile_image)" :src="resolveProfileImage(confirmState.user.profile_image)" :alt="confirmState.user.username" class="modal-avatar-image" />
         <span v-else>{{ confirmState.user.username.charAt(0).toUpperCase() }}</span>
       </div>
       <h3>Ajouter {{ confirmState.user.username }} ?</h3>

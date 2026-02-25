@@ -9,6 +9,7 @@ html,
 body,
 #app {
   font-family: 'Instrument Sans', sans-serif;
+  touch-action: manipulation;
 }
 
 #app {

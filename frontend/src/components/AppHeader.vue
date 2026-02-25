@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { useAuthStore } from '@/stores/auth'
+import { resolveProfileImage } from '@/utils/profileImage'
 import { computed } from 'vue'
 
 const authStore = useAuthStore()
 const isConnected = computed(() => authStore.isConnected)
+const avatarSrc = computed(() => resolveProfileImage(authStore.user?.profile_image))
 
 defineProps({
   title: {
@@ -46,8 +48,8 @@ defineEmits(['resumeLater'])
       </button>
 
       <RouterLink to="/profile" v-if="isConnected" class="avatar-link">
-        <div v-if="authStore.user?.profile_image" class="user-avatar user-avatar-image">
-          <img :src="authStore.user.profile_image" :alt="'Image de profil'" />
+        <div v-if="avatarSrc" class="user-avatar user-avatar-image">
+          <img :src="avatarSrc" :alt="'Image de profil'" />
         </div>
         <div v-else class="user-avatar">
           {{ authStore.user?.username.charAt(0).toUpperCase() }}

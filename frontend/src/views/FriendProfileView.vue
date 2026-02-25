@@ -2,6 +2,7 @@
 import Header from '@/components/AppHeader.vue'
 import ProgressBar from '@/components/ProgressBar.vue'
 import { useFriendsStore, type FriendProfile } from '@/stores/friends'
+import { resolveProfileImage } from '@/utils/profileImage'
 import { useRoute, useRouter } from 'vue-router'
 import { onMounted, ref, computed } from 'vue'
 
@@ -98,8 +99,8 @@ const missionItems = computed(() => [
       <div v-else-if="error" class="error">{{ error }}</div>
 
       <div v-else-if="profile" class="profile-container">
-        <div v-if="profile.profile_image" class="avatar-large avatar-image">
-          <img :src="profile.profile_image" :alt="'Image de profil'" />
+        <div v-if="resolveProfileImage(profile.profile_image)" class="avatar-large avatar-image">
+          <img :src="resolveProfileImage(profile.profile_image)" :alt="'Image de profil'" />
         </div>
         <div v-else class="avatar-large">{{ profile.username.charAt(0).toUpperCase() }}</div>
 

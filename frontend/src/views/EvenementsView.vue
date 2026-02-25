@@ -2,6 +2,7 @@
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useFriendsStore } from '@/stores/friends'
+import { resolveProfileImage } from '@/utils/profileImage'
 import Header from '@/components/AppHeader.vue'
 
 const store = useFriendsStore()
@@ -38,7 +39,7 @@ onMounted(async () => {
           <span class="activity-date" v-if="act.timestamp">{{ formatDate(act.timestamp) }}</span>
           <div class="activity-content-row">
             <div class="avatar">
-              <img v-if="act.profile_image" :src="act.profile_image" alt="Profil" class="avatar-image" />
+              <img v-if="resolveProfileImage(act.profile_image)" :src="resolveProfileImage(act.profile_image)" alt="Profil" class="avatar-image" />
               <span v-else>{{ act.friend_username.charAt(0).toUpperCase() }}</span>
             </div>
             <div class="activity-info">

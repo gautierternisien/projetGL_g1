@@ -2,6 +2,7 @@
 import Header from '@/components/AppHeader.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
+import { resolveProfileImage } from '@/utils/profileImage'
 import { useRouter } from 'vue-router'
 import { ref, onMounted, onUnmounted } from 'vue'
 
@@ -32,22 +33,23 @@ onMounted(async () => {
     router.push('/login')
     return
   }
-  
+
   // Recharger les données utilisateur pour être sûr d'avoir les dernières valeurs
   await authStore.fetchUser()
-  
+
   if (authStore.user) {
     email.value = authStore.user.email
     username.value = authStore.user.username
     firstName.value = authStore.user.first_name || ''
     lastName.value = authStore.user.last_name || ''
     if (authStore.user.profile_image) {
-      selectedProfileImage.value = authStore.user.profile_image
-      initialProfileImage.value = authStore.user.profile_image
-      tempSelectedImage.value = authStore.user.profile_image
+      const resolved = resolveProfileImage(authStore.user.profile_image)
+      selectedProfileImage.value = resolved
+      initialProfileImage.value = resolved
+      tempSelectedImage.value = resolved
     }
   }
-  
+
   // Charger toutes les images du dossier image_profil
   try {
     const imageNames = [
@@ -78,7 +80,7 @@ function goBack() {
 function openProfileImageModal() {
   // Sauvegarder l'image actuelle pour pouvoir la restaurer en cas d'annulation
   tempSelectedImage.value = selectedProfileImage.value
-  
+
   // Si une image est déjà sélectionnée, positionner le carousel sur cette image
   if (selectedProfileImage.value && allProfileImages.value.length > 0) {
     const index = allProfileImages.value.findIndex(img => img === selectedProfileImage.value)
@@ -86,7 +88,7 @@ function openProfileImageModal() {
       currentImageIndex.value = index
     }
   }
-  
+
   showProfileImageModal.value = true
   uiStore.setNavigationBlur(true)
 }
@@ -205,25 +207,25 @@ async function saveChanges() {
     }
 
     await Promise.all(promises)
-    
+
     successMessage.value = 'Profil mis à jour avec succès !'
-    
+
     // Mettre à jour l'image initiale et temporaire si elle a changé
     if (hasImageChanged) {
       initialProfileImage.value = selectedProfileImage.value
       tempSelectedImage.value = selectedProfileImage.value
     }
-    
+
     // Réinitialiser les champs de mot de passe
     currentPassword.value = ''
     newPassword.value = ''
     confirmPassword.value = ''
-    
+
     // Rediriger après 1.5 secondes
     setTimeout(() => {
       router.push('/profile')
     }, 600)
-    
+
   } catch (e: unknown) {
     if (e instanceof Error) {
       errorMessage.value = e.message
@@ -242,14 +244,14 @@ async function saveChanges() {
       resumeBtnLabel="Retour"
       @resumeLater="goBack"
     />
-    
+
     <div class="scrollable-area">
       <div class="edit-profile-content">
         <!-- Icône de profil -->
         <div class="profile-icon-container">
-          <div 
-            v-if="selectedProfileImage" 
-            class="profile-icon" 
+          <div
+            v-if="selectedProfileImage"
+            class="profile-icon"
             @click="openProfileImageModal"
             style="cursor: pointer"
           >
@@ -266,7 +268,7 @@ async function saveChanges() {
         <form @submit.prevent="saveChanges" class="edit-form">
           <div class="form-section">
             <h3>Informations du compte</h3>
-            
+
             <div class="form-group">
               <label for="email">Adresse email</label>
               <input
@@ -293,7 +295,7 @@ async function saveChanges() {
 
           <div class="form-section">
             <h3>Informations personnelles</h3>
-            
+
             <div class="form-group">
               <label for="firstName">Prénom (optionnel)</label>
               <input
@@ -318,7 +320,7 @@ async function saveChanges() {
           <div class="form-section">
             <h3>Changer le mot de passe</h3>
             <p class="section-hint">Laissez vide pour ne pas modifier</p>
-            
+
             <div class="form-group">
               <label for="currentPassword">Mot de passe actuel</label>
               <input

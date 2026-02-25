@@ -11,6 +11,7 @@ import { useFriendsStore } from '@/stores/friends'
 import { API_URL } from '@/config'
 import { loadAnswers, fetchRemoteAnswers } from '@/lib/ngc/answersStorage'
 import { computeCategoryProgressFromAnswers } from '@/utils/ngcProgress'
+import { resolveProfileImage } from '@/utils/profileImage'
 
 const store = useProgressStore()
 const authStore = useAuthStore()
@@ -783,8 +784,8 @@ watch(isConnected, () => {
                 <div class="card-content">
                   <div class="card-avatar">
                     <img
-                      v-if="event.profile_image"
-                      :src="event.profile_image"
+                      v-if="resolveProfileImage(event.profile_image)"
+                      :src="resolveProfileImage(event.profile_image)"
                       alt="Profil"
                       class="avatar-image"
                     />
