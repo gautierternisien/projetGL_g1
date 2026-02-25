@@ -4,7 +4,7 @@ from jose import JWTError, jwt
 
 SECRET_KEY = "Y5MssM1JhO9y3Pwx5MvbJi3azNJg3tJoxTuvkWjaHAE" # In production, use env variable
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 240
 
 # --- TIME MANAGEMENT FOR TESTING ---
 # Pour simuler une date/heure spécifique lors des tests, définir cette variable
@@ -33,7 +33,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     if expires_delta:
         expire = get_current_time() + expires_delta
     else:
-        expire = get_current_time() + timedelta(minutes=15)
+        expire = get_current_time() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
