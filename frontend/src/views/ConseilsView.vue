@@ -39,6 +39,18 @@ const conseilActuel = computed(() => {
           </div>
         </Card>
 
+        <!-- Impact des services sociétaux -->
+        <Card title="Impact des services sociétaux">
+          <div class="dashboard-card-content">
+            <p class="dashboard-text">
+              Les services sociétaux correspondent à 1,4 tonnes de CO2eq, ce qui correspond à une
+              grande part des objectifs de 2050 fixés à 2 tonnes ! Pour agir sur ce chiffre,
+              participez à la vie politique de votre pays, votez, placez mieux votre argent,
+              faites pression localement !
+            </p>
+          </div>
+        </Card>
+
         <!-- Aide du gouvernement -->
         <Card title="Conseils du gouvernement">
           <div class="dashboard-card-content gov-links-container">
