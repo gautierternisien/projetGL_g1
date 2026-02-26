@@ -152,7 +152,7 @@ export function derivePreferencesFromAnswers(rawAnswers: Record<string, any>): D
 export const PREFERENCE_LABELS: Record<keyof DerivedPreferences, string> = {
   possession_voiture: "J'utilise une voiture",
   possession_velo: "J'ai un vélo",
-  prend_avion: "Je prends l'avion",
+  prend_avion: "J'utilise et peux me passer de l'avion",
   est_proprietaire: 'Je suis propriétaire',
   vit_en_maison: 'Je vis en maison',
   vit_en_appartement: 'Je vis en appartement',
